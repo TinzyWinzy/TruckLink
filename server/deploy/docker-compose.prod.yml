@@ -1,0 +1,34 @@
+# Staging overlay: loop back data-plane ports, add Caddy at the edge.
+# Usage (on VM1): docker compose -f ../docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build
+# Only 80/443 are public. Postgres/RabbitMQ/management listen on 127.0.0.1.
+services:
+  rabbitmq:
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  api:
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      API_DOMAIN: ${API_DOMAIN:-api.example.com}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:

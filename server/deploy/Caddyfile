@@ -1,0 +1,15 @@
+# VM2 edge (or VM1 if single-box staging): TLS + reverse proxy, nothing else public.
+# DNS: api.<your-domain> A-record -> this host. Caddy fetches LetsEncrypt automatically.
+{$API_DOMAIN} {
+  reverse_proxy api:3000
+
+  header {
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "no-referrer"
+    -Server
+  }
+
+  # Tablets on cheap links: don't buffer SSE/long polls here (none today, keep).
+  # Rate-limit the sync endpoint when abuse appears (see SECURITY.md §residual 3).
+}

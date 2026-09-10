@@ -118,3 +118,13 @@ CREATE INDEX IF NOT EXISTS idx_outbox_pending ON outbox_events(dispatched_at, cr
 ALTER TABLE queue_entries ADD COLUMN IF NOT EXISTS billed BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE queue_entries ADD COLUMN IF NOT EXISTS erp_reference TEXT;
 CREATE INDEX IF NOT EXISTS idx_queue_billed ON queue_entries(facility_id, billed);
+
+-- $0 notifications: FCM device tokens per user. One row per (user, token).
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    user_id TEXT NOT NULL,
+    facility_id TEXT NOT NULL REFERENCES facilities(id),
+    fcm_token TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (user_id, fcm_token)
+);
+CREATE INDEX IF NOT EXISTS idx_push_facility ON push_subscriptions(facility_id);

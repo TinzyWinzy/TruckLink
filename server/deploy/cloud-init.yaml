@@ -1,0 +1,56 @@
+#cloud-config
+# VM1 bak-staging / VM2 bak-ops bootstrap (Ubuntu 24.04 aarch64).
+# Paste into OCI Console -> Create Instance -> Advanced options -> User data.
+# Then: restrict port 22 to your IP in the subnet security list (console).
+
+users:
+  - name: opshield
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [docker]
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - REPLACE_WITH_YOUR_SSH_PUBLIC_KEY
+
+packages:
+  - ufw
+  - fail2ban
+  - unattended-upgrades
+  - ca-certificates
+  - curl
+  - gnupg
+
+write_files:
+  - path: /etc/ufw/applications.d/opshield
+    content: |
+      [OpShield]
+      title=BAK OpShield staging
+      ports=22,80,443/tcp
+  - path: /etc/sysctl.d/99-opshield.conf
+    content: |
+      vm.swappiness=10
+
+runcmd:
+  # 2 GB swap — small VMs OOM on `npm ci` / image builds without it.
+  - fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  # Docker official repo (arm64).
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
+  - apt-get update -qq
+  - apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - systemctl enable --now docker
+  - usermod -aG docker ubuntu || true
+  - usermod -aG docker opshield || true
+  # Firewall: deny-first, SSH/HTTP/HTTPS only. Tighten 22 to your IP in OCI.
+  - ufw --force reset
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw --force enable
+  # Auto security patches; Docker images are rebuilt by deploy, not patched.
+  - systemctl enable --now unattended-upgrades
+
+final_message: "OpShield base ready. Log in as opshield, clone the repo, continue in server/deploy/README.md"
