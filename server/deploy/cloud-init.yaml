@@ -9,7 +9,7 @@ users:
     groups: [docker]
     shell: /bin/bash
     ssh_authorized_keys:
-      - REPLACE_WITH_YOUR_SSH_PUBLIC_KEY
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC6pFeD5NM/gQYfQOPBh1WtKGE5GSs0/cGsjL38FA2/7/Km6GOokyAUvzgAFoISvoSTIGQt+4qjIfAaHRQpmzLNW7XQKY44URZf8Ez1AcFhZEZQLz36QBJPhmu6xGpDLkFIinZP3kfgHgiGTCPd0ZXMq1/H3p87IAQzNY4GhpC5eRMFt3sbHKemiclq3uSPlggfdD5pc983JEl3Q5nWCkUoFgwhEp0Wi/cJxwPkHlBRNTAV3w0f3nrm+awG9UZYqBatx/yVmeiSfk7V1Hyh5HJhDih+dLMeqo8yA6wz6AkZ5I2x9Kwzys2qsCNO3MxEYh47Vs5b3rDt7b7u3CSWYyAl ssh-key-2026-09-10
 
 packages:
   - ufw
