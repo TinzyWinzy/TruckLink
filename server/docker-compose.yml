@@ -1,5 +1,6 @@
-# BAK OpShield local infra (Phase 4). API + tablets run without this;
-# bring it up only when testing workers / escalation timers.
+# BAK OpShield infra. Local dev: `docker compose up postgres rabbitmq`.
+# Staging VPS: copy `.env.example` -> `.env`, fill secrets, then
+# `docker compose up -d --build` (api + worker + relay join the same net).
 services:
   rabbitmq:
     image: rabbitmq:3-management
@@ -14,6 +15,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   postgres:
     image: postgres:16
@@ -25,6 +27,52 @@ services:
       POSTGRES_DB: bak_logistics
     volumes:
       - bak-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/bak_logistics
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      - postgres
+      - rabbitmq
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["node", "dist/workers/run.js"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/bak_logistics
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      - postgres
+      - rabbitmq
+    restart: unless-stopped
+
+  relay:
+    build: .
+    command: ["node", "dist/firestore-relay/relay.js"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/bak_logistics
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+    volumes:
+      - ../.secrets:/secrets:ro
+    depends_on:
+      - postgres
+      - rabbitmq
+    restart: unless-stopped
 
 volumes:
   bak-pgdata:

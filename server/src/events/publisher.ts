@@ -1,7 +1,7 @@
 // Publisher abstraction (Phase 4). amqplib is only imported when a broker is
 // actually configured, so `npm run dev` / tests work with zero infra.
 
-import { ALLOWED_PUBLISH_KEYS } from './topology.js'
+import { ALLOWED_PUBLISH_KEYS, assertTopology } from './topology.js'
 
 export interface Publisher {
   readonly connected: boolean
@@ -19,6 +19,14 @@ class NoOpPublisher implements Publisher {
 
 interface AmqpChannel {
   publish(exchange: string, routingKey: string, content: Buffer, opts?: Record<string, unknown>): boolean
+  close(): Promise<void>
+  on(event: string, cb: (err: Error) => void): void
+}
+
+interface AmqpConnection {
+  createChannel(): Promise<AmqpChannel>
+  close(): Promise<void>
+  on(event: string, cb: (err: Error) => void): void
 }
 
 class AmqpPublisher implements Publisher {
@@ -54,8 +62,15 @@ export async function getPublisher(): Promise<Publisher> {
   }
   // Lazy import keeps amqplib optional for broker-less dev/test.
   const amqp = await import('amqplib')
-  const conn = await amqp.connect(url)
+  const conn = (await amqp.connect(url)) as unknown as AmqpConnection
+  // Never let broker hiccups crash the API process (amqplib 'error' events
+  // are fatal when unhandled — this bit us in staging rehearsal).
+  conn.on('error', (err) => console.warn('[amqp] connection error:', err.message))
   const ch = await conn.createChannel()
+  ch.on('error', (err) => console.warn('[amqp] channel error:', err.message))
+  // Producer-side declaration is idempotent: publishes never 404 even when
+  // no worker has booted yet.
+  await assertTopology(ch as never)
   cached = new AmqpPublisher(ch as unknown as AmqpChannel, async () => {
     await ch.close()
     await conn.close()

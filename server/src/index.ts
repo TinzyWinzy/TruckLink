@@ -93,7 +93,9 @@ app.post('/api/sync/upload', requireApiKey, async (req: Request, res: Response) 
     for (const raw of batch) {
       const checked = validateBatchItem(raw)
       if (!checked.ok) {
-        throw new Error(checked.error)
+        await client.query('ROLLBACK')
+        res.status(400).json({ error: checked.error })
+        return
       }
       const { op: opType, table, data, id } = checked.item
       const d = (data ?? {}) as Record<string, unknown>
