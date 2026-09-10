@@ -3,7 +3,7 @@
 // Skips any alert already acknowledged — ack is the single source of truth.
 
 import { pool } from '../db.js'
-import { getSmsGateway } from '../events/sms.js'
+import { notifyEscalation, type EscalationTarget } from '../events/notify.js'
 
 export interface EscalationMessage {
   checkId?: string
@@ -22,12 +22,6 @@ export function escalationTarget(msg: EscalationMessage, routingKey: string): st
   return null // immediate quarantine notice: timers scheduled, nothing to send yet
 }
 
-function phoneFor(target: string): string | undefined {
-  if (target === 'FACILITY_MANAGER') return process.env.MANAGER_PHONE
-  if (target === 'BDM') return process.env.BDM_PHONE
-  return process.env.SUPERVISOR_PHONE
-}
-
 async function isQuarantineAcknowledged(queueId: string | undefined): Promise<boolean> {
   if (!queueId) return false
   const res = await pool.query(
@@ -39,25 +33,29 @@ async function isQuarantineAcknowledged(queueId: string | undefined): Promise<bo
   return row ? row.acknowledged === true || row.acknowledged === 1 : false
 }
 
-/** Returns 'sent' | 'skipped-acked' | 'scheduled'. Throws on SMS failure (nack/retry). */
+/** Returns 'sent' | 'skipped-acked' | 'scheduled'. Throws on sender failure (nack/retry). */
 export async function handleEscalationMessage(
   msg: EscalationMessage,
   routingKey: string,
 ): Promise<'sent' | 'skipped-acked' | 'scheduled'> {
-  const target = escalationTarget(msg, routingKey)
+  const target = escalationTarget(msg, routingKey) as EscalationTarget | null
   if (!target) return 'scheduled'
 
   if (await isQuarantineAcknowledged(msg.queueId)) return 'skipped-acked'
 
-  const to = phoneFor(target)
   const text =
     `BAK OpShield [${msg.dueAfter ?? ''} unacked]: ` +
     `${msg.regNumber ?? msg.queueId ?? 'vehicle'} quarantined ` +
     `(+${msg.overloadKg ?? '?'}kg, ~$${msg.overloadFeeUsd ?? '?'}). Ack in app or call the yard.`
-  if (!to) {
-    console.log(`[escalation:${target}] no phone configured — ${text}`)
-    return 'sent'
-  }
-  await getSmsGateway().send(to, text)
+  await notifyEscalation(
+    target,
+    text,
+    {
+      regNumber: msg.regNumber ?? msg.queueId ?? 'vehicle',
+      overloadKg: msg.overloadKg ?? '?',
+      overloadFeeUsd: msg.overloadFeeUsd ?? '?',
+      dueAfter: msg.dueAfter ?? '',
+    },
+  )
   return 'sent'
 }
