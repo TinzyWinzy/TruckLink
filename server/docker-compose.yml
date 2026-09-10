@@ -1,0 +1,30 @@
+# BAK OpShield local infra (Phase 4). API + tablets run without this;
+# bring it up only when testing workers / escalation timers.
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bak_logistics
+    volumes:
+      - bak-pgdata:/var/lib/postgresql/data
+
+volumes:
+  bak-pgdata:

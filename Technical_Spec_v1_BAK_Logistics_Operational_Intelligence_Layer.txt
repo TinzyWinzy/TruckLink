@@ -1,0 +1,833 @@
+RADBIT STUDIOS
+TECHNICAL SPECIFICATION v1.0
+Operational Intelligence Layer for BAK Logistics
+
+Document Control
+Version: 1.0
+Date: September 2026
+Author: Tinotenda Brandon Duma, Founder & Lead Developer, RadBit Studios
+Status: Draft - Engineering Review
+Classification: Confidential
+
+
+1. Document Purpose
+
+This Technical Specification defines the architecture, technology stack, data models, API contracts, security posture, and deployment strategy for the BAK Logistics Operational Intelligence Layer. It is intended for the engineering team, DevOps, and technical stakeholders at BAK Logistics.
+
+
+2. Architecture Philosophy
+
+The system is designed as a lean, non-disruptive intelligence overlay. It operates entirely independently of BAK's existing WMS/ERP during the pilot, with a forward-compatible architecture for Phase 2 integration.
+
+Core Principles:
+- Offline-first: Yard operations cannot pause for connectivity issues
+- Event-driven: All state changes emit events for real-time dashboards and audit trails
+- Immutable audit: Compliance logs are append-only with cryptographic integrity
+- Multi-tenant: Database design supports future rollout across multiple BAK facilities
+- API-ready: RESTful and GraphQL interfaces pre-built for Phase 2 WMS/ERP sync
+
+
+3. Technology Stack
+
+3.1 Backend
+- Platform: Firebase (Google Cloud)
+- Database: Firestore (NoSQL document store) for operational data
+- Authentication: Firebase Authentication (email/password, custom token for PIN auth)
+- Functions: Firebase Cloud Functions (Node.js 20 LTS) for business logic and event processing
+- Storage: Firebase Cloud Storage for photos, documents, and audit exports
+- Hosting: Firebase Hosting for web application delivery
+- Pub/Sub: Firebase Cloud Functions triggered by Firestore document changes
+
+3.2 Frontend
+- Framework: React 18 with TypeScript
+- State Management: Zustand for client state, React Query for server state
+- UI Library: Tailwind CSS + Headless UI components
+- PWA: Progressive Web App with service worker for offline caching
+- Build Tool: Vite
+- Testing: Vitest + React Testing Library
+
+3.3 Mobile/Tablet
+- Same PWA codebase as desktop, responsive design for 10-inch tablets
+- Touch-optimized interactions (minimum 48x48dp touch targets)
+- Local storage via IndexedDB for offline queue
+- Background sync API for automatic sync when connectivity returns
+
+3.4 DevOps & Tooling
+- Version Control: GitHub
+- CI/CD: GitHub Actions
+- Monitoring: Firebase Performance Monitoring + Sentry for error tracking
+- Analytics: Firebase Analytics for user behavior
+- Documentation: Swagger/OpenAPI 3.0 for API docs
+
+
+4. System Architecture
+
+4.1 High-Level Architecture
+
+                    +------------------+
+                    |   User Devices   |
+                    | (Tablets/Desktop)|
+                    +--------+---------+
+                             |
+                    +--------v---------+
+                    |  Firebase Hosting|
+                    |   (React PWA)    |
+                    +--------+---------+
+                             |
+              +--------------+--------------+
+              |                             |
+    +---------v----------+      +----------v---------+
+    | Firebase Auth      |      | Firestore (DB)     |
+    | (JWT Tokens)       |      | (Real-time sync)   |
+    +--------------------+      +----------+---------+
+                                           |
+                              +------------+------------+
+                              |                         |
+                    +---------v---------+    +----------v----------+
+                    | Cloud Functions   |    | Cloud Storage       |
+                    | (Business Logic)  |    | (Files/Photos)      |
+                    +---------+---------+    +---------------------+
+                              |
+                    +---------v---------+
+                    | External Services |
+                    | (SMS/Email/Phase2)|
+                    +-------------------+
+
+4.2 Component Breakdown
+
+4.2.1 Client Layer (React PWA)
+- Runs in browser on tablets and desktops
+- Service worker caches static assets and API responses
+- IndexedDB stores offline actions queue
+- Real-time listeners connect to Firestore for live dashboard updates
+- Background sync registers pending actions for automatic retry
+
+4.2.2 API Gateway Layer (Firebase Hosting + Cloud Functions)
+- Hosting serves the React application and API endpoints
+- Cloud Functions expose RESTful and GraphQL endpoints
+- Rate limiting: 1000 requests/minute per facility (enforced at function level)
+- CORS configured for BAK domain and RadBit domain only
+
+4.2.3 Data Layer (Firestore)
+- Document-oriented NoSQL database
+- Real-time listeners push updates to connected clients
+- Multi-tenant: top-level collection per facility
+- Sub-collections: vehicles, queue, docks, equipment, complianceChecks, auditLogs
+
+4.2.4 Event Processing Layer (Cloud Functions)
+- Firestore triggers execute on document create/update/delete
+- Functions handle: audit log generation, alert dispatch, analytics aggregation, compliance validation
+- Idempotent design: functions safely handle duplicate triggers
+
+4.2.5 Storage Layer (Cloud Storage)
+- Photos from compliance checks stored with facility-scoped paths
+- Audit exports generated as signed JSON files
+- Retention policy: 7 years for compliance documents
+
+4.2.6 Integration Layer (Phase 2)
+- RESTful API for WMS/ERP sync
+- Webhook endpoints for external system notifications
+- GraphQL endpoint for flexible data queries
+
+
+5. Data Model
+
+5.1 Firestore Collections Structure
+
+facilities/{facilityId}
+  - name: string
+  - location: geopoint
+  - timezone: string
+  - operatingHours: { open: timestamp, close: timestamp }
+  - dockCount: number
+  - equipmentFleetSize: number
+  - createdAt: timestamp
+  - updatedAt: timestamp
+
+facilities/{facilityId}/vehicles/{vehicleId}
+  - licensePlate: string (indexed)
+  - type: string (enum: FLATBED, TANKER, REFRIGERATED, CONTAINER, DRY_VAN)
+  - gvmRating: number (kg)
+  - axleConfiguration: string (e.g., "2-4-2")
+  - ownerOperator: string
+  - status: string (enum: ACTIVE, INACTIVE, MAINTENANCE)
+  - createdAt: timestamp
+
+facilities/{facilityId}/drivers/{driverId}
+  - name: string
+  - licenseNumber: string (indexed)
+  - licenseExpiry: timestamp
+  - contactNumber: string
+  - photoUrl: string (Cloud Storage path)
+  - status: string (enum: ACTIVE, SUSPENDED, EXPIRED)
+  - createdAt: timestamp
+
+facilities/{facilityId}/docks/{dockId}
+  - name: string
+  - capacity: number (kg)
+  - status: string (enum: AVAILABLE, OCCUPIED, MAINTENANCE, RESERVED)
+  - currentAssignment: reference (queueEntryId or null)
+  - createdAt: timestamp
+
+facilities/{facilityId}/equipment/{equipmentId}
+  - type: string (enum: FORKLIFT, PALLET_JACK, TRAILER, CRANE)
+  - status: string (enum: AVAILABLE, IN_USE, MAINTENANCE, OFF_DUTY)
+  - currentAssignment: reference (queueEntryId or null)
+  - maintenanceSchedule: timestamp
+  - createdAt: timestamp
+
+facilities/{facilityId}/queue/{queueEntryId}
+  - vehicleId: reference
+  - driverId: reference
+  - entryTimestamp: timestamp (indexed)
+  - exitTimestamp: timestamp (nullable)
+  - status: string (enum: QUEUED, ASSIGNED, LOADING, COMPLETED, QUARANTINED, RELEASED)
+  - assignedDockId: reference (nullable)
+  - assignedSupervisorId: reference
+  - cargoType: string
+  - expectedDestination: string
+  - cargoWeight: number (kg)
+  - waitTimeMinutes: number (computed)
+  - turnaroundTimeMinutes: number (computed, nullable)
+  - createdAt: timestamp
+  - updatedAt: timestamp
+
+facilities/{facilityId}/complianceChecks/{checkId}
+  - queueEntryId: reference
+  - checklistItems: array<{
+      itemId: string,
+      label: string,
+      completed: boolean,
+      completedAt: timestamp,
+      completedBy: reference,
+      photoUrl: string (nullable),
+      notes: string (nullable)
+    }>
+  - axleLoadCalculations: array<{
+      axlePosition: number,
+      measuredWeight: number,
+      limit: number,
+      status: string (enum: PASS, FAIL)
+    }>
+  - totalWeight: number
+  - gvmStatus: string (enum: PASS, FAIL)
+  - overallStatus: string (enum: PASS, FAIL, OVERRIDE_APPROVED)
+  - supervisorId: reference
+  - completedAt: timestamp
+  - overrideRecord: {
+      requestedBy: reference,
+      requestTimestamp: timestamp,
+      reason: string,
+      approvedBy: reference,
+      approvalTimestamp: timestamp
+    } (nullable)
+  - createdAt: timestamp
+
+facilities/{facilityId}/auditLogs/{logId}
+  - timestamp: timestamp (indexed)
+  - userId: reference
+  - userRole: string
+  - action: string (enum: LOGIN, LOGOUT, CREATE, UPDATE, DELETE, GATE_RELEASE, OVERRIDE_REQUEST, OVERRIDE_APPROVE, EXPORT)
+  - entityType: string
+  - entityId: string
+  - beforeState: map (nullable)
+  - afterState: map (nullable)
+  - deviceId: string
+  - sessionId: string
+  - ipAddress: string (hashed)
+  - previousHash: string (SHA-256)
+  - currentHash: string (SHA-256)
+  - createdAt: timestamp
+
+facilities/{facilityId}/alerts/{alertId}
+  - type: string (enum: EXCESSIVE_WAIT, COMPLIANCE_FAILURE, EQUIPMENT_SHORTAGE, DOCK_OVERLOAD, SYNC_FAILURE)
+  - severity: string (enum: LOW, MEDIUM, HIGH, CRITICAL)
+  - triggeredAt: timestamp
+  - acknowledgedAt: timestamp (nullable)
+  - acknowledgedBy: reference (nullable)
+  - escalationLevel: number (default: 0)
+  - relatedEntityType: string
+  - relatedEntityId: string
+  - message: string
+  - status: string (enum: ACTIVE, ACKNOWLEDGED, RESOLVED, ESCALATED)
+  - createdAt: timestamp
+
+facilities/{facilityId}/users/{userId}
+  - email: string (indexed, nullable for PIN-only users)
+  - pinHash: string (nullable)
+  - role: string (enum: DISPATCH_SUPERVISOR, FACILITY_MANAGER, OPERATIONS_SUPERVISOR, EXECUTIVE, ADMIN, COMPLIANCE_OFFICER)
+  - name: string
+  - contactNumber: string
+  - facilityAssignments: array<reference>
+  - active: boolean
+  - lastLoginAt: timestamp
+  - mfaEnabled: boolean
+  - createdAt: timestamp
+  - updatedAt: timestamp
+
+5.2 Indexes
+
+Required Firestore Composite Indexes:
+- queue: facilityId + status + entryTimestamp (for live queue filtering)
+- queue: facilityId + assignedSupervisorId + status (for supervisor workload view)
+- complianceChecks: facilityId + overallStatus + completedAt (for compliance reporting)
+- auditLogs: facilityId + timestamp (for audit trail queries)
+- alerts: facilityId + status + severity + triggeredAt (for active alert dashboard)
+
+5.3 Data Integrity Rules
+
+- Queue entries cannot transition from RELEASED or QUARANTINED back to QUEUED
+- Dock status must be AVAILABLE before assignment
+- Compliance check cannot be created for a queue entry not in LOADING or COMPLETED status
+- Override approval requires a different user than the override requester
+- Audit logs are append-only: no update or delete operations permitted
+
+
+6. API Specification
+
+6.1 RESTful Endpoints (Phase 1 - Internal Use)
+
+All endpoints require Authorization: Bearer {jwt_token} header.
+Base URL: https://api.radbit-bak.firebaseapp.com/v1
+
+Authentication
+POST /auth/login
+  Body: { email: string, password: string } OR { pin: string, deviceId: string }
+  Response: { token: string, refreshToken: string, user: UserObject, expiresIn: number }
+
+POST /auth/refresh
+  Body: { refreshToken: string }
+  Response: { token: string, expiresIn: number }
+
+POST /auth/logout
+  Headers: Authorization: Bearer {token}
+  Response: { success: boolean }
+
+Queue Management
+GET /facilities/{facilityId}/queue
+  Query: status, limit, offset
+  Response: { entries: QueueEntry[], total: number, averageWaitTime: number }
+
+POST /facilities/{facilityId}/queue
+  Body: { vehicleId, driverId, cargoType, expectedDestination, cargoWeight }
+  Response: { queueEntryId: string, entryTimestamp: timestamp }
+
+PATCH /facilities/{facilityId}/queue/{queueEntryId}
+  Body: { status, assignedDockId, assignedSupervisorId } (partial update)
+  Response: { updatedQueueEntry: QueueEntry }
+
+DELETE /facilities/{facilityId}/queue/{queueEntryId}
+  Note: Soft delete only, actual deletion blocked by security rules
+  Response: { success: boolean }
+
+Dock Management
+GET /facilities/{facilityId}/docks
+  Query: status
+  Response: { docks: Dock[], utilizationPercentage: number }
+
+PATCH /facilities/{facilityId}/docks/{dockId}
+  Body: { status, currentAssignment }
+  Response: { updatedDock: Dock }
+
+Equipment Management
+GET /facilities/{facilityId}/equipment
+  Query: status, type
+  Response: { equipment: Equipment[], availabilityPercentage: number }
+
+PATCH /facilities/{facilityId}/equipment/{equipmentId}
+  Body: { status, currentAssignment }
+  Response: { updatedEquipment: Equipment }
+
+Compliance
+POST /facilities/{facilityId}/compliance-checks
+  Body: { queueEntryId, checklistItems, axleLoadCalculations, totalWeight }
+  Response: { checkId: string, overallStatus: string, violations: string[] }
+
+POST /facilities/{facilityId}/compliance-checks/{checkId}/override
+  Body: { reason: string }
+  Response: { overrideRequestId: string, status: string }
+
+POST /facilities/{facilityId}/compliance-checks/{checkId}/override/approve
+  Body: { approved: boolean, notes: string }
+  Response: { updatedCheck: ComplianceCheck }
+
+Audit & Reporting
+GET /facilities/{facilityId}/audit-logs
+  Query: startDate, endDate, userId, action, entityType, limit, offset
+  Response: { logs: AuditLog[], total: number, nextOffset: number }
+
+POST /facilities/{facilityId}/audit-logs/export
+  Body: { startDate, endDate, format: "json" | "csv" }
+  Response: { downloadUrl: string, expiresAt: timestamp }
+
+GET /facilities/{facilityId}/reports/performance
+  Query: startDate, endDate, granularity: "daily" | "weekly" | "monthly"
+  Response: { report: PerformanceReport }
+
+Alerts
+GET /facilities/{facilityId}/alerts
+  Query: status, severity, limit
+  Response: { alerts: Alert[], unacknowledgedCount: number }
+
+PATCH /facilities/{facilityId}/alerts/{alertId}
+  Body: { status, acknowledgedBy }
+  Response: { updatedAlert: Alert }
+
+6.2 GraphQL Endpoint (Phase 2 - WMS/ERP Integration)
+
+Endpoint: POST /graphql
+Schema includes: Facility, Vehicle, Driver, QueueEntry, ComplianceCheck, AuditLog types with full CRUD and subscription support for real-time sync.
+
+6.3 Webhook Events (Phase 2)
+
+Events emitted to configured webhook URLs:
+- queue.entry.created
+- queue.entry.status_changed
+- compliance.check.completed
+- compliance.check.failed
+- compliance.override.approved
+- alert.triggered
+- alert.escalated
+
+Payload: JSON with event type, timestamp, facility ID, and full entity snapshot.
+
+
+7. Security Architecture
+
+7.1 Authentication Flow
+
+1. User enters credentials (email/password or PIN) on tablet/desktop
+2. Client sends credentials to Firebase Auth
+3. Firebase Auth verifies and returns JWT ID token (24-hour expiry) and refresh token
+4. Client stores token in secure HTTP-only cookie or secure local storage
+5. All API requests include Authorization: Bearer {token} header
+6. Firebase Security Rules validate token and enforce RBAC on every database read/write
+
+7.2 Authorization (Firebase Security Rules)
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can only read their own profile
+    match /facilities/{facilityId}/users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && getUserRole(request.auth.uid) == 'ADMIN';
+    }
+
+    // Queue: supervisors can create/update, managers can read all
+    match /facilities/{facilityId}/queue/{queueEntryId} {
+      allow create: if request.auth != null && hasRole(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR']);
+      allow update: if request.auth != null && hasRole(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER']);
+      allow read: if request.auth != null && isAssignedToFacility(facilityId);
+      allow delete: if false; // No deletes permitted
+    }
+
+    // Compliance checks: supervisors create, operations supervisors can override
+    match /facilities/{facilityId}/complianceChecks/{checkId} {
+      allow create: if request.auth != null && hasRole(['DISPATCH_SUPERVISOR']);
+      allow update: if request.auth != null && hasRole(['OPERATIONS_SUPERVISOR', 'ADMIN']);
+      allow read: if request.auth != null && isAssignedToFacility(facilityId);
+      allow delete: if false;
+    }
+
+    // Audit logs: append-only, no deletes, no updates
+    match /facilities/{facilityId}/auditLogs/{logId} {
+      allow create: if request.auth != null && isSystemOrAuthenticated();
+      allow read: if request.auth != null && hasRole(['COMPLIANCE_OFFICER', 'ADMIN', 'EXECUTIVE']);
+      allow update, delete: if false;
+    }
+
+    // Alerts: all authenticated facility users can read and acknowledge
+    match /facilities/{facilityId}/alerts/{alertId} {
+      allow read: if request.auth != null && isAssignedToFacility(facilityId);
+      allow update: if request.auth != null && isAssignedToFacility(facilityId);
+      allow create, delete: if false;
+    }
+  }
+}
+
+7.3 Data Encryption
+
+- Data in transit: TLS 1.3 (enforced by Firebase Hosting and Cloud Functions)
+- Data at rest: AES-256 (enforced by Google Cloud Firestore and Cloud Storage)
+- Passwords: bcrypt hashing with cost factor 12
+- API tokens: JWT signed with RS256, 24-hour expiry
+- Audit log chain: Each entry hashes previous entry's hash + current payload using SHA-256
+
+7.4 Audit Log Integrity
+
+Implementation of cryptographic chain:
+1. First log entry: hash = SHA-256(entry_payload + facility_salt)
+2. Subsequent entries: hash = SHA-256(previous_hash + entry_payload + facility_salt)
+3. Export includes all hashes and facility salt for third-party verification
+4. Tampering detection: recompute hash chain and compare with stored hashes
+
+7.5 Input Validation
+
+- All API inputs validated using Zod schemas on Cloud Functions
+- SQL injection prevention: NoSQL database (Firestore) inherently resistant
+- XSS prevention: React auto-escapes output; CSP headers enforced
+- File upload validation: Images only (JPEG, PNG), max 5MB, scanned for malware
+
+
+8. Offline-First Architecture
+
+8.1 Offline Strategy
+
+The system must function fully during network outages common in industrial yard environments.
+
+8.2 IndexedDB Schema (Client-Side)
+
+Database: radbit_bak_offline
+Object Stores:
+- pendingActions: { id, actionType, payload, timestamp, retryCount, lastError }
+- cachedQueue: { facilityId, entries, lastSyncedAt }
+- cachedDocks: { facilityId, docks, lastSyncedAt }
+- cachedEquipment: { facilityId, equipment, lastSyncedAt }
+- cachedUsers: { userId, profile, lastSyncedAt }
+- settings: { key, value }
+
+8.3 Sync Mechanism
+
+1. User performs action while offline (e.g., completes compliance check)
+2. Action stored in pendingActions with unique client-generated ID
+3. Service worker detects online event
+4. Background sync API triggers sync process
+5. Client processes pendingActions in chronological order
+6. Each action sent to Cloud Function with idempotency key (client-generated ID)
+7. Cloud Function checks idempotency: if action ID already processed, return cached result
+8. On success: remove from pendingActions, update cached data
+9. On failure: increment retryCount, store lastError, retry with exponential backoff (max 5 retries)
+10. Conflict resolution: server timestamp wins; client notified of resolved state
+
+8.4 Offline UI States
+
+- Clear connectivity indicator (green/amber/red) in app header
+- Offline badge on actions that will be queued
+- Sync progress indicator when reconnecting
+- Warning modal if user attempts to navigate away during active sync
+
+
+9. Real-Time Architecture
+
+9.1 Firestore Listeners
+
+- Live Queue Dashboard: listens to queue collection filtered by facilityId + active statuses
+- Dock Status Board: listens to docks collection filtered by facilityId
+- Alert Panel: listens to alerts collection filtered by facilityId + ACTIVE status
+- Equipment Tracker: listens to equipment collection filtered by facilityId
+
+9.2 Listener Optimization
+
+- Use query cursors and pagination for large datasets (>100 documents)
+- Detach listeners when components unmount to prevent memory leaks
+- Batch UI updates using React Query's batching to prevent render thrashing
+- Implement optimistic updates for user actions (show result immediately, confirm with server)
+
+9.3 Event-Driven Processing (Cloud Functions)
+
+onQueueEntryCreated:
+  - Calculate initial wait time
+  - Update facility active vehicle count
+  - Emit queue.entry.created event
+
+onQueueEntryStatusChanged:
+  - If status = ASSIGNED: update dock status, calculate assignment time
+  - If status = COMPLETED: calculate turnaround time, update performance metrics
+  - If status = QUARANTINED: create CRITICAL alert, notify Operations Supervisor
+  - Emit queue.entry.status_changed event
+
+onComplianceCheckCompleted:
+  - If overallStatus = FAIL: create quarantine alert, block gate release
+  - If overallStatus = PASS: enable gate release, log completion
+  - Update compliance statistics
+  - Emit compliance.check.completed or compliance.check.failed event
+
+onAlertCreated:
+  - If severity = CRITICAL: immediate SMS + email to Operations Supervisor
+  - If severity = HIGH: email + in-app notification
+  - If not acknowledged within 10 minutes: escalate to Facility Manager
+  - If not acknowledged within 30 minutes: escalate to Executive
+
+
+10. Compliance Validation Engine
+
+10.1 Axle Load Calculation
+
+Input: axleConfiguration (string), measuredWeights (array of numbers), route (string)
+Logic:
+1. Parse axle configuration (e.g., "2-4-2" = 3 axles, positions 1, 2, 3)
+2. Retrieve route-specific limits from configuration (stored in facility document)
+3. For each axle: measuredWeight <= limit ? PASS : FAIL
+4. Calculate total weight = sum(measuredWeights)
+5. Retrieve vehicle GVM rating from vehicle document
+6. totalWeight <= gvmRating ? PASS : FAIL
+7. overallStatus = ALL(axleStatus = PASS) AND gvmStatus = PASS ? PASS : FAIL
+
+10.2 Configuration-Driven Rules
+
+Stored in facilities/{facilityId}/complianceConfig:
+- axleLimits: map<route, array<{ axlePosition, maxWeight }>>
+- gvmLimits: map<vehicleType, maxWeight>
+- requiredChecklistItems: array<{ itemId, label, mandatory, requiresPhoto }>
+- overridePolicy: { requiresSecondaryApproval: boolean, autoEscalateAfterMinutes: number }
+
+10.3 Override Workflow
+
+State Machine:
+  PASS/FAIL -> (FAIL detected) -> QUARANTINED
+  QUARANTINED -> (override requested) -> PENDING_OVERRIDE
+  PENDING_OVERRIDE -> (approved) -> OVERRIDE_APPROVED
+  PENDING_OVERRIDE -> (rejected) -> QUARANTINED
+  OVERRIDE_APPROVED -> (gate release) -> RELEASED
+
+All state transitions logged in audit trail with full context.
+
+
+11. Performance Engineering
+
+11.1 Database Optimization
+
+- Use Firestore batched writes for multi-document updates (max 500 per batch)
+- Implement pagination for all list queries (default 25 items, max 100)
+- Use Firestore transactions for atomic operations (e.g., dock assignment + queue status update)
+- Denormalize computed fields (waitTime, turnaroundTime) to reduce client-side calculation
+- Set TTL policies on temporary data (e.g., expired sessions, old pendingActions after sync)
+
+11.2 Frontend Optimization
+
+- Code splitting by route (lazy load Dashboard, Compliance, Reports, Admin modules)
+- Image optimization: WebP format, responsive sizing, lazy loading
+- Bundle size target: <200KB initial JS, <500KB total after lazy loading
+- Virtualized lists for queue entries (>50 items)
+- Debounce search inputs (300ms)
+- Memoize expensive computations (useMemo for analytics calculations)
+
+11.3 API Optimization
+
+- Cloud Functions cold start mitigation: minimum instances = 1 during operational hours
+- Response caching: Cache-Control headers for static configuration data (1 hour TTL)
+- Compression: Brotli compression for API responses >1KB
+- Connection pooling: Reuse Firestore client instances across function invocations
+
+11.4 Load Testing Targets
+
+- 50 concurrent users per facility
+- 100 queue entries created per hour per facility
+- 200 compliance checks completed per hour per facility
+- Dashboard load time: <2 seconds on 3G
+- API response time: p95 <500ms for read operations, p95 <1s for write operations
+
+
+12. Error Handling & Resilience
+
+12.1 Client-Side Error Handling
+
+- Global error boundary catches React rendering errors, displays fallback UI, logs to Sentry
+- API error mapping: HTTP status codes mapped to user-friendly messages
+- Network errors: automatic retry with exponential backoff (3 attempts)
+- Validation errors: inline field-level feedback with Zod error messages
+- Sync failures: persistent notification with retry option and error details
+
+12.2 Server-Side Error Handling
+
+- Cloud Functions: structured logging with correlation IDs
+- Unhandled exceptions: caught by Firebase, logged, function instance recycled
+- Firestore transaction failures: automatic retry (max 3 attempts), then fail with error code
+- External service failures (SMS/email): queue for retry, alert admin if persistent
+
+12.3 Graceful Degradation
+
+- If real-time listener fails: fall back to manual refresh button
+- If analytics aggregation fails: show cached data with stale timestamp warning
+- If compliance validation service fails: block gate release (fail-safe) and alert admin
+- If alert dispatch fails: queue alerts, display in-app banner
+
+
+13. Deployment Strategy
+
+13.1 Environment Structure
+
+- Development: Local Firebase emulator suite, local React dev server
+- Staging: Firebase project "radbit-bak-staging", isolated data, BAK UAT access
+- Production: Firebase project "radbit-bak-prod", live data, production SLA
+
+13.2 CI/CD Pipeline (GitHub Actions)
+
+On pull request to main:
+  - Run unit tests (Vitest)
+  - Run integration tests (Firebase emulator)
+  - Run linting (ESLint + Prettier)
+  - Build check (Vite production build)
+
+On merge to main:
+  - Deploy to staging environment
+  - Run smoke tests against staging
+  - Notify team via Slack
+
+On release tag (v*.*.*):
+  - Deploy to production environment
+  - Run production health checks
+  - Update release notes
+  - Notify BAK stakeholders
+
+13.3 Deployment Checklist (Go-Live)
+
+- [ ] Firestore security rules reviewed and tested
+- [ ] Composite indexes created and verified
+- [ ] Cloud Functions deployed and cold-start tested
+- [ ] Firebase Auth configured with BAK domain restrictions
+- [ ] PWA service worker registered and offline mode verified
+- [ ] Tablet devices enrolled and app installed
+- [ ] Compliance configuration populated and validated
+- [ ] User accounts created with correct RBAC roles
+- [ ] Alert escalation chains configured and tested
+- [ ] Backup and disaster recovery procedures documented
+- [ ] Runbook created for common operational issues
+- [ ] BAK Champion Program users trained and certified
+
+
+14. Monitoring & Observability
+
+14.1 Metrics (Firebase Performance Monitoring + Custom Dashboard)
+
+- API response time (p50, p95, p99)
+- Firestore read/write operation counts and latency
+- Cloud Functions invocation count, duration, error rate
+- Client-side page load times
+- Offline sync success/failure rates
+- Active user count (DAU, MAU)
+- Queue throughput (vehicles per hour)
+- Compliance check volume and pass/fail rates
+
+14.2 Alerting (Firebase Alerts + Custom Webhooks)
+
+- Error rate >1% for any Cloud Function: P1 alert to engineering
+- Firestore read operations >10,000/minute: P2 alert (potential N+1 query)
+- Client-side crash rate >0.5%: P2 alert to engineering
+- Authentication failure rate >10%: P1 alert (potential security issue)
+- Offline sync failure rate >5%: P2 alert to operations
+
+14.3 Logging
+
+- Structured JSON logs from all Cloud Functions
+- Correlation IDs propagated across request chain
+- Log retention: 30 days in Firebase, 1 year exported to Cloud Storage
+- Sensitive data redaction: passwords, tokens, PII automatically scrubbed
+
+
+15. Testing Strategy
+
+15.1 Unit Tests (Vitest)
+
+Coverage target: >80% for business logic, >90% for compliance validation engine
+- Compliance calculation logic
+- Audit log hash chain generation
+- RBAC permission resolution
+- Data transformation utilities
+- Offline sync conflict resolution
+
+15.2 Integration Tests (Firebase Emulator Suite)
+
+- Firestore security rules validation
+- Cloud Function trigger behavior
+- API endpoint request/response contracts
+- Authentication flow end-to-end
+- Offline sync mechanism
+
+15.3 End-to-End Tests (Playwright)
+
+- Critical user journeys:
+  - Vehicle entry -> dock assignment -> compliance check -> gate release
+  - Compliance failure -> quarantine -> override -> approval -> release
+  - Offline checklist completion -> sync -> audit verification
+  - Alert trigger -> acknowledgment -> escalation
+- Cross-browser: Chrome, Safari (iPad), Samsung Internet (Android tablet)
+- Device testing: 10-inch tablet primary, desktop secondary
+
+15.4 Performance Tests (k6)
+
+- Load test: 50 concurrent users, 10-minute sustained load
+- Spike test: 0 to 100 users in 30 seconds
+- Stress test: 200 concurrent users until failure
+- Target: p95 response time <500ms, error rate <0.1%
+
+15.5 Security Tests
+
+- OWASP ZAP automated scan (staging environment)
+- Manual penetration test (annual, third-party)
+- Firebase Security Rules unit tests (100% coverage of all paths)
+
+
+16. Scalability Roadmap
+
+16.1 Phase 1 (Pilot - Single Facility)
+- Single Firebase project
+- Manual data entry only
+- Up to 50 concurrent users
+- Firestore on-demand scaling
+
+16.2 Phase 2 (Multi-Facility Rollout)
+- Multi-tenant architecture (already designed, facility-scoped collections)
+- WMS/ERP API integration
+- RFID/ANPR hardware integration
+- Regional Firebase project replication for latency optimization
+- Auto-scaling Cloud Functions based on load
+
+16.3 Phase 3 (Enterprise Scale)
+- Dedicated GCP project with custom VPC
+- BigQuery integration for advanced analytics and ML
+- Custom microservices for high-throughput components
+- Global CDN for static assets
+- Disaster recovery across multiple GCP regions
+
+
+17. Disaster Recovery
+
+17.1 Backup Strategy
+
+- Firestore: Daily automated backups (Google Cloud managed)
+- Cloud Storage: Object versioning enabled, 7-year retention for compliance
+- Configuration: Infrastructure-as-code (Firebase CLI config) stored in Git
+
+17.2 Recovery Procedures
+
+RPO (Recovery Point Objective): <1 hour
+RTO (Recovery Time Objective): <4 hours
+
+1. Identify failure scope (data corruption, region outage, accidental deletion)
+2. Assess backup integrity from most recent daily backup
+3. Restore Firestore from backup to staging for validation
+4. If validation passes, restore to production
+5. Verify data consistency with checksum comparison
+6. Notify stakeholders and document incident
+
+
+18. Appendices
+
+Appendix A: Firebase Project Configuration
+- Project IDs for dev/staging/prod
+- API keys (stored in GitHub Secrets, not in repository)
+- Service account configurations
+
+Appendix B: Environment Variables
+- Required environment variables for local development
+- Secret management strategy (GitHub Secrets -> Firebase Environment Config)
+
+Appendix C: Third-Party Service Credentials
+- SMS gateway API credentials
+- Email service (SendGrid/Postmark) credentials
+- Sentry DSN for error tracking
+
+Appendix D: Device Specifications
+- Recommended ruggedized tablet models for yard deployment
+- Minimum hardware requirements
+- Network connectivity specifications
+
+Appendix E: Compliance Configuration Template
+- JSON schema for facility-specific compliance rules
+- Sample configuration for BAK pilot facility
+
+
+Document History
+v1.0 - 07 September 2026 - Initial technical specification for engineering review

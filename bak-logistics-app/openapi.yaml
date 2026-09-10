@@ -1,0 +1,70 @@
+openapi: 3.0.3
+info:
+  title: BAK Operational Intelligence API
+  version: 0.1.0
+  description: Pilot REST contract (Spec §6). Firebase Functions implement these; Vercel frontend consumes them.
+servers:
+  - url: https://api.radbit-bak.example.com/v1
+    description: Pilot (replace with Functions URL)
+paths:
+  /auth/login:
+    post:
+      summary: Email/password or PIN login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string }
+                password: { type: string }
+                pin: { type: string }
+                deviceId: { type: string }
+      responses:
+        '200':
+          description: JWT + refresh token
+  /facilities/{facilityId}/queue:
+    get:
+      summary: List queue entries (US-001/US-002/US-005)
+      parameters:
+        - { name: facilityId, in: path, required: true, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 25 } }
+      responses:
+        '200': { description: Queue page }
+    post:
+      summary: Register vehicle entry
+      parameters:
+        - { name: facilityId, in: path, required: true, schema: { type: string } }
+      responses:
+        '201': { description: Created }
+  /facilities/{facilityId}/compliance-checks:
+    post:
+      summary: Submit pre-departure check (US-003)
+      parameters:
+        - { name: facilityId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: PASS/FAIL + violations }
+  /facilities/{facilityId}/compliance-checks/{checkId}/override:
+    post:
+      summary: Request override (US-004)
+      parameters:
+        - { name: facilityId, in: path, required: true, schema: { type: string } }
+        - { name: checkId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: PENDING_OVERRIDE }
+  /facilities/{facilityId}/audit-logs:
+    get:
+      summary: Search audit trail (US-006)
+      parameters:
+        - { name: facilityId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Log page }
+  /facilities/{facilityId}/alerts:
+    get:
+      summary: Active alerts
+      parameters:
+        - { name: facilityId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Alert page }

@@ -1,0 +1,381 @@
+RADBIT STUDIOS
+PRODUCT REQUIREMENTS DOCUMENT v1.0
+Operational Intelligence Layer for BAK Logistics
+
+Document Control
+Version: 1.0
+Date: September 2026
+Author: Tinotenda Brandon Duma, Founder & Lead Developer, RadBit Studios
+Status: Draft - Internal Review
+Classification: Confidential
+
+
+1. Document Purpose
+
+This PRD defines the functional and non-functional requirements for the BAK Logistics Operational Intelligence Layer pilot. It serves as the single source of truth for engineering, QA, and stakeholder alignment during the 6-week deployment cycle.
+
+
+2. Product Vision
+
+Build a non-disruptive digital overlay that digitizes yard capacity management and automates pre-departure compliance validation for BAK Logistics. The system transforms invisible operational friction into measurable, controllable data - creating an immutable audit trail that shields BAK from statutory fines, reputational damage, and internal security vulnerabilities.
+
+
+3. Strategic Context
+
+3.1 Business Drivers
+- Zimbabwe Government "Zero Tolerance" axle-load enforcement campaign (Nov 2025)
+- September 2025 BAK security incident exposing manual gate vulnerabilities
+- Landlocked Zimbabwe faces 75% higher transport costs than coastal economies
+- Industry evidence: AI-driven yard orchestration delivers 50%+ throughput improvements
+- Ryder System benchmark: 85% gate processing reduction, 5.7x 3-year ROI
+
+3.2 Success Criteria
+- Gate processing time reduction measurable within 30 days of go-live
+- Zero compliance violations on loads processed through the system
+- Complete digital audit trail for every gate release
+- Adoption rate >80% among targeted shift supervisors
+
+
+4. Target Users & Personas
+
+4.1 Primary Users
+
+Persona: Dispatch Supervisor (Gate)
+- Role: Manages vehicle entry, queue assignment, dock allocation
+- Pain Points: Fragmented communication, no visibility into yard state, paper-based checks
+- Goals: Rapid gate processing, accurate dock assignment, zero compliance escapes
+- Devices: Ruggedized mobile tablet (primary), desktop dashboard (secondary)
+
+Persona: Facility Manager
+- Role: Oversees yard operations, reports to executive leadership
+- Pain Points: No operational baselines, reactive problem solving, manual reporting
+- Goals: Real-time visibility, performance analytics, exception alerts
+- Devices: Desktop dashboard, mobile phone for alerts
+
+Persona: Operations Supervisor
+- Role: Handles compliance exceptions, load rebalancing, escalation decisions
+- Pain Points: Delayed notification of failures, no quarantine workflow, paper trails
+- Goals: Immediate exception alerts, clear escalation paths, defensible audit records
+- Devices: Mobile phone, desktop dashboard
+
+4.2 Secondary Users
+- Executive Leadership: Weekly/monthly performance reports
+- Compliance Officer: Audit log review, regulatory dispute evidence
+- IT Administrator: User management, RBAC configuration, system health monitoring
+
+
+5. Functional Requirements
+
+5.1 Module A: Capacity Command Centre
+
+FR-A1: Live Queue Management
+- The system shall display a real-time list of all vehicles currently in the yard
+- Each vehicle entry shall capture: license plate, driver name, entry timestamp, cargo type, expected destination, assigned dock (if any)
+- The system shall calculate and display wait time per vehicle (current time minus entry timestamp)
+- The system shall allow Dispatch Supervisors to assign vehicles to specific docks via drag-and-drop or selection interface
+- The system shall enforce dock capacity limits (configurable per facility)
+- The system shall highlight vehicles exceeding configurable wait-time thresholds (default: 60 minutes)
+- The system shall support vehicle status states: QUEUED, ASSIGNED, LOADING, COMPLETED, QUARANTINED
+
+FR-A2: Asset Status Dashboards
+- The system shall display real-time availability of handling equipment: forklifts, trailers, pallet jacks
+- Each asset shall have a status: AVAILABLE, IN_USE, MAINTENANCE, OFF_DUTY
+- The system shall allow Dispatch Supervisors to assign available equipment to specific docks/vehicles
+- The system shall log all asset assignments with timestamp and supervisor ID
+- The system shall alert when asset utilization exceeds 85% of available fleet (configurable)
+
+FR-A3: Performance Analytics
+- The system shall automatically calculate average turnaround time per vehicle (entry to exit)
+- The system shall calculate average wait time per vehicle (entry to dock assignment)
+- The system shall calculate dock utilization percentage (time dock is occupied vs. available)
+- The system shall calculate asset utilization percentage (time asset is in use vs. available)
+- The system shall generate daily, weekly, and monthly reports exportable to CSV and PDF
+- The system shall identify peak-hour bottlenecks through time-series analysis
+- The system shall provide a baseline establishment report after 14 days of operation
+
+5.2 Module B: Smart Compliance Gatekeeper
+
+FR-B1: Digital Clearances
+- The system shall present a tablet-optimized pre-departure checklist for each vehicle
+- The checklist shall include: driver license verification, vehicle registration, cargo manifest, weight certificate, axle load calculation
+- The system shall support photo capture for cargo condition documentation
+- The system shall require digital signature/tap-to-confirm from the Dispatch Supervisor
+- The system shall timestamp every checklist completion with supervisor ID and geolocation (if available)
+- The system shall prevent gate release until all mandatory checklist items are completed
+
+FR-B2: Rule-Based Load Validation
+- The system shall allow configurable axle load limits per vehicle type and route
+- The system shall calculate total cargo weight against vehicle gross vehicle mass (GVM) rating
+- The system shall flag loads exceeding configured thresholds before gate release
+- The system shall display a clear PASS/FAIL status with specific violation details
+- The system shall support override by Operations Supervisor with mandatory reason capture and secondary approval
+- The system shall maintain a 99%+ accuracy target on automated calculations
+
+FR-B3: Immutable Audit Trail
+- The system shall log every system interaction: login, data entry, status change, gate release, exception override
+- Each log entry shall include: timestamp, user ID, action type, before/after state, device identifier
+- The system shall prevent log modification or deletion by any user role
+- The system shall support log export in tamper-evident format (e.g., signed JSON)
+- The system shall retain logs for minimum 7 years to meet statutory requirements
+- The system shall provide rapid search and filtering by date range, user, vehicle, or action type
+
+5.3 Cross-Cutting Requirements
+
+FR-C1: User Authentication & RBAC
+- The system shall support email/password and PIN-based authentication for tablet users
+- The system shall enforce role-based access: DISPATCH_SUPERVISOR, FACILITY_MANAGER, OPERATIONS_SUPERVISOR, EXECUTIVE, ADMIN, COMPLIANCE_OFFICER
+- Each role shall have predefined permissions (see Appendix A: RBAC Matrix)
+- The system shall enforce session timeout after 15 minutes of inactivity (configurable)
+- The system shall support multi-factor authentication for ADMIN and EXECUTIVE roles
+
+FR-C2: Alerting & Notifications
+- The system shall send real-time alerts for: compliance failure, quarantine trigger, excessive wait time, equipment shortage
+- Alerts shall be delivered via in-app notification, SMS, and email (configurable per user)
+- The system shall support escalation chains (e.g., if Operations Supervisor does not respond within 10 minutes, alert Facility Manager)
+- The system shall maintain an alert history log
+
+FR-C3: Offline Resilience
+- The system shall support offline data capture on tablets with local storage
+- The system shall queue offline actions and sync automatically upon connectivity restoration
+- The system shall display clear offline/online status indicators
+- The system shall resolve sync conflicts using timestamp-based last-write-wins with manual override capability
+
+
+6. Non-Functional Requirements
+
+6.1 Performance
+- Page load time: <2 seconds for all primary interfaces on 3G equivalent connectivity
+- Gate processing workflow: <30 seconds from vehicle selection to compliance result
+- Real-time dashboard refresh: <5 seconds latency for status updates
+- Report generation: <10 seconds for daily reports, <60 seconds for monthly reports
+- Concurrent users: Support minimum 50 simultaneous users per facility
+
+6.2 Reliability & Availability
+- System uptime target: 99.5% during operational hours (06:00-22:00)
+- Scheduled maintenance windows: Maximum 2 hours weekly, announced 48 hours in advance
+- Data backup: Automated daily backups with 30-day retention
+- Disaster recovery: RPO <1 hour, RTO <4 hours
+
+6.3 Security
+- Data in transit: TLS 1.3 encryption minimum
+- Data at rest: AES-256 encryption
+- Password storage: bcrypt hashing with salt
+- API authentication: JWT tokens with 24-hour expiry
+- Audit log integrity: Cryptographic hashing chain (each log entry hashes previous entry hash)
+- Penetration testing: Annual third-party assessment
+
+6.4 Scalability
+- Architecture shall support horizontal scaling to additional BAK facilities without code changes
+- Database design shall support multi-tenant facility isolation
+- API rate limiting: 1000 requests/minute per facility
+
+6.5 Usability
+- Tablet interface optimized for 10-inch screens with touch targets minimum 48x48dp
+- Color-blind accessible status indicators (not relying solely on red/green)
+- Support for English language interface (Shona and Ndebele localization in Phase 2)
+- On-screen contextual help for all compliance checklist items
+
+6.6 Compliance
+- Data protection: Adhere to Zimbabwe Data Protection Act principles
+- Audit standards: Support Zimbabwe Revenue Authority (ZIMRA) and Transport Ministry inspection requirements
+- Record retention: 7-year minimum for all compliance and gate release records
+
+
+7. User Stories & Acceptance Criteria
+
+7.1 US-001: Vehicle Entry Registration
+As a Dispatch Supervisor, I want to register a vehicle entering the yard so that it appears in the live queue.
+
+Acceptance Criteria:
+- Given I am on the Gate Entry screen, when I enter license plate, driver name, cargo type, and expected destination, then the vehicle appears in the Live Queue with status QUEUED and timestamp
+- Given I omit the license plate field, when I attempt to submit, then the system displays a validation error and prevents submission
+- Given I enter a duplicate license plate for a vehicle already in QUEUED status, then the system warns me and requires confirmation
+
+7.2 US-002: Dock Assignment
+As a Dispatch Supervisor, I want to assign a queued vehicle to an available dock so that loading can commence.
+
+Acceptance Criteria:
+- Given a vehicle in QUEUED status, when I select an AVAILABLE dock, then the vehicle status changes to ASSIGNED and the dock status changes to OCCUPIED
+- Given I attempt to assign a vehicle to an already OCCUPIED dock, then the system prevents assignment and shows current occupant
+- Given a vehicle has been in QUEUED status for >60 minutes, when I view the queue, then the vehicle is highlighted in amber
+
+7.3 US-003: Pre-Departure Compliance Check
+As a Dispatch Supervisor, I want to complete a digital pre-departure checklist so that the vehicle can be cleared for gate release.
+
+Acceptance Criteria:
+- Given a vehicle in LOADING or COMPLETED status, when I open the Compliance Check screen, then I see all mandatory checklist items
+- Given I complete all checklist items and all automated validations pass, when I submit, then the system displays PASS status and enables gate release
+- Given an axle load calculation exceeds the configured limit, when I submit, then the system displays FAIL status, prevents gate release, and triggers quarantine workflow
+- Given I am offline, when I complete the checklist, then the system stores data locally and syncs when connectivity returns
+
+7.4 US-004: Compliance Exception Override
+As an Operations Supervisor, I want to override a failed compliance check with documented justification so that legitimate exceptions can proceed.
+
+Acceptance Criteria:
+- Given a vehicle in QUARANTINED status due to compliance failure, when I review the failure details, then I can initiate an override request
+- Given I initiate an override, when I enter a mandatory reason (minimum 20 characters) and request secondary approval, then the vehicle status changes to PENDING_OVERRIDE
+- Given a second Operations Supervisor approves the override, when they confirm, then the vehicle status changes to OVERRIDE_APPROVED and gate release is enabled
+- Given an override is executed, when I view the audit trail, then the override reason, requester, and approver are all logged immutably
+
+7.5 US-005: Real-Time Yard Visibility
+As a Facility Manager, I want to view a dashboard showing all current yard activity so that I can identify bottlenecks proactively.
+
+Acceptance Criteria:
+- Given I am on the Facility Dashboard, when I load the page, then I see: total vehicles in yard, average wait time, dock utilization percentage, equipment availability, and active alerts
+- Given a vehicle exceeds the wait time threshold, when the threshold is crossed, then an alert appears on the dashboard within 5 seconds
+- Given I select a date range, when I request a performance report, then the system generates a downloadable PDF/CSV within 10 seconds
+
+7.6 US-006: Audit Trail Review
+As a Compliance Officer, I want to search and export audit logs so that I can provide evidence during regulatory inspections.
+
+Acceptance Criteria:
+- Given I am on the Audit Log screen, when I enter search criteria (date range, user, vehicle, action type), then the system displays matching results within 3 seconds
+- Given I select log entries, when I choose export, then the system generates a tamper-evident JSON file with cryptographic signatures
+- Given I attempt to modify or delete a log entry, when I try, then the system denies the action and logs the attempt
+
+
+8. Data Requirements
+
+8.1 Core Entities
+- Facility: ID, name, location, timezone, operating hours, dock count, equipment fleet size
+- Vehicle: ID, license plate, type, GVM rating, axle configuration, owner/operator
+- Driver: ID, name, license number, license expiry, contact number, photo
+- Dock: ID, facility ID, name, capacity, status, current assignment
+- Equipment: ID, facility ID, type, status, current assignment, maintenance schedule
+- QueueEntry: ID, vehicle ID, facility ID, entry timestamp, exit timestamp, status, assigned dock, assigned supervisor
+- ComplianceCheck: ID, queueEntry ID, checklist items, results, pass/fail status, supervisor ID, timestamp, override record
+- AuditLog: ID, timestamp, user ID, action, entity type, entity ID, before state, after state, device ID, session ID, hash chain
+- Alert: ID, type, severity, triggered timestamp, acknowledged timestamp, acknowledged by, escalation level
+
+8.2 Data Retention
+- Active operational data: 2 years online
+- Historical operational data: 5 years in warm storage
+- Audit logs: 7 years in cold storage with cryptographic integrity
+- Alert history: 2 years
+
+
+9. Integration Requirements
+
+9.1 Phase 1 (Pilot - Standalone)
+- No integration with existing WMS/ERP required
+- Manual data entry for vehicle, driver, and cargo information
+- Standalone user authentication (no SSO)
+
+9.2 Phase 2 (Post-Pilot - API Integration)
+- RESTful/GraphQL API for WMS/ERP synchronization
+- Webhook support for real-time event propagation
+- Potential integrations: RFID gate readers, ANPR cameras, digital weighbridge interfaces
+- SSO via SAML 2.0 or OAuth 2.0
+
+
+10. Success Metrics & KPIs
+
+10.1 Operational KPIs (Measured Weekly)
+- Average gate processing time (target: <5 minutes by Week 4)
+- Average vehicle turnaround time (target: establish baseline, then 15% improvement by Week 6)
+- Dock utilization percentage (target: >75% during peak hours)
+- Compliance check accuracy (target: 99%+ pass rate on valid loads, 100% catch rate on violations)
+- System uptime (target: 99.5% during operational hours)
+
+10.2 Adoption KPIs (Measured Weekly)
+- Daily active users (target: 100% of targeted shift supervisors)
+- Checklist completion rate (target: 100% of gate releases)
+- Offline sync success rate (target: >99%)
+- User support ticket volume (target: <5 per week by Week 4)
+
+10.3 Business KPIs (Measured Monthly)
+- Detention fee reduction (target: 10%+ reduction vs. pre-pilot baseline)
+- Compliance violation incidents (target: zero system-processed loads)
+- Audit trail completeness (target: 100% of gate releases have complete digital record)
+
+
+11. Timeline & Milestones
+
+Week 1: Alignment & Scoping
+- Stakeholder workshops, user role finalization, compliance parameter configuration
+- Hardware procurement initiation (ruggedized tablets)
+- Environment provisioning
+
+Weeks 2-3: Engineering Sprint
+- Database schema implementation
+- Module A UI development (Command Centre)
+- Module B UI development (Gatekeeper)
+- Authentication and RBAC implementation
+- Offline sync mechanism development
+
+Week 4: UAT & Super-User Training
+- Internal stress testing
+- User acceptance testing with 2-3 BAK supervisors
+- Champion Program launch: train 1-2 power-users per shift
+- Data population and configuration validation
+
+Week 5: Live Onboarding
+- Phased go-live: one shift, then full rollout
+- Ground staff onboarding (shift-by-shift)
+- Supervisor shadow support
+- Load Quarantine Procedures activation
+- Alert and escalation chain validation
+
+Week 6: Stabilization & Transition
+- Active monitoring and rapid bug fixes
+- Performance baseline establishment
+- Handover documentation
+- Transition to live operations support
+
+Post-Pilot (Months 2-3): API Integration Feasibility
+- Technical review of WMS/ERP integration points
+- API specification documentation
+- Legacy system data mapping
+- Scoping for Phase 2 rollout
+
+
+12. Risks & Mitigations
+
+| Risk | Likelihood | Impact | Mitigation |
+| :--- | :--- | :--- | :--- |
+| Low tablet adoption among supervisors | Medium | High | Champion Program with peer-to-peer support; simplified UI; on-site training |
+| Unreliable internet connectivity at facility | High | Medium | Robust offline mode with local storage and auto-sync |
+| Resistance to change from manual processes | Medium | High | Executive sponsorship; clear ROI communication; gradual rollout |
+| Compliance parameter misconfiguration | Low | High | Validation workshop with BAK compliance team; test environment verification |
+| Data accuracy issues from manual entry | Medium | Medium | Input validation rules; duplicate detection; mandatory field enforcement |
+| Scope creep beyond pilot boundaries | Medium | Medium | Strict change control process; documented Phase 2 backlog |
+| Hardware failure (tablets) | Low | Medium | Spare device provisioning; rapid replacement SLA |
+
+
+13. Assumptions & Dependencies
+
+13.1 Assumptions
+- BAK will provide 1-2 dedicated supervisors for UAT and Champion Program
+- BAK will provide current compliance parameters (axle limits, vehicle types, dock capacities)
+- BAK facility has minimum 3G cellular connectivity or reliable WiFi in yard area
+- BAK will provision tablet devices (or accept RadBit hardware recommendations) within Week 1
+- Pilot scope is limited to one BAK facility (Beitbridge, Forbes, or Chirundu)
+
+13.2 Dependencies
+- Firebase platform availability and stability
+- Tablet hardware delivery (3-5 day lead time)
+- BAK stakeholder availability for Week 1 workshops
+- Clear escalation contact from BAK operations team
+
+
+14. Open Questions
+
+1. Which specific BAK facility will host the pilot? (Beitbridge, Forbes, or Chirundu)
+2. What is the current average gate processing time and turnaround time baseline?
+3. Does BAK have existing tablet hardware, or should RadBit recommend specific ruggedized models?
+4. What are the exact axle load limits and vehicle classifications BAK currently uses?
+5. Does BAK have an existing WMS/ERP system that Phase 2 should target for integration?
+6. What is the preferred alert channel for Operations Supervisors? (SMS, WhatsApp, email, in-app only)
+7. Are there specific ZIMRA or Transport Ministry reporting formats the audit trail must support?
+
+
+15. Appendices
+
+Appendix A: RBAC Permission Matrix (To be completed during Week 1 scoping)
+Appendix B: UI Wireframes (Attached separately - Figma link)
+Appendix C: API Specification v0.1 (For Phase 2 planning)
+Appendix D: Compliance Parameter Template (To be populated by BAK)
+
+
+Document History
+v1.0 - 07 September 2026 - Initial draft for internal and stakeholder review

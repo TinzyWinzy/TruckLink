@@ -1,0 +1,13 @@
+# BAK repo root ignores (app has its own .gitignore too)
+node_modules/
+dist/
+functions/lib/
+functions/node_modules/
+.env.local
+.firebase/
+.firebaserc.lock
+firestore-debug.log
+ui-debug.log
+# Service-account keys — NEVER commit
+.secrets/
+*-firebase-adminsdk-*.json

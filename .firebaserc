@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "staging": "radbit-bak-staging",
+    "prod": "radbit-bak-prod",
+    "default": "radbit-bak-staging"
+  }
+}

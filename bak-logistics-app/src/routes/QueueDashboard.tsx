@@ -1,0 +1,199 @@
+import { useEffect, useMemo, useState } from 'react'
+import { queueEntrySchema } from '../lib/validation/compliance'
+import { enqueueOfflineAction, isOnline } from '../lib/offline/db'
+import { isLive } from '../lib/firebase'
+import type { LiveRow } from '../lib/live'
+import { useSession } from '../store/session'
+import { EmptyState, PageHeader, StatusPill } from '../components/ui'
+
+interface Row {
+  id: string
+  plate: string
+  driver: string
+  cargo: string
+  dest: string
+  rawStatus: string
+  enteredAt: string
+}
+
+const SYMBOL: Record<string, string> = {
+  QUEUED: '◆',
+  ASSIGNED: '►',
+  LOADING: '●',
+  COMPLETED: '✔',
+  QUARANTINED: '✖',
+  RELEASED: '✔✔',
+  PENDING_OVERRIDE: '…',
+  OVERRIDE_APPROVED: '✔*',
+}
+
+function mapLive(r: LiveRow): Row {
+  const rawStatus = String(r.status ?? 'QUEUED')
+  const ts = r.entryTimestamp as { toDate?: () => Date } | string | undefined
+  const enteredAt =
+    typeof ts === 'string' ? ts : (ts?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) ?? '—')
+  return {
+    id: r.id,
+    plate: String(r.licensePlate ?? '—'),
+    driver: String(r.driverName ?? (r.driverId as string) ?? '—'),
+    cargo: String(r.cargoType ?? '—'),
+    dest: String(r.expectedDestination ?? '—'),
+    rawStatus,
+    enteredAt,
+  }
+}
+
+const SEED: Row[] = [
+  { id: 'q1', plate: 'AEH 4521', driver: 'T. Moyo', cargo: 'Container', dest: 'Beitbridge', rawStatus: 'QUEUED', enteredAt: '08:12' },
+  { id: 'q2', plate: 'AGX 9033', driver: 'S. Ndlovu', cargo: 'Dry van', dest: 'Forbes', rawStatus: 'ASSIGNED', enteredAt: '08:40' },
+  { id: 'q3', plate: 'AFM 1187', driver: 'K. Sibanda', cargo: 'Tanker', dest: 'Chirundu', rawStatus: 'QUEUED', enteredAt: '07:05' },
+]
+
+export default function QueueDashboard() {
+  const { role, displayName } = useSession()
+  const [rows, setRows] = useState<Row[]>(SEED)
+  const [plate, setPlate] = useState('')
+  const [driver, setDriver] = useState('')
+  const [cargo, setCargo] = useState('Container')
+  const [dest, setDest] = useState('Beitbridge')
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [filter, setFilter] = useState('ALL')
+  const live = isLive()
+
+  useEffect(() => {
+    if (!live) return
+    let unsub: (() => void) | undefined
+    import('../lib/live').then((m) => {
+      unsub = m.subscribe('queue', (found) => setRows(found.map(mapLive))) ?? undefined
+    })
+    return () => unsub?.()
+  }, [live])
+
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { ALL: rows.length }
+    for (const r of rows) c[r.rawStatus] = (c[r.rawStatus] ?? 0) + 1
+    return c
+  }, [rows])
+  const shown = filter === 'ALL' ? rows : rows.filter((r) => r.rawStatus === filter)
+  const canRelease = role === 'OPERATIONS_SUPERVISOR' || role === 'FACILITY_MANAGER' || role === 'ADMIN'
+
+  async function register() {
+    const parsed = queueEntrySchema.safeParse({
+      licensePlate: plate,
+      driverName: driver,
+      cargoType: cargo,
+      expectedDestination: dest,
+    })
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? 'Invalid entry')
+      return
+    }
+    setError(null)
+    setNotice(null)
+
+    if (!live) {
+      setRows((r) => [
+        {
+          id: `q-${Date.now()}`,
+          plate: parsed.data.licensePlate.toUpperCase(),
+          driver: parsed.data.driverName,
+          cargo: parsed.data.cargoType,
+          dest: parsed.data.expectedDestination,
+          rawStatus: 'QUEUED',
+          enteredAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+        ...r,
+      ])
+      setPlate('')
+      setDriver('')
+      setNotice('✔ Entry added to this shift board (demo).')
+      return
+    }
+
+    if (!isOnline()) {
+      await enqueueOfflineAction('queue.create', { ...parsed.data })
+      setNotice('⏳ Offline — entry queued, will sync on reconnect.')
+      setPlate('')
+      setDriver('')
+      return
+    }
+    try {
+      const key = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      await (await import('../lib/live')).registerVehicleLive(parsed.data, key)
+      setPlate('')
+      setDriver('')
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  async function release(id: string) {
+    setError(null)
+    try {
+      await (await import('../lib/live')).releaseVehicleLive(id)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Shift queue"
+        sub={live ? 'Live yard board — oldest first. Register at the gate, release at the exit.' : 'Demo board — connect Firebase for the live yard.'}
+        mode={live ? 'live' : 'demo'}
+      />
+      {/* Primary job first: register the truck in front of you (Fitts + Hick) */}
+      <section className="card p-4 sm:p-5" aria-label="Register vehicle">
+        <h2 className="text-base font-extrabold">Register arrival</h2>
+        <div className="mt-3 grid gap-2 md:grid-cols-5">
+          <input aria-label="License plate" placeholder="Plate · AEH 4521" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} className="field touch-target px-3 md:col-span-1" autoCapitalize="characters" />
+          <input aria-label="Driver name" placeholder="Driver" value={driver} onChange={(e) => setDriver(e.target.value)} className="field touch-target px-3 md:col-span-1" />
+          <input aria-label="Cargo type" value={cargo} onChange={(e) => setCargo(e.target.value)} className="field touch-target px-3 md:col-span-1" />
+          <input aria-label="Destination" value={dest} onChange={(e) => setDest(e.target.value)} className="field touch-target px-3 md:col-span-1" />
+          <button type="button" onClick={register} className="btn-primary touch-target px-4 text-base md:col-span-1">
+            + Register
+          </button>
+        </div>
+        {error && <p role="alert" className="mt-2 rounded-lg bg-red-50 p-2 text-sm font-bold text-red-800">✖ {error}</p>}
+        {notice && <p role="status" className="mt-2 rounded-lg bg-emerald-50 p-2 text-sm font-bold text-emerald-800">{notice}</p>}
+      </section>
+
+      {/* Filter by exception first (Pareto) */}
+      <div className="mt-4 flex flex-wrap gap-1.5" role="group" aria-label="Filter queue">
+        {['ALL', 'QUARANTINED', 'QUEUED', 'ASSIGNED', 'RELEASED'].map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setFilter(s)}
+            aria-pressed={filter === s}
+            className={`touch-target rounded-full px-3 text-sm font-bold ${filter === s ? 'bg-slate-900 text-white' : 'border border-slate-300 bg-white text-slate-700'}`}
+          >
+            {s} · {counts[s] ?? 0}
+          </button>
+        ))}
+      </div>
+
+      {shown.length === 0 ? (
+        <div className="mt-3"><EmptyState title="Yard is clear" sub="No vehicles in this state. New arrivals appear here first." /></div>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {shown.map((r) => (
+            <li key={r.id} className="card flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+              <strong className="text-lg tabular-nums">{r.plate}</strong>
+              <StatusPill status={r.rawStatus} symbol={SYMBOL[r.rawStatus]} />
+              <span className="w-full text-sm text-slate-600 sm:w-auto">{r.driver} · {r.cargo} → {r.dest} · in {r.enteredAt}</span>
+              {(r.rawStatus === 'COMPLETED' || r.rawStatus === 'OVERRIDE_APPROVED') && live && canRelease && (
+                <button type="button" onClick={() => void release(r.id)} className="btn-accent touch-target ml-auto rounded-lg px-4 text-sm" aria-label={`Release ${r.plate}`}>
+                  Release {r.plate} →
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-3 text-xs text-slate-500">Signed in as {displayName}. Status always pairs shape + text for colour-blind safety.</p>
+    </div>
+  )
+}

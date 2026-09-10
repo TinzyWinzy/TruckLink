@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+:root {
+  /* BAK industrial identity — navy + yard amber on sunlit paper */
+  --bak-navy: #0f172a;
+  --bak-navy-soft: #1e293b;
+  --bak-amber: #b45309;
+  --bak-amber-bg: #fef3c7;
+  --bak-paper: #f6f4ec;
+  --bak-surface: #ffffff;
+  --bak-ink: #0f172a;
+  --bak-ink-2: #334155;
+  --bak-border: #e2e8f0;
+  --bak-status-queued: #1d4ed8;
+  --bak-status-queued-bg: #dbeafe;
+  --bak-status-pass: #047857;
+  --bak-status-pass-bg: #d1fae5;
+  --bak-status-fail: #b91c1c;
+  --bak-status-fail-bg: #fee2e2;
+  --bak-status-warn: #b45309;
+  --bak-status-warn-bg: #fef3c7;
+  --bak-focus: #2563eb;
+}
+
+/* Base: sunlit-yard legibility — no faint gray body text */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  background: var(--bak-paper);
+  color: var(--bak-ink);
+  font-feature-settings: "tnum" 1, "cv05" 1;
+}
+
+/* 48x48dp minimum touch targets (PRD NFR), color-blind safe: never color-alone */
+button, a, input, select, [role="button"] {
+  min-height: 44px;
+}
+.touch-target {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+/* Visible keyboard focus everywhere */
+:focus-visible {
+  outline: 3px solid var(--bak-focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Branded status language — signature element. Shape + text, never color-only. */
+.status-badge {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.pill-queued { background: var(--bak-status-queued-bg); color: var(--bak-status-queued); border-color: #bfdbfe; }
+.pill-pass { background: var(--bak-status-pass-bg); color: var(--bak-status-pass); border-color: #a7f3d0; }
+.pill-fail { background: var(--bak-status-fail-bg); color: var(--bak-status-fail); border-color: #fecaca; }
+.pill-warn { background: var(--bak-status-warn-bg); color: var(--bak-status-warn); border-color: #fde68a; }
+.pill-neutral { background: #f1f5f9; color: var(--bak-ink-2); border-color: var(--bak-border); }
+.pill-live { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+.pill-demo { background: #ffedd5; color: #9a3412; border-color: #fed7aa; }
+
+/* Section rhythm — composed, not uniform card stacks */
+.page-title {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.page-sub {
+  font-size: 0.875rem;
+  color: var(--bak-ink-2);
+  max-width: 62ch;
+}
+.card {
+  background: var(--bak-surface);
+  border: 1px solid var(--bak-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+}
+.btn-primary {
+  background: var(--bak-navy);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 10px;
+}
+.btn-primary:hover { background: var(--bak-navy-soft); }
+.btn-primary:disabled { opacity: 0.55; }
+.btn-accent {
+  background: var(--bak-amber);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 10px;
+}
+.field {
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  font-size: 16px; /* prevents iOS zoom on focus */
+}
+.field:focus {
+  border-color: var(--bak-focus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

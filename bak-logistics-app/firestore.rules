@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function role() { return request.auth.token.role; }
+    function inFacility(facilityId) {
+      return signedIn() && request.auth.token.facilities.hasAny([facilityId]);
+    }
+    function hasAnyRole(roles) { return signedIn() && role() in roles; }
+
+    match /facilities/{facilityId}/users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || hasAnyRole(['ADMIN']));
+      allow write: if hasAnyRole(['ADMIN']);
+    }
+    match /facilities/{facilityId}/queue/{entryId} {
+      allow create: if inFacility(facilityId) && hasAnyRole(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR']);
+      allow update: if inFacility(facilityId) && hasAnyRole(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER']);
+      allow read: if inFacility(facilityId);
+      allow delete: if false;
+    }
+    match /facilities/{facilityId}/complianceChecks/{checkId} {
+      allow create: if inFacility(facilityId) && hasAnyRole(['DISPATCH_SUPERVISOR']);
+      allow update: if inFacility(facilityId) && hasAnyRole(['OPERATIONS_SUPERVISOR', 'ADMIN']);
+      allow read: if inFacility(facilityId);
+      allow delete: if false;
+    }
+    match /facilities/{facilityId}/auditLogs/{logId} {
+      allow create: if inFacility(facilityId);
+      allow read: if inFacility(facilityId) && hasAnyRole(['COMPLIANCE_OFFICER', 'ADMIN', 'EXECUTIVE', 'FACILITY_MANAGER']);
+      allow update, delete: if false;
+    }
+    match /facilities/{facilityId}/docks/{dockId} {
+      // Gate tablets assign/release docks transactionally as supervisors.
+      allow update: if inFacility(facilityId) && hasAnyRole(['OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER']);
+      allow read: if inFacility(facilityId);
+      allow create, delete: if hasAnyRole(['ADMIN']);
+    }
+    match /facilities/{facilityId}/equipment/{equipId} {
+      allow update: if inFacility(facilityId) && hasAnyRole(['OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER']);
+      allow read: if inFacility(facilityId);
+      allow create, delete: if hasAnyRole(['ADMIN']);
+    }
+    match /facilities/{facilityId}/alerts/{alertId} {
+      // Client raises quarantine alerts optimistically (Functions mirror them
+      // idempotently); acks are supervisor actions. Tighten to Functions-only
+      // post-cutover (SAD §7 G5).
+      allow create: if inFacility(facilityId) && hasAnyRole(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER']);
+      allow update: if inFacility(facilityId) && hasAnyRole(['OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'ADMIN']);
+      allow read: if inFacility(facilityId);
+      allow delete: if false;
+    }
+    match /facilities/{facilityId}/{rest=**} {
+      allow read: if inFacility(facilityId);
+      allow write: if hasAnyRole(['ADMIN']);
+    }
+  }
+}
