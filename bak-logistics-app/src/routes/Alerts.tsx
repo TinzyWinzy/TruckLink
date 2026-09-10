@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { isLive } from '../lib/firebase'
 import type { LiveRow } from '../lib/live'
+import { isPushAvailable, pushState, subscribePush, type PushState } from '../lib/push'
 import { useSession } from '../store/session'
 import { EmptyState, PageHeader, StatusPill } from '../components/ui'
 import { approveOverridePS, acknowledgeAlertPS } from '../lib/powersync/operations'
@@ -20,6 +21,37 @@ export default function Alerts() {
   const live = isLive()
   const active = alerts.filter((a) => String(a.status) === 'ACTIVE' || !a.acknowledged)
   const canApproveOverride = role === 'OPERATIONS_SUPERVISOR' || role === 'FACILITY_MANAGER' || role === 'ADMIN'
+  const [push, setPush] = useState<PushState>(() => (isPushAvailable() ? 'off' : 'unsupported'))
+  const [pushBusy, setPushBusy] = useState(false)
+
+  useEffect(() => {
+    if (!isPushAvailable()) return
+    let on = true
+    void pushState()
+      .then((s) => {
+        if (on) setPush(s)
+      })
+      .catch(() => {
+        if (on) setPush('error')
+      })
+    return () => {
+      on = false
+    }
+  }, [])
+
+  async function enablePush() {
+    setPushBusy(true)
+    try {
+      await subscribePush(userId ?? displayName, role ?? 'DISPATCH_SUPERVISOR')
+      setPush('on')
+      setMessage('✔ Push alerts on — this tablet rings free on quarantine + escalation.')
+    } catch (e) {
+      setPush('error')
+      setMessage(`✖ Push unavailable: ${(e as Error).message} — WhatsApp/SMS fallback still covers you.`)
+    } finally {
+      setPushBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (!live) return
@@ -81,6 +113,19 @@ export default function Alerts() {
         <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-800">
           {message}
         </p>
+      )}
+      {push !== 'unsupported' && push !== 'on' && (
+        <div className="card mb-3 flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
+          <span className="font-semibold">Free push alerts {push === 'denied' ? '(blocked in browser settings)' : 'are off'}.</span>
+          <button
+            type="button"
+            onClick={() => void enablePush()}
+            disabled={pushBusy || push === 'denied'}
+            className="btn-primary touch-target rounded-lg px-4 text-sm disabled:opacity-50"
+          >
+            {pushBusy ? 'Enabling…' : '🔔 Enable push alerts ($0)'}
+          </button>
+        </div>
       )}
       {alerts.length === 0 ? (
         <EmptyState title="Yard is quiet" sub="No alerts. New quarantine, wait and equipment flags land here." />

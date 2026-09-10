@@ -11,6 +11,17 @@ export function rolesForTarget(target: EscalationTarget): string[] {
   return ['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR']
 }
 
+/** Tokens for the roles behind a target, in one facility. Empty when nobody subscribed. */
+export async function tokensForTarget(facilityId: string, target: EscalationTarget): Promise<string[]> {
+  const { pool } = await import('../db.js')
+  const res = await pool.query(
+    `SELECT DISTINCT fcm_token AS token FROM push_subscriptions
+     WHERE facility_id = $1 AND role = ANY($2)`,
+    [facilityId, rolesForTarget(target)],
+  )
+  return (res.rows as Array<{ token: string }>).map((r) => r.token)
+}
+
 export interface PushPayload {
   title: string
   body: string

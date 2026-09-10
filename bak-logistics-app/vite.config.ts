@@ -9,25 +9,12 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
-      workbox: {
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        cleanupOutdatedCaches: true,
-        runtimeCaching: [
-          {
-            // SAD §4.1: NetworkFirst for API reads (5s timeout, 24h / 100-entry cap).
-            // Firestore itself travels over its own channel; this covers Functions REST
-            // (openapi.yaml) and any future /api/* WMS/ERP bridge.
-            urlPattern: /\/api\/.*$/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-runtime-cache',
-              networkTimeoutSeconds: 5,
-              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
       },
       manifest: {
         name: 'BAK Operational Intelligence Layer',

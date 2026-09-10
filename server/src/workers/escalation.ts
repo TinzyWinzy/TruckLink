@@ -56,6 +56,7 @@ export async function handleEscalationMessage(
       overloadFeeUsd: msg.overloadFeeUsd ?? '?',
       dueAfter: msg.dueAfter ?? '',
     },
+    { facilityId: msg.facilityId },
   )
   return 'sent'
 }

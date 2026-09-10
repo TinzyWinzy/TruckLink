@@ -286,6 +286,51 @@ app.post('/api/wms/confirm', requireApiKey, async (req: Request, res: Response) 
   }
 })
 
+// Push subscriptions ($0 leg): tablets register their FCM token per role.
+// Idempotent upsert — re-subscribes are no-ops.
+const pushSubSchema = z.object({
+  userId: z.string().min(1).max(128),
+  facilityId: z.string().min(1).max(64),
+  role: z.string().min(1).max(32),
+  fcmToken: z.string().min(10).max(512),
+})
+
+app.post('/api/push/subscribe', requireApiKey, async (req: Request, res: Response) => {
+  const parsed = pushSubSchema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Expected { userId, facilityId, role, fcmToken }' })
+    return
+  }
+  try {
+    await pool.query(
+      `INSERT INTO push_subscriptions (user_id, facility_id, role, fcm_token)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, fcm_token) DO UPDATE SET role = $3, facility_id = $2`,
+      [parsed.data.userId, parsed.data.facilityId, parsed.data.role, parsed.data.fcmToken],
+    )
+    res.json({ success: true })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/push/unsubscribe', requireApiKey, async (req: Request, res: Response) => {
+  const parsed = pushSubSchema.pick({ userId: true, fcmToken: true }).safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Expected { userId, fcmToken }' })
+    return
+  }
+  try {
+    await pool.query(`DELETE FROM push_subscriptions WHERE user_id = $1 AND fcm_token = $2`, [
+      parsed.data.userId,
+      parsed.data.fcmToken,
+    ])
+    res.json({ success: true })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // Phase 6 control tower: dwell heatmap, surge status, ROI. Read-only.
 function facilityQuery(req: Request): string | null {
   const f = req.query.facilityId

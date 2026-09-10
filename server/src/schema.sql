@@ -120,11 +120,14 @@ ALTER TABLE queue_entries ADD COLUMN IF NOT EXISTS erp_reference TEXT;
 CREATE INDEX IF NOT EXISTS idx_queue_billed ON queue_entries(facility_id, billed);
 
 -- $0 notifications: FCM device tokens per user. One row per (user, token).
+-- role is denormalized from the tablet at subscribe time (users live in Firebase).
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     user_id TEXT NOT NULL,
     facility_id TEXT NOT NULL REFERENCES facilities(id),
+    role TEXT NOT NULL DEFAULT 'DISPATCH_SUPERVISOR',
     fcm_token TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (user_id, fcm_token)
 );
 CREATE INDEX IF NOT EXISTS idx_push_facility ON push_subscriptions(facility_id);
+CREATE INDEX IF NOT EXISTS idx_push_role ON push_subscriptions(facility_id, role);

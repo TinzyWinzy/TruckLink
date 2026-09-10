@@ -10,6 +10,7 @@
 // path is unchanged.
 
 import { getSmsGateway } from './sms.js'
+import { sendPush, tokensForTarget } from './push.js'
 
 export type EscalationTarget = 'SUPERVISOR' | 'FACILITY_MANAGER' | 'BDM'
 
@@ -79,12 +80,27 @@ async function sendWhatsApp(to: string, n: QuarantineNotify): Promise<void> {
   if (!res.ok) throw new Error(`WhatsApp ${res.status}: ${await res.text()}`)
 }
 
-/** WhatsApp → SMS → log. Throws only when a configured sender fails (retry). */
+/** Push ($0) → WhatsApp (bundles) → SMS → log. Throws only when a
+ * configured sender fails (nack/retry). Push needs facilityId to find tokens. */
 export async function notifyEscalation(
   target: EscalationTarget,
   text: string,
   n: QuarantineNotify,
-): Promise<'whatsapp' | 'sms' | 'log'> {
+  ctx: { facilityId?: string } = {},
+): Promise<'push' | 'whatsapp' | 'sms' | 'log'> {
+  if (ctx.facilityId) {
+    try {
+      const tokens = await tokensForTarget(ctx.facilityId, target)
+      const sent = await sendPush(tokens, {
+        title: `OpShield quarantine — ${n.dueAfter} unacked`,
+        body: text,
+        url: '/alerts',
+      })
+      if (sent.length > 0) return 'push'
+    } catch (err) {
+      console.warn(`[notify] push lookup failed, continuing chain: ${(err as Error).message}`)
+    }
+  }
   const waTo = whatsappTo(target)
   if (waTo) {
     try {
