@@ -17,9 +17,18 @@ interface AuditRow {
   action: string
 }
 
+export function requireAuditSalt(): string {
+  const salt = process.env.AUDIT_SALT
+  if (!salt) {
+    // Fail-closed (H3): a missing salt must never silently "verify" against a default.
+    throw new Error('AUDIT_SALT unset — refusing to verify the audit chain (fail-closed). See server/.env.example')
+  }
+  return salt
+}
+
 /** Returns first broken index, or -1 when the facility chain is intact. */
 export async function verifyFacilityChain(facilityId: string): Promise<number> {
-  const salt = process.env.AUDIT_SALT ?? 'pilot-salt-rotate-me'
+  const salt = requireAuditSalt()
   const res = await pool.query(
     `SELECT id, previous_hash, hash, payload, action FROM audit_logs
      WHERE facility_id = $1 ORDER BY timestamp ASC LIMIT 2000`,

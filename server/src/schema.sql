@@ -101,6 +101,15 @@ CREATE INDEX IF NOT EXISTS idx_alerts_facility_ack ON alerts(facility_id, acknow
 -- Phase 4 async orchestration: transactional outbox.
 -- Domain writes + events commit atomically; a relay publishes to RabbitMQ
 -- after COMMIT. Rows stay pending when the broker is down (pilot-safe).
+-- Server-owned audit ordering (Phase: security posture — H3). The client
+-- supplies actor/action/payload; the server appends previous_hash/hash under
+-- a FOR UPDATE lock on this row, so two tablets cannot fork the chain.
+CREATE TABLE IF NOT EXISTS audit_meta (
+    facility_id TEXT PRIMARY KEY,
+    current_hash TEXT NOT NULL,
+    seq BIGINT NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS outbox_events (
     id TEXT PRIMARY KEY,
     exchange TEXT NOT NULL,

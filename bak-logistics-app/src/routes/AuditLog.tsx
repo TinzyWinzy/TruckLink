@@ -21,26 +21,12 @@ export default function AuditLog() {
     return () => unsub?.()
   }, [live])
 
-  async function verify() {
-    try {
-      const idx = await (await import('../lib/live')).verifyAuditChainLive()
-      alert(idx === -1 ? '✔ Chain intact — every link connects.' : `✖ Break at row ${idx + 1} — escalate to ADMIN.`)
-    } catch (e) {
-      alert(`✖ ${(e as Error).message}`)
-    }
-  }
-
   return (
     <div>
       <PageHeader
         title="Audit trail"
-        sub="Append-only, hash-chained, 7-year retention. The legal shield for ZINARA disputes."
+        sub="Append-only, hash-chained, 7-year retention. Chaining is server-side; the client reads the verified chain."
         mode={live ? 'live' : 'demo'}
-        actions={live ? (
-          <button type="button" onClick={() => void verify()} className="touch-target rounded-lg border px-4 text-sm font-bold">
-            Verify chain
-          </button>
-        ) : undefined}
       />
       {logs.length === 0 ? (
         <EmptyState title="No entries yet" sub="Gate releases, overrides and assignments land here." />

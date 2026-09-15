@@ -44,16 +44,15 @@ let initFailed = false
 async function getMessaging(): Promise<typeof messaging> {
   if (messaging || initFailed) return messaging
   try {
-    const { readFile } = await import('node:fs/promises')
-    const file = process.env.FIREBASE_SERVICE_ACCOUNT_FILE
-    const inline = process.env.FIREBASE_SERVICE_ACCOUNT_JSON
-    const projectId = process.env.FIREBASE_PROJECT_ID
-    if (!projectId || (!file && !inline)) return null
-    const key = file ? JSON.parse(await readFile(file, 'utf8')) : JSON.parse(inline as string)
-    const { initializeApp, getApps, cert } = await import('firebase-admin/app')
+    if (!process.env.FIREBASE_PROJECT_ID) return null
+    // Reuses the shared admin app (firebase/app.ts) so relay + push + auth
+    // never double-initialize firebase-admin in one process.
+    const { getAdminApp } = await import('../firebase/app.js')
+    await getAdminApp()
     const { getMessaging: getMsg } = await import('firebase-admin/messaging')
-    if (getApps().length === 0) initializeApp({ credential: cert(key), projectId })
-    messaging = getMsg() as unknown as NonNullable<typeof messaging>
+    if (messaging) return messaging
+    const appModule = await import('firebase-admin/app')
+    messaging = getMsg(appModule.getApp()) as unknown as NonNullable<typeof messaging>
   } catch (err) {
     initFailed = true
     console.warn('[push] FCM init failed (push disabled):', (err as Error).message)

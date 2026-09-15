@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsc && node --test lib/audit.test.js",
     "seed": "tsc && node lib/seed.js",
-    "seed:users": "tsc && node lib/seed-users.js"
+    "seed:users": "tsc && node lib/seed-users.js",
+    "provision:pin": "tsc && node lib/provision-pin.js"
   },
   "dependencies": {
     "firebase-admin": "^13.0.0",

@@ -1,10 +1,19 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Compliance photos: facility-scoped, authenticated write, 5MB image-only enforced in Functions.
+    function signedIn() { return request.auth != null; }
+    function inFacility(facilityId) {
+      return signedIn() && request.auth.token.facilities.hasAny([facilityId]);
+    }
+    function canUploadCompliance(facilityId) {
+      return signedIn() && inFacility(facilityId)
+        && request.auth.token.role in ['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR'];
+    }
+    // Compliance photos: facility-scoped to claims (M1). Uploads restricted to
+    // gate/supervisor roles, 5MB image-only (Functions double-checks metadata).
     match /facilities/{facilityId}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
+      allow read: if inFacility(facilityId);
+      allow write: if canUploadCompliance(facilityId)
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
       allow delete: if false;

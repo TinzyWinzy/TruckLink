@@ -10,16 +10,34 @@ import { getPublisher, isAllowedPublishKey } from './events/publisher.js'
 import { EVENTS_EXCHANGE } from './events/topology.js'
 import { manifestSchema, handleManifestMessage } from './workers/manifestIngest.js'
 import { getDwellHeatmap, getSurgeStatus, getRoi } from './analytics/queries.js'
-import { requireApiKey, authBootWarning } from './auth.js'
-import { validateBatchItem } from './sync.js'
+import {
+  assertBootSecrets,
+  identityHasFacility,
+  requireApiKey,
+  requireFirebaseIdentity,
+  requireWmsKey,
+} from './auth.js'
+import {
+  assertItemScoped,
+  isServerAppendTable,
+  validateBatchItem,
+  type BatchItem,
+} from './sync.js'
+import { appendAuditServer, auditItemToAppend, type PgClient as AuditClient } from './audit/append.js'
 
 dotenv.config()
 
 const app = express()
 const port = process.env.PORT || 3000
-const JWT_SECRET = new TextEncoder().encode(process.env.POWERSYNC_JWT_SECRET || 'secret-key-for-powersync-tokens-at-least-32-chars')
 
-authBootWarning()
+// Fail-closed: no public fallback secret any more. Devs copy server/.env.example.
+const jwtSecretValue = process.env.POWERSYNC_JWT_SECRET
+if (!jwtSecretValue || jwtSecretValue.length < 32) {
+  throw new Error('POWERSYNC_JWT_SECRET required (32+ chars) — copy server/.env.example before starting.')
+}
+const JWT_SECRET = new TextEncoder().encode(jwtSecretValue)
+
+assertBootSecrets()
 
 // CORS allow-list: exact origins comma-separated. Unset = open (dev only).
 const corsOrigins = (process.env.CORS_ORIGIN ?? '').split(',').map((s) => s.trim()).filter(Boolean)
@@ -34,31 +52,36 @@ app.use((_req, res, next) => {
   next()
 })
 
+// Never leak internal error strings to clients (L2).
+function fail(res: Response, err: unknown): void {
+  console.error('Request error:', err instanceof Error ? err.stack ?? err.message : err)
+  res.status(500).json({ error: 'Internal server error' })
+}
+
 // Health check
 app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Generate PowerSync JWT. Requires the API key; the Bearer value is the
-// caller's asserted userId (pilot simplification — verify Firebase ID tokens
-// here before multi-tenant prod, see SECURITY.md).
-app.get('/api/auth/powersync-token', requireApiKey, async (req: Request, res: Response) => {
+// Generate PowerSync JWT. Caller identity comes from the verified Firebase ID
+// token (custom claims {role, facilities}); the API key no longer grants identities.
+app.get('/api/auth/powersync-token', requireFirebaseIdentity, async (req: Request, res: Response) => {
   try {
-    // Identity comes from the validated query param (pilot simplification).
-    const userId = typeof req.query.userId === 'string' && /^[A-Za-z0-9_@.+-]{1,128}$/.test(req.query.userId)
-      ? req.query.userId
-      : 'demo-user-id'
-    const rawFacility = (req.query.facilityId as string) || 'demo-facility'
-    if (!/^[A-Za-z0-9_-]{1,64}$/.test(rawFacility)) {
-      res.status(400).json({ error: 'Invalid facilityId' })
+    const identity = req.identity as NonNullable<typeof req.identity>
+    const requested = typeof req.query.facilityId === 'string' ? req.query.facilityId : ''
+    const facilityId = identity.facilities[0] ?? ''
+    if (requested && !identity.facilities.includes(requested)) {
+      res.status(403).json({ error: 'Forbidden: requested facility not in your claims' })
       return
     }
-    const facilityId = rawFacility
+    if (!facilityId) {
+      res.status(403).json({ error: 'Account has no facility claim — ask an ADMIN to set facilities' })
+      return
+    }
 
-    // PowerSync JWT with claims
     const token = await new jose.SignJWT({
-      sub: userId,
-      facility_id: facilityId
+      sub: identity.uid,
+      facility_id: facilityId,
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
@@ -68,22 +91,25 @@ app.get('/api/auth/powersync-token', requireApiKey, async (req: Request, res: Re
     res.json({
       token,
       endpoint: process.env.POWERSYNC_URL || 'https://sync.powersync.service',
-      userId
+      userId: identity.uid,
     })
-  } catch (err: any) {
-    res.status(500).json({ error: err.message })
+  } catch (err) {
+    fail(res, err)
   }
 })
 
 // PowerSync Batch Upload Endpoint (transactional outbox: domain write + events
 // commit atomically; relay to RabbitMQ happens after COMMIT, best-effort).
-// Tables/columns are allow-listed (see sync.ts) — unknown names rejected.
-app.post('/api/sync/upload', requireApiKey, async (req: Request, res: Response) => {
+// Tables/columns are allow-listed (see sync.ts); every row is bound to the
+// caller's verified facility; audit_logs appends go through the server-owned
+// chain (audit/append.ts).
+app.post('/api/sync/upload', requireFirebaseIdentity, async (req: Request, res: Response) => {
   const { batch } = req.body
   if (!Array.isArray(batch) || batch.length > 500) {
     res.status(400).json({ error: 'Expected batch array (max 500 items)' })
     return
   }
+  const identity = req.identity as NonNullable<typeof req.identity>
 
   const pending: Array<{ evt: DomainEvent; outboxId: string }> = []
   const client = await pool.connect()
@@ -97,10 +123,19 @@ app.post('/api/sync/upload', requireApiKey, async (req: Request, res: Response) 
         res.status(400).json({ error: checked.error })
         return
       }
+      const scoped = assertItemScoped(checked.item, identity)
+      if (!scoped.ok) {
+        await client.query('ROLLBACK')
+        res.status(403).json({ error: scoped.error })
+        return
+      }
       const { op: opType, table, data, id } = checked.item
       const d = (data ?? {}) as Record<string, unknown>
 
-      if (opType === 'PUT') {
+      if (opType === 'PUT' && isServerAppendTable(table)) {
+        // Server-owned chain append (audit_logs). Events emitted after COMMIT.
+        await appendAuditServer(client as unknown as AuditClient, auditItemToAppend(checked.item))
+      } else if (opType === 'PUT') {
         const keys = Object.keys(d)
         const values = Object.values(d)
         const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ')
@@ -132,10 +167,10 @@ app.post('/api/sync/upload', requireApiKey, async (req: Request, res: Response) 
     }
 
     await client.query('COMMIT')
-  } catch (err: any) {
+  } catch (err) {
     await client.query('ROLLBACK')
     console.error('Batch upload error:', err)
-    res.status(500).json({ error: err.message })
+    res.status(500).json({ error: 'Internal server error' })
     return
   } finally {
     client.release()
@@ -191,8 +226,8 @@ app.post('/api/events/relay', requireApiKey, async (_req: Request, res: Response
       }
     }
     res.json({ success: true, pending: rows.length, relayed })
-  } catch (err: any) {
-    res.status(500).json({ error: err.message })
+  } catch (err) {
+    fail(res, err)
   }
 })
 
@@ -217,9 +252,9 @@ app.post('/api/events/publish', requireApiKey, async (req: Request, res: Respons
     await client.query('BEGIN')
     await insertOutbox(client, EVENTS_EXCHANGE, parsed.data.routingKey, parsed.data.payload as Record<string, unknown>)
     await client.query('COMMIT')
-  } catch (err: any) {
+  } catch (err) {
     await client.query('ROLLBACK')
-    res.status(500).json({ error: err.message })
+    fail(res, err)
     return
   } finally {
     client.release()
@@ -234,8 +269,8 @@ app.post('/api/events/publish', requireApiKey, async (req: Request, res: Respons
 })
 
 // WMS inbound: legacy ERP drops an expected-dispatch notice; gate tablets
-// autocomplete it via PowerSync. Works broker-less (direct insert).
-app.post('/api/wms/manifest', requireApiKey, async (req: Request, res: Response) => {
+// autocomplete it via PowerSync. Uses its own WMS_API_KEY (never in the browser).
+app.post('/api/wms/manifest', requireWmsKey, async (req: Request, res: Response) => {
   const parsed = manifestSchema.safeParse(req.body)
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid manifest', issues: parsed.error.issues })
@@ -256,8 +291,8 @@ app.post('/api/wms/manifest', requireApiKey, async (req: Request, res: Response)
       // Broker-less is fine — the row is already committed.
     }
     res.json({ success: true, result })
-  } catch (err: any) {
-    res.status(500).json({ error: err.message })
+  } catch (err) {
+    fail(res, err)
   }
 })
 
@@ -268,7 +303,7 @@ const confirmSchema = z.object({
   erpReference: z.string().min(1),
 })
 
-app.post('/api/wms/confirm', requireApiKey, async (req: Request, res: Response) => {
+app.post('/api/wms/confirm', requireWmsKey, async (req: Request, res: Response) => {
   const parsed = confirmSchema.safeParse(req.body)
   if (!parsed.success) {
     res.status(400).json({ error: 'Expected { queueEntryId, erpReference }' })
@@ -281,24 +316,28 @@ app.post('/api/wms/confirm', requireApiKey, async (req: Request, res: Response) 
       [parsed.data.queueEntryId, parsed.data.erpReference],
     )
     res.json({ success: true, result: result.rowCount === 0 ? 'duplicate' : 'confirmed' })
-  } catch (err: any) {
-    res.status(500).json({ error: err.message })
+  } catch (err) {
+    fail(res, err)
   }
 })
 
-// Push subscriptions ($0 leg): tablets register their FCM token per role.
-// Idempotent upsert — re-subscribes are no-ops.
+// Push subscriptions ($0 leg): tablets register their FCM token. Identity comes
+// from the verified token — the body can't impersonate another user/facility.
 const pushSubSchema = z.object({
-  userId: z.string().min(1).max(128),
   facilityId: z.string().min(1).max(64),
   role: z.string().min(1).max(32),
   fcmToken: z.string().min(10).max(512),
 })
 
-app.post('/api/push/subscribe', requireApiKey, async (req: Request, res: Response) => {
+app.post('/api/push/subscribe', requireFirebaseIdentity, async (req: Request, res: Response) => {
+  const identity = req.identity as NonNullable<typeof req.identity>
   const parsed = pushSubSchema.safeParse(req.body)
   if (!parsed.success) {
-    res.status(400).json({ error: 'Expected { userId, facilityId, role, fcmToken }' })
+    res.status(400).json({ error: 'Expected { facilityId, role, fcmToken }' })
+    return
+  }
+  if (!identityHasFacility(identity, parsed.data.facilityId)) {
+    res.status(403).json({ error: 'Forbidden: facility not in your claims' })
     return
   }
   try {
@@ -306,77 +345,85 @@ app.post('/api/push/subscribe', requireApiKey, async (req: Request, res: Respons
       `INSERT INTO push_subscriptions (user_id, facility_id, role, fcm_token)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (user_id, fcm_token) DO UPDATE SET role = $3, facility_id = $2`,
-      [parsed.data.userId, parsed.data.facilityId, parsed.data.role, parsed.data.fcmToken],
+      [identity.uid, parsed.data.facilityId, identity.role ?? parsed.data.role, parsed.data.fcmToken],
     )
     res.json({ success: true })
-  } catch (err: any) {
-    res.status(500).json({ error: err.message })
+  } catch (err) {
+    fail(res, err)
   }
 })
 
-app.post('/api/push/unsubscribe', requireApiKey, async (req: Request, res: Response) => {
-  const parsed = pushSubSchema.pick({ userId: true, fcmToken: true }).safeParse(req.body)
+app.post('/api/push/unsubscribe', requireFirebaseIdentity, async (req: Request, res: Response) => {
+  const identity = req.identity as NonNullable<typeof req.identity>
+  const parsed = z.object({ fcmToken: z.string().min(10).max(512) }).safeParse(req.body)
   if (!parsed.success) {
-    res.status(400).json({ error: 'Expected { userId, fcmToken }' })
+    res.status(400).json({ error: 'Expected { fcmToken }' })
     return
   }
   try {
     await pool.query(`DELETE FROM push_subscriptions WHERE user_id = $1 AND fcm_token = $2`, [
-      parsed.data.userId,
+      identity.uid,
       parsed.data.fcmToken,
     ])
     res.json({ success: true })
-  } catch (err: any) {
-    res.status(500).json({ error: err.message })
+  } catch (err) {
+    fail(res, err)
   }
 })
 
-// Phase 6 control tower: dwell heatmap, surge status, ROI. Read-only.
+// Phase 6 control tower: dwell heatmap, surge status, ROI. Read-only,
+// facility-scoped to the caller's verified claims.
 function facilityQuery(req: Request): string | null {
   const f = req.query.facilityId
   return typeof f === 'string' && f.length > 0 && f.length <= 64 ? f : null
 }
 
-app.get('/api/analytics/heatmap', requireApiKey, async (req: Request, res: Response) => {
+function requireScopedFacility(req: Request, res: Response): string | null {
   const facilityId = facilityQuery(req)
   if (!facilityId) {
     res.status(400).json({ error: 'facilityId query param required' })
-    return
+    return null
   }
+  if (!identityHasFacility(req.identity, facilityId)) {
+    res.status(403).json({ error: 'Forbidden: facility not in your claims' })
+    return null
+  }
+  return facilityId
+}
+
+app.get('/api/analytics/heatmap', requireFirebaseIdentity, async (req: Request, res: Response) => {
+  const facilityId = requireScopedFacility(req, res)
+  if (!facilityId) return
   try {
     res.json({ success: true, buckets: await getDwellHeatmap(facilityId, Number(req.query.days ?? 14)) })
-  } catch (err: any) {
-    res.status(500).json({ error: err.message })
+  } catch (err) {
+    fail(res, err)
   }
 })
 
-app.get('/api/analytics/surge', requireApiKey, async (req: Request, res: Response) => {
-  const facilityId = facilityQuery(req)
-  if (!facilityId) {
-    res.status(400).json({ error: 'facilityId query param required' })
-    return
-  }
+app.get('/api/analytics/surge', requireFirebaseIdentity, async (req: Request, res: Response) => {
+  const facilityId = requireScopedFacility(req, res)
+  if (!facilityId) return
   try {
     res.json({ success: true, ...(await getSurgeStatus(facilityId)) })
-  } catch (err: any) {
-    res.status(500).json({ error: err.message })
+  } catch (err) {
+    fail(res, err)
   }
 })
 
-app.get('/api/analytics/roi', requireApiKey, async (req: Request, res: Response) => {
-  const facilityId = facilityQuery(req)
-  if (!facilityId) {
-    res.status(400).json({ error: 'facilityId query param required' })
-    return
-  }
+app.get('/api/analytics/roi', requireFirebaseIdentity, async (req: Request, res: Response) => {
+  const facilityId = requireScopedFacility(req, res)
+  if (!facilityId) return
   try {
     res.json({ success: true, ...(await getRoi(facilityId, Number(req.query.days ?? 30))) })
-  } catch (err: any) {
-    res.status(500).json({ error: err.message })
+  } catch (err) {
+    fail(res, err)
   }
 })
 
-app.get('/api/events/status', async (_req: Request, res: Response) => {  try {
+// Ops status — now behind the shared key too (L1).
+app.get('/api/events/status', requireApiKey, async (_req: Request, res: Response) => {
+  try {
     const pending = await countPendingOutbox(async (text, params) => ({ rows: (await pool.query(text, params)).rows }))
     const publisher = await getPublisher()
     res.json({
@@ -384,8 +431,8 @@ app.get('/api/events/status', async (_req: Request, res: Response) => {  try {
       outboxPending: pending,
       timestamp: new Date().toISOString(),
     })
-  } catch (err: any) {
-    res.status(500).json({ error: err.message })
+  } catch (err) {
+    fail(res, err)
   }
 })
 

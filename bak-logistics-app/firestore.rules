@@ -7,27 +7,55 @@ service cloud.firestore {
       return signedIn() && request.auth.token.facilities.hasAny([facilityId]);
     }
     function hasAnyRole(roles) { return signedIn() && role() in roles; }
+    // Enum validation (M4): statuses must be known values, never free text.
+    function validQueueStatus() {
+      return request.resource.data.status in [
+        'QUEUED', 'ASSIGNED', 'AT_DOCK', 'QUARANTINED', 'PENDING_OVERRIDE',
+        'OVERRIDE_APPROVED', 'RELEASED', 'COMPLETED'
+      ];
+    }
+    function validAlertShape() {
+      return request.resource.data.severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+        && request.resource.data.status in ['ACTIVE', 'ACKNOWLEDGED'];
+    }
+    function validComplianceShape() {
+      return request.resource.data.overallStatus in ['PASS', 'FAIL']
+        && (!('status' in request.resource.data) || request.resource.data.status in
+          ['PASSED', 'QUARANTINED', 'PENDING_OVERRIDE', 'OVERRIDE_APPROVED']);
+    }
 
     match /facilities/{facilityId}/users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || hasAnyRole(['ADMIN']));
       allow write: if hasAnyRole(['ADMIN']);
     }
     match /facilities/{facilityId}/queue/{entryId} {
-      allow create: if inFacility(facilityId) && hasAnyRole(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR']);
-      allow update: if inFacility(facilityId) && hasAnyRole(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER']);
+      allow create: if inFacility(facilityId) && hasAnyRole(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR']) && validQueueStatus();
+      allow update: if inFacility(facilityId) && hasAnyRole(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER']) && validQueueStatus();
       allow read: if inFacility(facilityId);
       allow delete: if false;
     }
     match /facilities/{facilityId}/complianceChecks/{checkId} {
-      allow create: if inFacility(facilityId) && hasAnyRole(['DISPATCH_SUPERVISOR']);
-      allow update: if inFacility(facilityId) && hasAnyRole(['OPERATIONS_SUPERVISOR', 'ADMIN']);
+      allow create: if inFacility(facilityId) && hasAnyRole(['DISPATCH_SUPERVISOR']) && validComplianceShape();
+      allow update: if inFacility(facilityId) && hasAnyRole(['OPERATIONS_SUPERVISOR', 'ADMIN']) && validComplianceShape();
       allow read: if inFacility(facilityId);
       allow delete: if false;
     }
     match /facilities/{facilityId}/auditLogs/{logId} {
-      allow create: if inFacility(facilityId);
+      // H3: the audit chain is appended server-side only (Cloud Functions /
+      // relay with the Admin SDK, which bypasses these rules). Clients read.
+      allow create: if false;
       allow read: if inFacility(facilityId) && hasAnyRole(['COMPLIANCE_OFFICER', 'ADMIN', 'EXECUTIVE', 'FACILITY_MANAGER']);
       allow update, delete: if false;
+    }
+    // M3: chain-ordering metadata is server-only — never readable/writable by clients.
+    match /facilities/{facilityId}/_meta/audit {
+      allow read, write: if false;
+    }
+    match /facilities/{facilityId}/complianceConfig/{configId} {
+      // L4: axle-limit tables are operational policy — ADMIN-only writes
+      // (staging seed + Firestore console) keep them consistent with audit.
+      allow read: if inFacility(facilityId);
+      allow write: if hasAnyRole(['ADMIN']);
     }
     match /facilities/{facilityId}/docks/{dockId} {
       // Gate tablets assign/release docks transactionally as supervisors.
@@ -41,11 +69,8 @@ service cloud.firestore {
       allow create, delete: if hasAnyRole(['ADMIN']);
     }
     match /facilities/{facilityId}/alerts/{alertId} {
-      // Client raises quarantine alerts optimistically (Functions mirror them
-      // idempotently); acks are supervisor actions. Tighten to Functions-only
-      // post-cutover (SAD §7 G5).
-      allow create: if inFacility(facilityId) && hasAnyRole(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER']);
-      allow update: if inFacility(facilityId) && hasAnyRole(['OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'ADMIN']);
+      allow create: if inFacility(facilityId) && hasAnyRole(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER']) && validAlertShape();
+      allow update: if inFacility(facilityId) && hasAnyRole(['OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'ADMIN']) && validAlertShape();
       allow read: if inFacility(facilityId);
       allow delete: if false;
     }

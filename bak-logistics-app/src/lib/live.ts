@@ -8,7 +8,6 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
   limit,
   onSnapshot,
   orderBy,
@@ -34,22 +33,6 @@ import { resolveSiLimits, type SiRemoteConfig } from './validation/siTables'
 export { isLive }
 export interface LiveRow extends Record<string, unknown> {
   id: string
-}
-
-/**
- * Client-side audit writes stay ON until Cloud Functions deploy to staging.
- * Cutover: set VITE_CLIENT_AUDIT_ENABLED=false after Functions own audit
- * exclusively (SAD §7 G5), else every event is logged twice.
- */
-export const CLIENT_AUDIT_ENABLED =
-  (import.meta.env.VITE_CLIENT_AUDIT_ENABLED as string | undefined ?? 'true') !== 'false'
-
-/** Must match Functions AUDIT_SALT env. Placeholder warns in console — rotate before prod (SAD §7 G6). */
-const AUDIT_SALT =
-  (import.meta.env.VITE_AUDIT_SALT as string | undefined) ?? 'pilot-salt-rotate-me'
-
-if (typeof console !== 'undefined' && AUDIT_SALT === 'pilot-salt-rotate-me' && typeof window !== 'undefined') {
-  console.warn('[audit] placeholder AUDIT_SALT in use — set VITE_AUDIT_SALT / AUDIT_SALT before prod.')
 }
 
 const ROLES = [
@@ -86,62 +69,6 @@ export async function signInLive(
 
 export async function signOutLive(): Promise<void> {
   if (auth) await signOut(auth)
-}
-
-// --- Client audit chain (stand-in until Functions deploy) -----------------------
-
-async function sha256hex(input: string): Promise<string> {
-  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
-  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-export async function appendAuditLive(entry: Record<string, unknown>): Promise<void> {
-  const last = await getDocs(query(col('auditLogs'), orderBy('timestamp', 'desc'), limit(1)))
-  const previousHash = last.empty ? 'GENESIS' : String(last.docs[0].get('currentHash'))
-  const payload = JSON.stringify(entry)
-  const currentHash = await sha256hex(`${previousHash}${payload}${AUDIT_SALT}`)
-  await setDoc(doc(col('auditLogs')), {
-    ...entry,
-    origin: 'client',
-    timestamp: serverTimestamp(),
-    previousHash,
-    currentHash,
-    createdAt: serverTimestamp(),
-  })
-}
-
-async function auditBestEffort(entry: Record<string, unknown>): Promise<void> {
-  if (!CLIENT_AUDIT_ENABLED) return
-  try {
-    await appendAuditLive(entry)
-  } catch (err) {
-    console.warn('audit write failed (non-blocking):', err)
-  }
-}
-
-/** Recompute hash chain client-side; returns first broken index or -1 if intact. */
-export async function verifyAuditChainLive(): Promise<number> {
-  const snap = await getDocs(query(col('auditLogs'), orderBy('timestamp', 'asc'), limit(500)))
-  let previousHash = 'GENESIS'
-  const rows = snap.docs.map((d) => ({
-    previousHash: String(d.get('previousHash')),
-    currentHash: String(d.get('currentHash')),
-    payload: JSON.stringify({
-      action: d.get('action'),
-      entityType: d.get('entityType'),
-      entityId: d.get('entityId'),
-      afterState: d.get('afterState') ?? null,
-      beforeState: d.get('beforeState') ?? null,
-    }),
-  }))
-  // Note: exact payload shape differs from writer (server timestamps excluded);
-  // full verification uses Functions export with stored payloads. This is a
-  // linkage check: every previousHash must equal the prior currentHash.
-  for (let i = 0; i < rows.length; i++) {
-    if (rows[i].previousHash !== previousHash) return i
-    previousHash = rows[i].currentHash
-  }
-  return -1
 }
 
 // --- One-time staging seed (ADMIN only, idempotent merges) -----------------------
@@ -286,7 +213,6 @@ export async function registerVehicleLive(
     },
     { merge: true },
   )
-  await auditBestEffort({ action: 'CREATE', entityType: 'queueEntry', entityId: `q-${key}`, afterState: data })
 }
 
 export async function assignDockLive(queueEntryId: string, dockId: string): Promise<void> {
@@ -301,7 +227,6 @@ export async function assignDockLive(queueEntryId: string, dockId: string): Prom
     tx.update(qRef, { status: 'ASSIGNED', assignedDockId: dockId, updatedAt: serverTimestamp() })
     tx.update(dRef, { status: 'OCCUPIED', currentAssignment: queueEntryId })
   })
-  await auditBestEffort({ action: 'UPDATE', entityType: 'queueEntry', entityId: queueEntryId, afterState: { status: 'ASSIGNED', assignedDockId: dockId } })
 }
 
 export async function submitComplianceLive(input: {
@@ -361,12 +286,6 @@ export async function submitComplianceLive(input: {
     )
   }
   const outcome: 'PASS' | 'FAIL' = result.overallStatus === 'PASS' ? 'PASS' : 'FAIL'
-  await auditBestEffort({
-    action: outcome === 'PASS' ? 'GATE_RELEASE' : 'CREATE',
-    entityType: 'complianceCheck',
-    entityId: checkId,
-    afterState: { overallStatus: result.overallStatus, queueEntryId: input.queueEntryId },
-  })
   return outcome
 }
 
@@ -376,7 +295,6 @@ export async function acknowledgeAlertLive(alertId: string, by: string): Promise
     acknowledgedBy: by,
     acknowledgedAt: serverTimestamp(),
   })
-  await auditBestEffort({ action: 'UPDATE', entityType: 'alert', entityId: alertId, afterState: { status: 'ACKNOWLEDGED', by } })
 }
 
 export interface ChecklistItem {
@@ -463,7 +381,6 @@ export async function requestOverrideLive(queueEntryId: string, reason: string, 
     overrideRequest: { reason: reason.trim(), requestedBy: displayName, requestedById: userId, requestedAt: serverTimestamp() },
     updatedAt: serverTimestamp(),
   })
-  await auditBestEffort({ action: 'OVERRIDE_REQUEST', entityType: 'queueEntry', entityId: queueEntryId, afterState: { status: 'PENDING_OVERRIDE', reason, by: userId } })
 }
 
 export async function approveOverrideLive(queueEntryId: string, approved: boolean, userId: string, notes = ''): Promise<void> {
@@ -481,7 +398,6 @@ export async function approveOverrideLive(queueEntryId: string, approved: boolea
     overrideDecision: { approved, by: userId, notes, decidedAt: serverTimestamp() },
     updatedAt: serverTimestamp(),
   })
-  await auditBestEffort({ action: 'OVERRIDE_APPROVE', entityType: 'queueEntry', entityId: queueEntryId, afterState: { status: approved ? 'OVERRIDE_APPROVED' : 'QUARANTINED', by: userId } })
 }
 
 export async function releaseVehicleLive(queueEntryId: string): Promise<void> {
@@ -490,7 +406,6 @@ export async function releaseVehicleLive(queueEntryId: string): Promise<void> {
     exitTimestamp: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
-  await auditBestEffort({ action: 'GATE_RELEASE', entityType: 'queueEntry', entityId: queueEntryId, afterState: { status: 'RELEASED' } })
 }
 
 // --- Reporting (FR-A4) ---------------------------------------------------------

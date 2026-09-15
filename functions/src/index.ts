@@ -18,10 +18,29 @@ async function appendAuditLog(
   entry: Record<string, unknown>,
 ): Promise<void> {
   const col = db.collection(`facilities/${facilityId}/auditLogs`)
+  const metaRef = db.doc(`facilities/${facilityId}/_meta/audit`)
+  // Fail-closed (H3): a missing salt must not silently chain onto a default.
+  const salt = process.env[`AUDIT_SALT_${facilityId}`] ?? process.env.AUDIT_SALT
+  if (!salt) {
+    logger.error(`AUDIT_SALT (or AUDIT_SALT_${facilityId}) unset — refusing to append audit entry`)
+    return
+  }
+  // Serialized append (M3): a single per-facility meta doc arbitrates order, so
+  // concurrent writers conflict and retry instead of forking the chain.
   await db.runTransaction(async (tx) => {
-    const last = await tx.get(col.orderBy('timestamp', 'desc').limit(1))
-    const previousHash = last.empty ? 'GENESIS' : (last.docs[0].get('currentHash') as string)
-    const salt = process.env[`AUDIT_SALT_${facilityId}`] ?? process.env.AUDIT_SALT ?? 'pilot-salt-rotate-me'
+    const meta = await tx.get(metaRef)
+    let previousHash = 'GENESIS'
+    let seq = 0
+    const m = meta.data()
+    if (m && m.currentHash) {
+      previousHash = String(m.currentHash)
+      seq = Number(m.seq ?? 0)
+    } else if (meta.exists) {
+      // Meta exists but empty migrated doc — treat as genesis.
+    } else {
+      const tail = await tx.get(col.orderBy('timestamp', 'desc').limit(1))
+      if (!tail.empty) previousHash = tail.docs[0].get('currentHash') as string
+    }
     const payload = JSON.stringify(entry)
     const currentHash = hashAuditEntry(previousHash, payload, salt)
     const ref = col.doc()
@@ -32,6 +51,7 @@ async function appendAuditLog(
       currentHash,
       createdAt: FieldValue.serverTimestamp(),
     })
+    tx.set(metaRef, { currentHash, seq: seq + 1, lastEntryAt: FieldValue.serverTimestamp() }, { merge: true })
   })
 }
 

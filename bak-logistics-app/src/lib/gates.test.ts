@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ROUTE_GATES, canVisit, type RouteKey } from './gates'
+import { ALERT_ACK_ROLES, ROUTE_GATES, canAckAlert, canVisit, landingPathForRole, type RouteKey } from './gates'
 import type { Role } from '../store/session'
 
 const ALL: Role[] = [
@@ -36,5 +36,24 @@ describe('ROUTE_GATES (RBAC matrix)', () => {
     expect(canVisit('docks', 'OPERATIONS_SUPERVISOR')).toBe(true)
     expect(canVisit('reports', 'DISPATCH_SUPERVISOR')).toBe(false)
     expect(canVisit('reports', 'EXECUTIVE')).toBe(true)
+  })
+
+  it('lands every role on a visitable route (no permission-wall first screen)', () => {
+    for (const r of ALL) {
+      const path = landingPathForRole(r)
+      const route = path.slice(1) as RouteKey
+      expect(canVisit(route, r)).toBe(true)
+    }
+    expect(landingPathForRole('EXECUTIVE')).toBe('/reports')
+    expect(landingPathForRole('COMPLIANCE_OFFICER')).toBe('/audit')
+    expect(landingPathForRole('DISPATCH_SUPERVISOR')).toBe('/queue')
+  })
+
+  it('keeps alert ack to update-capable roles (mirrors firestore.rules)', () => {
+    for (const r of ALERT_ACK_ROLES) expect(canAckAlert(r)).toBe(true)
+    for (const r of ['DISPATCH_SUPERVISOR', 'EXECUTIVE', 'COMPLIANCE_OFFICER'] as Role[]) {
+      expect(canAckAlert(r)).toBe(false)
+    }
+    expect(canAckAlert(null)).toBe(false)
   })
 })

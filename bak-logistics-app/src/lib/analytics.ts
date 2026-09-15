@@ -2,7 +2,6 @@
 // otherwise null (UI shows honest empty states — never fabricated numbers).
 
 const BASE = (import.meta.env.VITE_SYNC_API_URL as string | undefined)?.replace(/\/$/, '') ?? ''
-const API_KEY = (import.meta.env.VITE_SYNC_API_KEY as string | undefined) ?? ''
 
 export const isAnalyticsLive = (): boolean => BASE.length > 0
 
@@ -33,9 +32,15 @@ async function get<T>(path: string): Promise<T | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 8000)
   try {
+    // Identity: verified Firebase ID token (Bearer) — analytics endpoints are
+    // facility-scoped to claims now, the shared key is gone (H1).
+    const { auth } = await import('./firebase')
+    const user = auth?.currentUser
+    if (!user) return null
+    const idToken = await user.getIdToken()
     const res = await fetch(`${BASE}${path}`, {
       signal: controller.signal,
-      headers: API_KEY ? { 'X-API-Key': API_KEY } : {},
+      headers: { Authorization: `Bearer ${idToken}` },
     })
     if (!res.ok) return null
     return (await res.json()) as T

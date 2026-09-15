@@ -14,13 +14,25 @@
 ```bash
 sudo mkdir -p /opt/opshield && sudo chown $USER /opt/opshield
 git clone https://github.com/TinzyWinzy/BAK.git /opt/opshield && cd /opt/opshield/server
-cp .env.example .env   # then fill: SYNC_API_KEY, POWERSYNC_JWT_SECRET, phones,
-                       # WHATSAPP_*, AUDIT_SALT, API_DOMAIN, ACME_EMAIL
+cp .env.example .env   # then fill: SYNC_API_KEY, WMS_API_KEY, POWERSYNC_JWT_SECRET (32+),
+                       # AUDIT_SALT, FIREBASE_PROJECT_ID, phones, WHATSAPP_*, RABBITMQ_*,
+                       # POSTGRES_PASSWORD, DATABASE_URL, API_DOMAIN, ACME_EMAIL
 docker compose up -d --build
 docker compose exec postgres psql -U postgres -d bak_logistics -f /tmp/schema.sql
 # schema: docker cp src/schema.sql <pg-container>:/tmp/schema.sql first
 curl localhost:3000/api/health
 ```
+
+Boot is fail-closed (M2): the API refuses to start in production without
+`SYNC_API_KEY` (16+), `WMS_API_KEY` (16+), `POWERSYNC_JWT_SECRET` (32+),
+`FIREBASE_PROJECT_ID`. The audit chain also refuses to append/verify when
+`AUDIT_SALT` is unset (H3). The prod overlay `docker-compose.prod.yml`
+force-fails compose if `RABBITMQ_*` / `POSTGRES_PASSWORD` / `DATABASE_URL` are
+missing — it never silently boots with dev credentials.
+
+Identity (H1): tablets authenticate with Firebase ID tokens (Bearer); the only
+server-side key shipped to the app is none — `VITE_SYNC_API_KEY` is gone. The
+ERP portal uses the separate `WMS_API_KEY` on `/api/wms/*`.
 
 Single-box TLS: `API_DOMAIN=api.<domain> ACME_EMAIL=<you> docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml up -d --build` (needs the A-record first).
 

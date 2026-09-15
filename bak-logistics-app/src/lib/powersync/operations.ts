@@ -66,19 +66,14 @@ export interface AuditLogRow {
   payload: string
   actor_id: string
   timestamp: string
-  previous_hash: string
-  hash: string
-}
-
-const AUDIT_SALT = (import.meta.env.VITE_AUDIT_SALT as string | undefined) ?? 'pilot-salt-rotate-me'
-
-async function sha256hex(input: string): Promise<string> {
-  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
-  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('')
+  previous_hash?: string | null
+  hash?: string | null
 }
 
 /**
- * Append cryptographic audit entry into local SQLite audit_logs
+ * Append an audit *fact* locally. Hashing and chaining are the server's job
+ * (server/src/audit/append.ts — H3): the client only records what happened;
+ * the server fills previous_hash/hash inside a locked transaction on upload.
  */
 export async function appendAuditPS(
   facilityId: string,
@@ -87,20 +82,13 @@ export async function appendAuditPS(
   payload: Record<string, unknown>
 ): Promise<void> {
   const db = getPowerSyncDb()
-  const last = await db.getOptional<{ hash: string }>(
-    'SELECT hash FROM audit_logs WHERE facility_id = ? ORDER BY timestamp DESC LIMIT 1',
-    [facilityId]
-  )
-  const previousHash = last?.hash || 'GENESIS'
-  const payloadStr = JSON.stringify(payload)
   const timestamp = new Date().toISOString()
-  const hash = await sha256hex(`${previousHash}${payloadStr}${AUDIT_SALT}`)
   const id = `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
   await db.execute(
-    `INSERT INTO audit_logs (id, facility_id, action, payload, actor_id, timestamp, previous_hash, hash)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, facilityId, action, payloadStr, actorId, timestamp, previousHash, hash]
+    `INSERT INTO audit_logs (id, facility_id, action, payload, actor_id, timestamp)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, facilityId, action, JSON.stringify(payload), actorId, timestamp]
   )
 }
 

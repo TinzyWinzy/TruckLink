@@ -1,24 +1,25 @@
 import { Link, useLocation } from 'react-router-dom'
 import { pendingActionCount, pendingActionCountSyncInitial, isOnline } from '../lib/offline/db'
-import { useSession, type Role } from '../store/session'
+import { useSession, type Role, canAccess } from '../store/session'
 import { useEffect, useState, type ReactNode } from 'react'
 import { isLive } from '../lib/firebase'
+import { ROUTE_GATES, landingPathForRole } from '../lib/gates'
 
-const PRIMARY: { to: string; label: string; roles?: Role[] }[] = [
-  { to: '/queue', label: 'Queue' },
-  { to: '/compliance', label: 'Compliance' },
-  { to: '/docks', label: 'Docks' },
+const PRIMARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] = [
+  { to: '/queue', label: 'Queue', route: 'queue' },
+  { to: '/compliance', label: 'Compliance', route: 'compliance' },
+  { to: '/docks', label: 'Docks', route: 'docks' },
 ]
 
-const SECONDARY: { to: string; label: string; roles?: Role[] }[] = [
-  { to: '/alerts', label: 'Alerts' },
-  { to: '/reports', label: 'Reports' },
-  { to: '/audit', label: 'Audit' },
-  { to: '/admin', label: 'Admin', roles: ['ADMIN'] },
+const SECONDARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] = [
+  { to: '/alerts', label: 'Alerts', route: 'alerts' },
+  { to: '/reports', label: 'Reports', route: 'reports' },
+  { to: '/audit', label: 'Audit', route: 'audit' },
+  { to: '/admin', label: 'Admin', route: 'admin' },
 ]
 
 function visible(items: typeof PRIMARY, role: Role | null) {
-  return items.filter((i) => !i.roles || (role && i.roles.includes(role)))
+  return items.filter((i) => canAccess(role, ROUTE_GATES[i.route]))
 }
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -81,7 +82,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-10 bg-slate-900 text-white shadow-md">
         {/* Shift strip — glanceable yard state first (Pareto: exceptions before browsing) */}
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 pt-3">
-          <Link to="/queue" className="flex items-center gap-2 font-extrabold tracking-tight" aria-label="BAK Intel home">
+          <Link to={role ? landingPathForRole(role) : '/queue'} className="flex items-center gap-2 font-extrabold tracking-tight" aria-label="BAK Intel home">
             <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 text-sm font-black text-slate-900">
               B
             </span>

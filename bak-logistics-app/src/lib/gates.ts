@@ -26,3 +26,21 @@ export const ROUTE_GATES: Record<RouteKey, Role[]> = {
 export function canVisit(route: RouteKey, role: Role | null): boolean {
   return canAccess(role, ROUTE_GATES[route])
 }
+
+/** Firestore `alerts` update gate mirrored client-side (firestore.rules alerts/update).
+ * DISPATCH/EXECUTIVE/COMPLIANCE are read-only on alerts — the Acknowledge
+ * button must stay hidden for them in both demo and live modes, otherwise
+ * demo works and live denies (permission error). */
+export const ALERT_ACK_ROLES: Role[] = ['OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'ADMIN']
+
+export function canAckAlert(role: Role | null): boolean {
+  return canAccess(role, ALERT_ACK_ROLES)
+}
+
+/** Post-sign-in landing — every role must land on a route it canVisit.
+ * Yard roles → /queue; EXECUTIVE/ADMIN → /reports; COMPLIANCE → /audit. */
+export function landingPathForRole(role: Role): string {
+  if (role === 'EXECUTIVE' || role === 'ADMIN') return '/reports'
+  if (role === 'COMPLIANCE_OFFICER') return '/audit'
+  return '/queue'
+}

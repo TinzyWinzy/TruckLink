@@ -3,6 +3,7 @@ import { isLive } from '../lib/firebase'
 import type { LiveRow } from '../lib/live'
 import { isPushAvailable, pushState, subscribePush, type PushState } from '../lib/push'
 import { useSession } from '../store/session'
+import { canAckAlert } from '../lib/gates'
 import { EmptyState, PageHeader, StatusPill } from '../components/ui'
 import { approveOverridePS, acknowledgeAlertPS } from '../lib/powersync/operations'
 
@@ -21,6 +22,7 @@ export default function Alerts() {
   const live = isLive()
   const active = alerts.filter((a) => String(a.status) === 'ACTIVE' || !a.acknowledged)
   const canApproveOverride = role === 'OPERATIONS_SUPERVISOR' || role === 'FACILITY_MANAGER' || role === 'ADMIN'
+  const canAck = canAckAlert(role)
   const [push, setPush] = useState<PushState>(() => (isPushAvailable() ? 'off' : 'unsupported'))
   const [pushBusy, setPushBusy] = useState(false)
 
@@ -63,6 +65,10 @@ export default function Alerts() {
   }, [live])
 
   async function ack(id: string) {
+    if (!canAck) {
+      setMessage('Read-only role — a yard supervisor acknowledges this alert.')
+      return
+    }
     if (!live) {
       setAlerts((a) => a.map((x) => (x.id === id ? { ...x, status: 'ACKNOWLEDGED' } : x)))
       return
@@ -163,13 +169,19 @@ export default function Alerts() {
                         {isTargeted ? 'Cancel' : 'Authorize Override ⚖'}
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => void ack(a.id)}
-                      className="btn-primary touch-target rounded-lg px-4 text-sm"
-                    >
-                      Acknowledge
-                    </button>
+                    {canAck ? (
+                      <button
+                        type="button"
+                        onClick={() => void ack(a.id)}
+                        className="btn-primary touch-target rounded-lg px-4 text-sm"
+                      >
+                        Acknowledge
+                      </button>
+                    ) : (
+                      <span className="text-xs font-semibold text-slate-500">
+                        Read-only — yard supervisors acknowledge.
+                      </span>
+                    )}
                   </div>
                 )}
 

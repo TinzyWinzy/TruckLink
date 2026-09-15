@@ -4,10 +4,10 @@
 // Messaging -> Web Push certificates) and VITE_SYNC_API_URL.
 
 import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging'
+import { getAuth } from 'firebase/auth'
 import { app, facilityId } from './firebase'
 
 const API = (import.meta.env.VITE_SYNC_API_URL as string | undefined)?.replace(/\/$/, '') ?? ''
-const API_KEY = (import.meta.env.VITE_SYNC_API_KEY as string | undefined) ?? ''
 const VAPID = (import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined) ?? ''
 
 export const isPushAvailable = (): boolean =>
@@ -34,9 +34,14 @@ export async function subscribePush(userId: string, role: string): Promise<strin
   if (permission !== 'granted') throw new Error('Notification permission not granted.')
   const messaging = getMessaging(app)
   const token = await getToken(messaging, { vapidKey: VAPID })
+  // Identity: the server verifies the Firebase ID token; the shared API key is gone (H1).
+  const auth = getAuth(app)
+  const user = auth.currentUser
+  if (!user) throw new Error('Sign in before subscribing to push.')
+  const idToken = await user.getIdToken()
   const res = await fetch(`${API}/api/push/subscribe`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(API_KEY ? { 'X-API-Key': API_KEY } : {}) },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
     body: JSON.stringify({ userId, facilityId, role, fcmToken: token }),
   })
   if (!res.ok) throw new Error(`Subscribe failed: ${res.status}`)

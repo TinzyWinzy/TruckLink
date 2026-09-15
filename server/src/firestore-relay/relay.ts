@@ -8,8 +8,8 @@
 // and quarantine-event fan-out into RabbitMQ (10m/30m escalation timers).
 //
 // Run: `npm run relay` (requires FIREBASE_PROJECT_ID + FIREBASE_SERVICE_ACCOUNT_JSON).
-// functions/ stays untouched as fallback; when this relay is live, set
-// VITE_CLIENT_AUDIT_ENABLED=false so the client stops double-writing audit.
+// functions/ stays untouched as fallback. Audit chaining is server-owned (H3):
+// the client no longer writes auditLogs at all — no double-write to disable.
 
 import { decideQueueChange, facilityFromPath, quarantineAlertId, quarantineAlertPayload } from './decide.js'
 import { hashAuditEntry } from '../workers/auditVerify.js'
@@ -21,30 +21,62 @@ interface FirestoreDoc {
   data(): Record<string, unknown> | undefined
 }
 
+interface FirestoreMetaDoc {
+  set(data: Record<string, unknown>, opts?: Record<string, unknown>): Promise<void>
+  get(): Promise<{ exists: boolean; data(): Record<string, unknown> | undefined }>
+}
+
 interface FirestoreDb {
   collectionGroup(name: string): {
     onSnapshot(cb: (snap: { docChanges(): Array<{ type: string; doc: FirestoreDoc }> }) => void | Promise<void>): void
   }
   collection(path: string): {
     orderBy(field: string, dir: string): { limit(n: number): unknown }
-    doc(id?: string): { set(data: Record<string, unknown>, opts?: Record<string, unknown>): Promise<void>; get(): Promise<{ empty: boolean; docs: Array<{ get(f: string): unknown }> }> }
+    doc(id?: string): { set(data: Record<string, unknown>, opts?: Record<string, unknown>): Promise<void>; get(): unknown } & FirestoreMetaDoc
   }
-  runTransaction(fn: (tx: { get(q: unknown): Promise<{ empty: boolean; docs: Array<{ get(f: string): unknown }> }>; set(ref: unknown, data: Record<string, unknown>): void }) => Promise<void>): Promise<void>
+  runTransaction(fn: (tx: { get(q: unknown): Promise<{ exists: boolean; data(): Record<string, unknown> | undefined; empty: boolean; docs: Array<{ get(f: string): unknown }> }>; set(ref: unknown, data: Record<string, unknown>): void }) => Promise<void>): Promise<void>
 }
 
 function auditSalt(facilityId: string): string {
-  return process.env[`AUDIT_SALT_${facilityId}`] ?? process.env.AUDIT_SALT ?? 'pilot-salt-rotate-me'
+  const salt = process.env[`AUDIT_SALT_${facilityId}`] ?? process.env.AUDIT_SALT
+  if (!salt) {
+    // Fail-closed (H3): never silently chain onto a default salt.
+    throw new Error(`AUDIT_SALT (or AUDIT_SALT_${facilityId}) unset — relay refuses to append to the audit chain.`)
+  }
+  return salt
 }
 
+/**
+ * Serialized audit append (M3). Concurrency is arbitrated on a single per-facility
+ * meta doc (`facilities/{fid}/_meta/audit`), updated inside the same transaction as
+ * the log entry — two relay/function instances that race retry on the conflict and
+ * can never both chain onto the same previousHash.
+ */
 async function appendAuditLog(db: FirestoreDb, facilityId: string, entry: Record<string, unknown>): Promise<void> {
   const col = db.collection(`facilities/${facilityId}/auditLogs`)
+  const metaRef = db.collection(`facilities/${facilityId}`).doc('_meta/audit')
+  const salt = auditSalt(facilityId)
+
   await db.runTransaction(async (tx) => {
-    const last = await tx.get(col.orderBy('timestamp', 'desc').limit(1))
-    const previousHash = last.empty ? 'GENESIS' : String(last.docs[0].get('currentHash'))
+    const meta = await tx.get(metaRef)
+    let previousHash: string
+    let seq: number
+    if (meta.exists) {
+      const m = meta.data() ?? {}
+      previousHash = String(m.currentHash ?? 'GENESIS')
+      seq = Number(m.seq ?? 0)
+    } else {
+      // Bootstrap from an existing tail so a pre-meta history still chains.
+      const tail = await tx.get(col.orderBy('timestamp', 'desc').limit(1))
+      previousHash = tail.empty ? 'GENESIS' : String(tail.docs[0].get('currentHash'))
+      seq = 0
+    }
     const payload = JSON.stringify(entry)
-    const currentHash = hashAuditEntry(previousHash, payload, auditSalt(facilityId))
+    const currentHash = hashAuditEntry(previousHash, payload, salt)
     const now = new Date()
     tx.set(col.doc(), { ...entry, timestamp: now, previousHash, currentHash, createdAt: now, origin: 'relay' })
+    // Writing the shared meta doc makes concurrent appends conflict → retry.
+    tx.set(metaRef, { currentHash, seq: seq + 1, lastEntryAt: now })
   })
 }
 

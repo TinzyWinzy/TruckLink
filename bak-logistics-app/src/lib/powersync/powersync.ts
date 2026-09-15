@@ -15,17 +15,21 @@ export interface AppSyncCredentials extends PowerSyncCredentials {
 export class AppBackendConnector implements PowerSyncBackendConnector {
   private backendUrl: string
   private token: string | null = null
-  private apiKey: string
+  private tokenProvider: () => Promise<string | null>
 
-  constructor(backendUrl: string = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000') {
+  constructor(
+    backendUrl: string = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000',
+    tokenProvider?: () => Promise<string | null>,
+  ) {
     this.backendUrl = backendUrl
-    this.apiKey = (import.meta.env.VITE_SYNC_API_KEY as string | undefined) ?? ''
+    // Identity comes from a fresh Firebase ID token (Bearer) — the old shared
+    // X-API-Key shipped in the bundle and is no longer accepted (H1).
+    this.tokenProvider = tokenProvider ?? (async () => null)
   }
 
   private authHeaders(extra: Record<string, string> = {}): Record<string, string> {
     return {
       ...extra,
-      ...(this.apiKey ? { 'X-API-Key': this.apiKey } : {}),
       ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
     }
   }
@@ -41,10 +45,15 @@ export class AppBackendConnector implements PowerSyncBackendConnector {
     }
 
     try {
+      const idToken = this.token ?? (await this.tokenProvider()) ?? null
+      if (!idToken) {
+        // No signed-in Firebase user yet — no sync until identity exists.
+        return null
+      }
       const facilityId = (import.meta.env.VITE_FACILITY_ID as string | undefined) ?? 'demo-facility'
       const res = await fetch(
         `${this.backendUrl}/api/auth/powersync-token?facilityId=${encodeURIComponent(facilityId)}`,
-        { headers: this.authHeaders() },
+        { headers: { Authorization: `Bearer ${idToken}` } },
       )
       if (!res.ok) {
         return null
@@ -251,7 +260,15 @@ export function getPowerSyncDb(): PowerSyncDatabase {
 
 export function getBackendConnector(): AppBackendConnector {
   if (!connectorInstance) {
-    connectorInstance = new AppBackendConnector()
+    connectorInstance = new AppBackendConnector(undefined, async () => {
+      try {
+        const { auth } = await import('../firebase')
+        const user = auth?.currentUser
+        return user ? user.getIdToken() : null
+      } catch {
+        return null
+      }
+    })
   }
   return connectorInstance
 }

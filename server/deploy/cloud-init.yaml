@@ -3,10 +3,15 @@
 # Paste into OCI Console -> Create Instance -> Advanced options -> User data.
 # Then: restrict port 22 to your IP in the subnet security list (console).
 
+# Disable root SSH and password authentication (L3).
+disable_root: true
+ssh_pwauth: false
+
 users:
   - name: opshield
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: [docker]
+    # Restricted sudo: only docker compose, systemctl restart/stop for the stack,
+    # and file reads. Remove `groups: [docker]` to avoid implicit root.
+    sudo: "NOPASSWD: /usr/bin/docker compose, /usr/bin/systemctl restart docker, /usr/bin/systemctl stop docker, /usr/bin/systemctl start docker, /usr/bin/cat, /usr/bin/tail, /usr/bin/journalctl"
     shell: /bin/bash
     ssh_authorized_keys:
       - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC6pFeD5NM/gQYfQOPBh1WtKGE5GSs0/cGsjL38FA2/7/Km6GOokyAUvzgAFoISvoSTIGQt+4qjIfAaHRQpmzLNW7XQKY44URZf8Ez1AcFhZEZQLz36QBJPhmu6xGpDLkFIinZP3kfgHgiGTCPd0ZXMq1/H3p87IAQzNY4GhpC5eRMFt3sbHKemiclq3uSPlggfdD5pc983JEl3Q5nWCkUoFgwhEp0Wi/cJxwPkHlBRNTAV3w0f3nrm+awG9UZYqBatx/yVmeiSfk7V1Hyh5HJhDih+dLMeqo8yA6wz6AkZ5I2x9Kwzys2qsCNO3MxEYh47Vs5b3rDt7b7u3CSWYyAl ssh-key-2026-09-10
@@ -28,6 +33,11 @@ write_files:
   - path: /etc/sysctl.d/99-opshield.conf
     content: |
       vm.swappiness=10
+  - path: /etc/ssh/sshd_config.d/opshield-hardening.conf
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      ChallengeResponseAuthentication no
 
 runcmd:
   # 2 GB swap — small VMs OOM on `npm ci` / image builds without it.
@@ -41,7 +51,6 @@ runcmd:
   - apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   - systemctl enable --now docker
   - usermod -aG docker ubuntu || true
-  - usermod -aG docker opshield || true
   # Firewall: deny-first, SSH/HTTP/HTTPS only. Tighten 22 to your IP in OCI.
   - ufw --force reset
   - ufw default deny incoming
@@ -50,6 +59,8 @@ runcmd:
   - ufw allow 80/tcp
   - ufw allow 443/tcp
   - ufw --force enable
+  # Restart sshd to apply hardening drop-in.
+  - systemctl restart sshd
   # Auto security patches; Docker images are rebuilt by deploy, not patched.
   - systemctl enable --now unattended-upgrades
 
