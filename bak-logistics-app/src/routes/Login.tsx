@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSession, type Role } from '../store/session'
+import { useSession, roleFromSlug, type Role } from '../store/session'
 import { isLive } from '../lib/firebase'
 import { landingPathForRole } from '../lib/gates'
 import { parsePinCredentials } from '../lib/pin'
@@ -45,6 +45,20 @@ export default function Login() {
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('demo')
   const allowDemo = !import.meta.env.PROD || import.meta.env.VITE_ALLOW_DEMO === 'true' || demoHatch
   const online = typeof navigator === 'undefined' ? true : navigator.onLine
+  const { role: activeRole } = useSession()
+
+  // Econet-style deep link: ?demo=1&role=dispatch signs straight into the
+  // practice shift — the shareable validation link for Tafadzwa. Test-only:
+  // practice sessions never touch yard data.
+  useEffect(() => {
+    if (!allowDemo) return
+    const slug = roleFromSlug(new URLSearchParams(window.location.search).get('role'))
+    if (slug && slug !== activeRole) {
+      signInDemo(slug)
+      navigate(landingPathForRole(slug))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function signInWith(emailValue: string, passwordValue: string, pinMode = false) {
     setBusy(true)

@@ -46,11 +46,32 @@ test('compliance officer lands on audit trail', async ({ page }) => {
   await expect(page.getByText('Audit trail')).toBeVisible()
 })
 
+test('deep link ?role=dispatch signs straight into the shift', async ({ page }) => {
+  await page.goto('/?demo=1&role=dispatch')
+  await expect(page).toHaveURL(/\/queue$/)
+  await expect(page.getByText('Shift queue')).toBeVisible()
+})
+
+test('header View-as switcher changes role without sign-out', async ({ page }) => {
+  await page.goto('/?demo=1&role=dispatch')
+  await expect(page).toHaveURL(/\/queue$/)
+  await page.getByLabel('Switch practice role').selectOption('EXECUTIVE')
+  await expect(page).toHaveURL(/\/reports$/)
+  await expect(page.getByText('Shift performance')).toBeVisible()
+})
+
+test('practice session survives refresh (tab close signs out by design)', async ({ page }) => {
+  await page.goto('/?demo=1&role=dispatch')
+  await expect(page).toHaveURL(/\/queue$/)
+  await page.reload()
+  await expect(page).toHaveURL(/\/queue$/)
+  await expect(page.getByText('Shift queue')).toBeVisible()
+})
+
 test('dispatch is gated out of docks (dead-end, no redirect loop)', async ({ page }) => {
   await page.getByRole('button', { name: /Start shift as DISPATCH SUPERVISOR/ }).click()
   await expect(page).toHaveURL(/\/queue$/)
-  // Client-side navigation (full reload drops the in-memory demo session by
-  // design, so push a route the same way the router sees it).
+  // Client-side navigation (no full reload, so the practice session holds).
   await page.evaluate(() => {
     window.history.pushState({}, '', '/docks')
     window.dispatchEvent(new PopStateEvent('popstate'))

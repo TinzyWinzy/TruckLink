@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { pendingActionCount, pendingActionCountSyncInitial, isOnline } from '../lib/offline/db'
-import { useSession, type Role, canAccess } from '../store/session'
+import { useSession, isPracticeSession, type Role, canAccess } from '../store/session'
+import { useNavigate } from 'react-router-dom'
 import { useEffect, useState, type ReactNode } from 'react'
 import { isLive } from '../lib/firebase'
 import { ROUTE_GATES, landingPathForRole } from '../lib/gates'
@@ -26,7 +27,9 @@ function visible(items: typeof PRIMARY, role: Role | null) {
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
-  const { role, displayName, online, setOnline, signOut } = useSession()
+  const navigate = useNavigate()
+  const { role, userId, displayName, online, setOnline, signOut, signInDemo } = useSession()
+  const practice = isPracticeSession(userId)
   const [pending, setPending] = useState(pendingActionCountSyncInitial)
   const [critical, setCritical] = useState(0)
   const live = isLive()
@@ -107,6 +110,25 @@ export default function Layout({ children }: { children: ReactNode }) {
           <span className="ml-auto hidden text-xs font-semibold text-white/60 md:inline">
             {displayName} · {role?.replace(/_/g, ' ') ?? 'signed out'}
           </span>
+          {practice && (
+            <label className="flex items-center gap-1.5 rounded-lg border border-amber-400/50 bg-white/5 px-2 py-1 text-xs font-bold text-amber-300">
+              View as
+              <select
+                aria-label="Switch practice role"
+                value={role ?? ''}
+                onChange={(e) => {
+                  const next = e.target.value as Role
+                  signInDemo(next)
+                  navigate(landingPathForRole(next))
+                }}
+                className="touch-target min-h-0 rounded bg-transparent py-0.5 pr-1 font-extrabold text-white [&>option]:text-slate-900"
+              >
+                {(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'EXECUTIVE', 'COMPLIANCE_OFFICER', 'ADMIN'] as Role[]).map((r) => (
+                  <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <button
             type="button"
             onClick={async () => {
