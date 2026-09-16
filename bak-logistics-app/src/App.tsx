@@ -12,6 +12,8 @@ const Alerts = lazy(() => import('./routes/Alerts'))
 const Reports = lazy(() => import('./routes/Reports'))
 const AuditLog = lazy(() => import('./routes/AuditLog'))
 const Admin = lazy(() => import('./routes/Admin'))
+const Hub = lazy(() => import('./routes/Hub'))
+const Guide = lazy(() => import('./routes/Guide'))
 
 /** Role gate per ROUTE_GATES. Mismatch renders a dead-end, never a redirect loop. */
 function RoleGuard({ route, children }: { route: RouteKey; children: ReactNode }) {
@@ -58,6 +60,8 @@ export default function App() {
         <Route path="/reports" element={<RoleGuard route="reports"><Layout><Reports /></Layout></RoleGuard>} />
         <Route path="/audit" element={<RoleGuard route="audit"><Layout><AuditLog /></Layout></RoleGuard>} />
         <Route path="/admin" element={<RoleGuard route="admin"><Layout><Admin /></Layout></RoleGuard>} />
+        <Route path="/hub" element={<RoleGuard route="hub"><Layout><Hub /></Layout></RoleGuard>} />
+        <Route path="/guide" element={<RoleGuard route="guide"><Layout><Guide /></Layout></RoleGuard>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>

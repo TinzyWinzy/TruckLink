@@ -52,7 +52,7 @@ export async function connectWeighbridge(
   opts: { baudRate?: number; signal?: AbortSignal } = {},
 ): Promise<SerialConnection> {
   const nav = navigator as Navigator & { serial: { requestPort: () => Promise<SerialPortLike> } }
-  if (!nav.serial) throw new Error('Web Serial not supported in this browser — use Chromium on the yard tablet.')
+  if (!nav.serial) throw new Error("This tablet's browser can't talk to the scale — use Chrome on the yard tablet.")
   const port = await nav.serial.requestPort()
   await port.open({ baudRate: opts.baudRate ?? 9600 })
   const decoder = new TextDecoder()

@@ -15,8 +15,12 @@ import { EmptyState, PageHeader, Stat } from '../components/ui'
 const SEED: LiveRow[] = [
   { id: 'q1', licensePlate: 'AEH 4521', driverName: 'T. Moyo', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED', entryTimestamp: new Date(Date.now() - 42 * 60000).toISOString() },
   { id: 'q2', licensePlate: 'AGX 9033', driverName: 'S. Ndlovu', cargoType: 'Dry van', expectedDestination: 'Forbes', status: 'ASSIGNED', entryTimestamp: new Date(Date.now() - 25 * 60000).toISOString() },
-  { id: 'q3', licensePlate: 'AFM 1187', driverName: 'K. Sibanda', cargoType: 'Tanker', expectedDestination: 'Chirundu', status: 'QUEUED', entryTimestamp: new Date(Date.now() - 74 * 60000).toISOString() },
-  { id: 'q0', licensePlate: 'AEO 2210', driverName: 'R. Dube', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'RELEASED', entryTimestamp: new Date(Date.now() - 180 * 60000).toISOString(), exitTimestamp: new Date(Date.now() - 95 * 60000).toISOString() },
+  { id: 'q3', licensePlate: 'AFM 1187', driverName: 'K. Sibanda', cargoType: 'Tanker', expectedDestination: 'Chirundu', status: 'QUARANTINED', entryTimestamp: new Date(Date.now() - 169 * 60000).toISOString() },
+  { id: 'q4', licensePlate: 'ABZ 9901', driverName: 'R. Dube', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED', entryTimestamp: new Date(Date.now() - 74 * 60000).toISOString() },
+  { id: 'q5', licensePlate: 'AEO 2210', driverName: 'P. Chikafu', cargoType: 'Refrigerated', expectedDestination: 'Harare Local', status: 'RELEASED', entryTimestamp: new Date(Date.now() - 180 * 60000).toISOString(), exitTimestamp: new Date(Date.now() - 95 * 60000).toISOString() },
+  { id: 'q6', licensePlate: 'ADP 3357', driverName: 'J. Banda', cargoType: 'Flatbed', expectedDestination: 'Chirundu', status: 'PENDING_OVERRIDE', entryTimestamp: new Date(Date.now() - 86 * 60000).toISOString() },
+  { id: 'q7', licensePlate: 'AEW 7712', driverName: 'M. Hove', cargoType: 'Dry van', expectedDestination: 'Forbes', status: 'OVERRIDE_APPROVED', entryTimestamp: new Date(Date.now() - 139 * 60000).toISOString() },
+  { id: 'q8', licensePlate: 'AFX 6640', driverName: 'D. Mutasa', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED', entryTimestamp: new Date(Date.now() - 9 * 60000).toISOString() },
 ]
 
 const fmt = (n: number | null) => (n == null ? '—' : `${Math.round(n)}m`)
@@ -83,7 +87,7 @@ export default function Reports() {
     <div>
       <PageHeader
         title="Shift performance"
-        sub={live ? 'Live numbers for the SLA conversation — waiting now, cleared today, dock pressure.' : 'Demo numbers — live SLA data appears once Firebase is connected.'}
+        sub={live ? 'Live numbers for the SLA conversation — waiting now, cleared today, dock pressure.' : 'Practice numbers — training data only.'}
         mode={live ? 'live' : 'demo'}
         actions={
           <button type="button" onClick={downloadCsv} className="btn-primary touch-target rounded-lg px-4 text-sm">
@@ -114,7 +118,7 @@ export default function Reports() {
 
       <h2 className="mb-2 mt-6 text-base font-extrabold">Corridor pressure</h2>
       {!analytics ? (
-        <EmptyState title="Surge detection offline" sub="Set VITE_SYNC_API_URL to stream live corridor pressure." />
+        <EmptyState title="Surge detection unavailable" sub="Ask your supervisor to connect the corridor feed." />
       ) : !surge ? (
         <EmptyState title="Loading pressure…" sub="Reaching the sync API." />
       ) : surge.surging ? (
@@ -130,7 +134,7 @@ export default function Reports() {
 
       <h2 className="mb-2 mt-6 text-base font-extrabold">ZINARA fines intercepted · 30d</h2>
       {!analytics ? (
-        <EmptyState title="ROI offline" sub="Set VITE_SYNC_API_URL to show intercepted overload fines." />
+        <EmptyState title="Fines tracker unavailable" sub="Ask your supervisor to connect the fines feed." />
       ) : !roi ? (
         <EmptyState title="Loading ROI…" sub="Reaching the sync API." />
       ) : (
@@ -148,7 +152,7 @@ export default function Reports() {
 
       <h2 className="mb-2 mt-6 text-base font-extrabold">Dwell heatmap · 14d avg by entry hour</h2>
       {!analytics ? (
-        <EmptyState title="Heatmap offline" sub="Set VITE_SYNC_API_URL to show dwell by hour." />
+        <EmptyState title="Hourly chart unavailable" sub="Ask your supervisor to connect the dwell feed." />
       ) : !heatmap ? (
         <EmptyState title="Loading heatmap…" sub="Reaching the sync API." />
       ) : heatmap.every((b) => b.movements === 0) ? (

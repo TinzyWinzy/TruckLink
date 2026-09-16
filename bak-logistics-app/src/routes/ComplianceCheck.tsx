@@ -79,7 +79,7 @@ export default function ComplianceCheck() {
         })
         const ok = r.overallStatus === 'PASS'
         setPassed(ok)
-        setResult(ok ? '✔ PASS — gate release enabled (demo). Next: release the truck from the Queue board.' : `✖ FAIL — quarantine: ${r.violations.join('; ')}`)
+        setResult(ok ? '✔ PASS — practice check. On the yard, release the truck from the Queue board.' : `✖ FAIL — quarantine: ${r.violations.join('; ')}`)
         return
       }
       if (!entryId.trim()) {
@@ -115,7 +115,7 @@ export default function ComplianceCheck() {
   async function readScale() {
     setScaleMsg(null)
     if (!isWebSerialSupported()) {
-      setScaleMsg('✖ This browser has no Web Serial — use Chromium on the yard tablet. Manual entry still works.')
+      setScaleMsg('✖ This browser can’t talk to the scale — use Chrome on the yard tablet. Typing still works.')
       return
     }
     try {
@@ -137,7 +137,7 @@ export default function ComplianceCheck() {
   async function requestOverride() {
     setOverrideMsg(null)
     if (!live) {
-      setOverrideMsg('Demo — override needs a live queue entry.')
+      setOverrideMsg('Practice — overrides need a yard entry.')
       return
     }
     if (!entryId.trim()) {

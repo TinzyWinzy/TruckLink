@@ -6,12 +6,9 @@ import { useSession } from '../store/session'
 import { canAckAlert } from '../lib/gates'
 import { EmptyState, PageHeader, StatusPill } from '../components/ui'
 import { approveOverridePS, acknowledgeAlertPS } from '../lib/powersync/operations'
+import { DEMO_ALERTS } from '../lib/demoData'
 
-const SEED: LiveRow[] = [
-  { id: 'seed-1', type: 'QUARANTINE', severity: 'CRITICAL', status: 'ACTIVE', message: 'AFM 1187 quarantined: Axle 2 overloaded by 1,400kg. Rebalancing or override required.', triggeredAt: '08:19' },
-  { id: 'seed-2', type: 'EXCESSIVE_WAIT', severity: 'HIGH', status: 'ACTIVE', message: 'ABZ 9901 waiting 74m (exceeds 60m threshold)', triggeredAt: '08:19' },
-  { id: 'seed-3', type: 'EQUIPMENT_SHORTAGE', severity: 'MEDIUM', status: 'ACKNOWLEDGED', message: 'Forklift utilization 87% — consider rebalancing', triggeredAt: '07:55' },
-]
+const SEED: LiveRow[] = DEMO_ALERTS as unknown as LiveRow[]
 
 export default function Alerts() {
   const { userId, role, displayName } = useSession()
@@ -155,7 +152,9 @@ export default function Alerts() {
                     symbol="■"
                   />
                 </div>
-                <span className="w-full text-[15px] sm:w-auto sm:flex-1">{String(a.message ?? '')}</span>
+                <span className="w-full text-[15px] sm:w-auto sm:flex-1">{String(a.message ?? '')}
+                  {typeof a.action === 'string' && a.action ? <span className="mt-1 block text-xs font-semibold text-slate-600">→ {a.action}</span> : null}
+                </span>
                 <StatusPill status={String(a.status ?? (a.acknowledged ? 'ACKNOWLEDGED' : 'ACTIVE'))} />
 
                 {isActive && (

@@ -11,3 +11,5 @@ ui-debug.log
 # Service-account keys — NEVER commit
 .secrets/
 *-firebase-adminsdk-*.json
+
+.vercel

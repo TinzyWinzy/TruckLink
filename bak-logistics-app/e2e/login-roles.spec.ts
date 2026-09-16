@@ -1,0 +1,60 @@
+import { expect, test } from '@playwright/test'
+
+const ROLES = [
+  'DISPATCH SUPERVISOR',
+  'OPERATIONS SUPERVISOR',
+  'FACILITY MANAGER',
+  'EXECUTIVE',
+  'COMPLIANCE OFFICER',
+  'ADMIN',
+] as const
+
+test.beforeEach(async ({ page }) => {
+  await page.goto('/')
+  // Practice harness: no live backend → PRACTICE pill + role radiogroup.
+  await expect(page.getByText('■ PRACTICE')).toBeVisible()
+  await expect(page.getByRole('radiogroup', { name: 'Shift role' })).toBeVisible()
+})
+
+test('gate shows all six role tabs, dispatch selected by default', async ({ page }) => {
+  for (const r of ROLES) {
+    await expect(page.getByRole('radio', { name: new RegExp(r) })).toBeVisible()
+  }
+  await expect(page.getByRole('radio', { name: /DISPATCH SUPERVISOR/ })).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByRole('button', { name: /Start shift as DISPATCH SUPERVISOR/ })).toBeVisible()
+})
+
+test('selecting a tab updates the CTA and lands on the role home', async ({ page }) => {
+  await page.getByRole('radio', { name: /EXECUTIVE/ }).click()
+  await expect(page.getByRole('radio', { name: /EXECUTIVE/ })).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByRole('radio', { name: /DISPATCH SUPERVISOR/ })).toHaveAttribute('aria-checked', 'false')
+  await page.getByRole('button', { name: /Start shift as EXECUTIVE/ }).click()
+  await expect(page).toHaveURL(/\/reports$/)
+  await expect(page.getByText('Shift performance')).toBeVisible()
+})
+
+test('dispatch lands on queue; compliance lands on audit', async ({ page }) => {
+  await page.getByRole('button', { name: /Start shift as DISPATCH SUPERVISOR/ }).click()
+  await expect(page).toHaveURL(/\/queue$/)
+  await expect(page.getByText('Shift queue')).toBeVisible()
+})
+
+test('compliance officer lands on audit trail', async ({ page }) => {
+  await page.getByRole('radio', { name: /COMPLIANCE OFFICER/ }).click()
+  await page.getByRole('button', { name: /Start shift as COMPLIANCE OFFICER/ }).click()
+  await expect(page).toHaveURL(/\/audit$/)
+  await expect(page.getByText('Audit trail')).toBeVisible()
+})
+
+test('dispatch is gated out of docks (dead-end, no redirect loop)', async ({ page }) => {
+  await page.getByRole('button', { name: /Start shift as DISPATCH SUPERVISOR/ }).click()
+  await expect(page).toHaveURL(/\/queue$/)
+  // Client-side navigation (full reload drops the in-memory demo session by
+  // design, so push a route the same way the router sees it).
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/docks')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  await expect(page.getByText('Not permitted')).toBeVisible()
+  await expect(page).toHaveURL(/\/docks$/)
+})

@@ -22,10 +22,10 @@ interface SessionState {
 export const useSession = create<SessionState>((set) => ({
   userId: null,
   role: null,
-  displayName: 'Demo user',
+  displayName: 'Practice user',
   online: typeof navigator === 'undefined' ? true : navigator.onLine,
   signInDemo: (role) =>
-    set({ userId: `demo-${role.toLowerCase()}`, role, displayName: `Demo ${role.replace(/_/g, ' ')}` }),
+    set({ userId: `demo-${role.toLowerCase()}`, role, displayName: `${role.replace(/_/g, ' ')} (practice)` }),
   signInReal: (userId, role, displayName) => set({ userId, role, displayName }),
   signOut: () => set({ userId: null, role: null }),
   setOnline: (online) => set({ online }),

@@ -4,7 +4,8 @@ import { enqueueOfflineAction, isOnline } from '../lib/offline/db'
 import { isLive } from '../lib/firebase'
 import type { LiveRow } from '../lib/live'
 import { useSession } from '../store/session'
-import { EmptyState, PageHeader, StatusPill } from '../components/ui'
+import { DEMO_QUEUE } from '../lib/demoData'
+import { EmptyState, PageHeader, StatusPill, spineForStatus } from '../components/ui'
 
 interface Row {
   id: string
@@ -43,11 +44,7 @@ function mapLive(r: LiveRow): Row {
   }
 }
 
-const SEED: Row[] = [
-  { id: 'q1', plate: 'AEH 4521', driver: 'T. Moyo', cargo: 'Container', dest: 'Beitbridge', rawStatus: 'QUEUED', enteredAt: '08:12' },
-  { id: 'q2', plate: 'AGX 9033', driver: 'S. Ndlovu', cargo: 'Dry van', dest: 'Forbes', rawStatus: 'ASSIGNED', enteredAt: '08:40' },
-  { id: 'q3', plate: 'AFM 1187', driver: 'K. Sibanda', cargo: 'Tanker', dest: 'Chirundu', rawStatus: 'QUEUED', enteredAt: '07:05' },
-]
+const SEED: Row[] = DEMO_QUEUE
 
 export default function QueueDashboard() {
   const { role, displayName } = useSession()
@@ -107,7 +104,7 @@ export default function QueueDashboard() {
       ])
       setPlate('')
       setDriver('')
-      setNotice('✔ Entry added to this shift board (demo).')
+      setNotice('✔ Entry added — practice entry, training only.')
       return
     }
 
@@ -141,7 +138,8 @@ export default function QueueDashboard() {
     <div>
       <PageHeader
         title="Shift queue"
-        sub={live ? 'Live yard board — oldest first. Register at the gate, release at the exit.' : 'Demo board — connect Firebase for the live yard.'}
+        eyebrow="Harare yard · oldest first"
+        sub={live ? 'Live yard board — oldest first. Register at the gate, release at the exit.' : 'Practice board — training entries only.'}
         mode={live ? 'live' : 'demo'}
       />
       {/* Primary job first: register the truck in front of you (Fitts + Hick) */}
@@ -180,8 +178,8 @@ export default function QueueDashboard() {
       ) : (
         <ul className="mt-3 space-y-2">
           {shown.map((r) => (
-            <li key={r.id} className="card flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
-              <strong className="text-lg tabular-nums">{r.plate}</strong>
+            <li key={r.id} className={`card spine ${spineForStatus(r.rawStatus)} flex flex-wrap items-center gap-x-3 gap-y-1 py-3 pl-5 pr-4`}>
+              <strong className="tnum text-lg tracking-tight">{r.plate}</strong>
               <StatusPill status={r.rawStatus} symbol={SYMBOL[r.rawStatus]} />
               <span className="w-full text-sm text-slate-600 sm:w-auto">{r.driver} · {r.cargo} → {r.dest} · in {r.enteredAt}</span>
               {(r.rawStatus === 'COMPLETED' || r.rawStatus === 'OVERRIDE_APPROVED') && live && canRelease && (
@@ -193,7 +191,7 @@ export default function QueueDashboard() {
           ))}
         </ul>
       )}
-      <p className="mt-3 text-xs text-slate-500">Signed in as {displayName}. Status always pairs shape + text for colour-blind safety.</p>
+      <p className="mt-3 text-xs text-slate-500">Signed in as {displayName}. Every status shows a shape + words — nothing depends on colour alone.</p>
     </div>
   )
 }

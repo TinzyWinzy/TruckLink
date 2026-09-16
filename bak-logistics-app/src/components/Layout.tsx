@@ -12,6 +12,8 @@ const PRIMARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] 
 ]
 
 const SECONDARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] = [
+  { to: '/hub', label: 'Hub', route: 'hub' },
+  { to: '/guide', label: 'Guide', route: 'guide' },
   { to: '/alerts', label: 'Alerts', route: 'alerts' },
   { to: '/reports', label: 'Reports', route: 'reports' },
   { to: '/audit', label: 'Audit', route: 'audit' },
@@ -68,37 +70,41 @@ export default function Layout({ children }: { children: ReactNode }) {
     return () => unsub?.()
   }, [live, role])
 
-  const linkCls = (to: string, primary: boolean) => {
+  const linkCls = (to: string) => {
     const active = pathname === to
-    const base = 'touch-target inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold'
-    if (active) return `${base} bg-white text-slate-900 shadow-sm`
-    return primary
-      ? `${base} text-white/90 hover:bg-white/10`
-      : `${base} text-white/65 hover:bg-white/10 hover:text-white`
+    const base = 'nav-pill touch-target inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold'
+    if (active) return `${base} nav-active`
+    return `${base} text-white/75 hover:bg-white/10 hover:text-white`
   }
 
   return (
-    <div className="min-h-screen text-slate-900">
-      <header className="sticky top-0 z-10 bg-slate-900 text-white shadow-md">
-        {/* Shift strip — glanceable yard state first (Pareto: exceptions before browsing) */}
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 pt-3">
-          <Link to={role ? landingPathForRole(role) : '/queue'} className="flex items-center gap-2 font-extrabold tracking-tight" aria-label="BAK Intel home">
-            <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 text-sm font-black text-slate-900">
+    <div className="on-dark min-h-screen text-slate-900">
+      <header className="gantry sticky top-0 z-10 text-white shadow-lg">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-3">
+          <Link to={role ? landingPathForRole(role) : '/queue'} className="flex items-center gap-2.5" aria-label="BAK Intel home">
+            <span aria-hidden="true" className="gantry-mark flex h-9 w-9 items-center justify-center rounded-xl text-base font-black text-slate-900">
               B
             </span>
-            BAK Intel
+            <span className="leading-none">
+              <span className="block text-[10px] font-extrabold uppercase tracking-[0.18em] text-amber-400">
+                Harare · Yard
+              </span>
+              <span className="block text-lg font-extrabold tracking-tight">BAK Intel</span>
+            </span>
           </Link>
-          <span role="status" aria-label={online ? 'Online' : 'Offline'} className={online ? 'pill pill-live' : 'pill pill-warn'}>
-            {online ? '● ONLINE' : '■ OFFLINE'}
-          </span>
-          <span className={live ? 'pill pill-live' : 'pill pill-demo'}>{live ? '● STAGING' : '■ DEMO'}</span>
-          {pending > 0 && (
-            <span role="status" className="pill pill-queued">⏳ {pending} queued</span>
-          )}
-          {critical > 0 && (
-            <Link to="/alerts" className="pill pill-fail" role="alert">✖ {critical} critical</Link>
-          )}
-          <span className="ml-auto hidden text-xs text-white/70 sm:inline">
+          <div className="flex flex-wrap items-center gap-1.5" role="status" aria-label="Yard state">
+            <span aria-label={online ? 'Online' : 'Offline'} className={online ? 'pill pill-live' : 'pill pill-warn'}>
+              {online ? '● ONLINE' : '■ OFFLINE'}
+            </span>
+            <span className={live ? 'pill pill-live' : 'pill pill-demo'}>{live ? '● LIVE' : '■ PRACTICE'}</span>
+            {pending > 0 && (
+              <span role="status" className="pill pill-queued">⏳ {pending} queued</span>
+            )}
+            {critical > 0 && (
+              <Link to="/alerts" className="pill pill-fail" role="alert">✖ {critical} critical</Link>
+            )}
+          </div>
+          <span className="ml-auto hidden text-xs font-semibold text-white/60 md:inline">
             {displayName} · {role?.replace(/_/g, ' ') ?? 'signed out'}
           </span>
           <button
@@ -116,19 +122,19 @@ export default function Layout({ children }: { children: ReactNode }) {
             Sign out
           </button>
         </div>
-        {/* Weighted nav — 3 primary jobs, alerts flagged, rest secondary (Hick's Law) */}
-        <nav aria-label="Primary" className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4 pb-2 pt-1">
+        {/* Weighted nav — 3 primary jobs, hub/guide + rest secondary (Hick's Law) */}
+        <nav aria-label="Primary" className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4 pb-2.5 pt-2">
           {visible(PRIMARY, role).map((item) => (
-            <Link key={item.to} to={item.to} aria-current={pathname === item.to ? 'page' : undefined} className={linkCls(item.to, true)}>
+            <Link key={item.to} to={item.to} aria-current={pathname === item.to ? 'page' : undefined} className={linkCls(item.to)}>
               {item.label}
             </Link>
           ))}
           <span aria-hidden="true" className="mx-1 h-5 w-px bg-white/20" />
           {visible(SECONDARY, role).map((item) => (
-            <Link key={item.to} to={item.to} aria-current={pathname === item.to ? 'page' : undefined} className={linkCls(item.to, false)}>
+            <Link key={item.to} to={item.to} aria-current={pathname === item.to ? 'page' : undefined} className={linkCls(item.to)}>
               {item.label}
               {item.to === '/alerts' && critical > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-extrabold text-white">
+                <span className="tnum flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-extrabold text-white">
                   {critical}
                 </span>
               )}
@@ -136,7 +142,10 @@ export default function Layout({ children }: { children: ReactNode }) {
           ))}
         </nav>
       </header>
-      <main className="mx-auto w-full max-w-6xl px-4 py-5">{children}</main>
+      <main className="mx-auto w-full max-w-6xl px-4 py-6">{children}</main>
+      <footer className="yard-foot mx-auto w-full max-w-6xl px-4 py-4 text-xs">
+        BAK Intel · Harare yard overlay · {live ? 'connected' : 'training mode'} · Works offline — queued work syncs on reconnect.
+      </footer>
     </div>
   )
 }

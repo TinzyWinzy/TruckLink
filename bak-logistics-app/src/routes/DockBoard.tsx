@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { isLive } from '../lib/firebase'
 import type { LiveRow } from '../lib/live'
 import { isOnline } from '../lib/offline/db'
-import { EmptyState, PageHeader, StatusPill } from '../components/ui'
+import { EmptyState, PageHeader, StatusPill, spineForStatus } from '../components/ui'
+import { DEMO_DOCKS } from '../lib/demoData'
 
 interface Dock {
   id: string
@@ -12,12 +13,7 @@ interface Dock {
   util: number
 }
 
-const SEED: Dock[] = [
-  { id: 'D1', label: 'Dock 1', rawStatus: 'OCCUPIED', occupant: 'AEH 4521', util: 82 },
-  { id: 'D2', label: 'Dock 2', rawStatus: 'AVAILABLE', occupant: '', util: 41 },
-  { id: 'D3', label: 'Dock 3', rawStatus: 'AVAILABLE', occupant: '', util: 35 },
-  { id: 'D4', label: 'Dock 4', rawStatus: 'MAINTENANCE', occupant: '', util: 0 },
-]
+const SEED: Dock[] = DEMO_DOCKS
 
 const SYMBOL: Record<string, string> = { AVAILABLE: '○', OCCUPIED: '■', MAINTENANCE: '✚', RESERVED: '◐' }
 
@@ -56,11 +52,11 @@ export default function DockBoard() {
   async function tap(dock: Dock) {
     setMessage(null)
     if (!live) {
-      setMessage(`Demo — ${dock.label} tap recorded locally.`)
+      setMessage(`Practice — ${dock.label} tap recorded on this tablet.`)
       return
     }
     if (!isOnline()) {
-      setMessage('■ Offline — dock moves need connectivity (transactional). Trucks keep queueing.')
+      setMessage('■ Offline — dock moves need signal. Trucks keep queueing.')
       return
     }
     const first = queuedIds[0]
@@ -80,12 +76,13 @@ export default function DockBoard() {
     <div>
       <PageHeader
         title="Dock board"
-        sub={live ? `${free} of ${docks.length} docks free · ${queuedIds.length} waiting. Tap a free dock to take the oldest truck.` : 'Demo layout — live board shows free docks and waiting trucks.'}
+        eyebrow="72,000 m² · tap a free dock"
+        sub={live ? `${free} of ${docks.length} docks free · ${queuedIds.length} waiting. Tap a free dock to take the oldest truck.` : 'Practice layout — training docks only.'}
         mode={live ? 'live' : 'demo'}
       />
       {message && <p role="status" className="mb-3 rounded-lg bg-slate-900 p-3 text-sm font-bold text-white">{message}</p>}
       {docks.length === 0 ? (
-        <EmptyState title="No docks configured" sub="Ask an ADMIN to seed the facility." />
+        <EmptyState title="No docks configured" sub="Ask your supervisor to set up the yard." />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {docks.map((d) => {
@@ -96,7 +93,7 @@ export default function DockBoard() {
                 type="button"
                 onClick={() => void tap(d)}
                 disabled={live && !free_}
-                className={`card touch-target p-4 text-left ${free_ ? 'ring-2 ring-emerald-600 hover:shadow-md' : ''} disabled:opacity-70`}
+                className={`card spine touch-target p-4 pl-5 text-left ${spineForStatus(d.rawStatus)} ${free_ ? 'ring-2 ring-emerald-600 hover:shadow-md' : ''} disabled:opacity-70`}
                 aria-label={`${d.label}, ${d.rawStatus}${d.occupant ? `, ${d.occupant}` : ''}`}
               >
                 <div className="flex items-center justify-between gap-2">

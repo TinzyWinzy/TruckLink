@@ -52,13 +52,13 @@ export async function signInLive(
   email: string,
   password: string,
 ): Promise<{ uid: string; role: LiveRole; displayName: string }> {
-  if (!auth) throw new Error('Auth not configured (demo mode)')
+  if (!auth) throw new Error('Sign-in not connected (practice mode)')
   const cred = await signInWithEmailAndPassword(auth, email, password)
   const token = await cred.user.getIdTokenResult()
   const role = token.claims.role as string | undefined
   if (!role || !(ROLES as readonly string[]).includes(role)) {
     await signOut(auth)
-    throw new Error('No role claim on this account — ask an ADMIN to set custom claims (role + facilities).')
+    throw new Error('This account has no job assigned — ask your supervisor to set up your account.')
   }
   return {
     uid: cred.user.uid,
@@ -162,10 +162,40 @@ export async function seedDemoFacility(): Promise<void> {
     },
     { merge: true },
   )
+  // Tafadzwa walkthrough shift — same 8-truck morning as demoData.ts.
+  // Idempotent merges; safe to re-run. Skipped silently when docs exist?
+  // No — merge overwrites status, which is exactly what a re-demo wants.
+  const shiftQueue = [
+    { id: 'q-seed-1', licensePlate: 'AEH 4521', driverName: 'T. Moyo', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED' },
+    { id: 'q-seed-2', licensePlate: 'AGX 9033', driverName: 'S. Ndlovu', cargoType: 'Dry van', expectedDestination: 'Forbes', status: 'ASSIGNED', assignedDockId: 'D1' },
+    { id: 'q-seed-3', licensePlate: 'AFM 1187', driverName: 'K. Sibanda', cargoType: 'Tanker', expectedDestination: 'Chirundu', status: 'QUARANTINED' },
+    { id: 'q-seed-4', licensePlate: 'ABZ 9901', driverName: 'R. Dube', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED' },
+    { id: 'q-seed-6', licensePlate: 'ADP 3357', driverName: 'J. Banda', cargoType: 'Flatbed', expectedDestination: 'Chirundu', status: 'PENDING_OVERRIDE' },
+    { id: 'q-seed-7', licensePlate: 'AEW 7712', driverName: 'M. Hove', cargoType: 'Dry van', expectedDestination: 'Forbes', status: 'OVERRIDE_APPROVED' },
+    { id: 'q-seed-8', licensePlate: 'AFX 6640', driverName: 'D. Mutasa', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED' },
+  ]
+  for (const q of shiftQueue) {
+    await setDoc(
+      doc(col('queue'), q.id),
+      { ...q, entryTimestamp: serverTimestamp(), createdAt: serverTimestamp() },
+      { merge: true },
+    )
+  }
+  const shiftAlerts = [
+    { id: 'quar-q-seed-3', type: 'COMPLIANCE_FAILURE', severity: 'CRITICAL', status: 'ACTIVE', relatedEntityType: 'queueEntry', relatedEntityId: 'q-seed-3', message: 'AFM 1187 quarantined: Axle 2 overloaded by 1,400kg. Rebalancing or override required.' },
+    { id: 'wait-q-seed-4', type: 'EXCESSIVE_WAIT', severity: 'HIGH', status: 'ACTIVE', relatedEntityType: 'queueEntry', relatedEntityId: 'q-seed-4', message: 'ABZ 9901 waiting 74m (exceeds 60m threshold).' },
+  ]
+  for (const a of shiftAlerts) {
+    await setDoc(
+      doc(col('alerts'), a.id),
+      { ...a, escalationLevel: 0, triggeredAt: serverTimestamp(), createdAt: serverTimestamp() },
+      { merge: true },
+    )
+  }
 }
 
 function col(name: string) {
-  if (!db) throw new Error('Firestore not configured (demo mode)')
+  if (!db) throw new Error('Yard system not connected')
   return collection(db, `facilities/${facilityId}/${name}`)
 }
 

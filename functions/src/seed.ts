@@ -109,6 +109,34 @@ async function main(): Promise<void> {
     { merge: true },
   )
 
+  // Tafadzwa walkthrough shift — mirrors bak-logistics-app/src/lib/demoData.ts.
+  const shiftQueue = [
+    { id: 'q-seed-1', licensePlate: 'AEH 4521', driverName: 'T. Moyo', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED' },
+    { id: 'q-seed-2', licensePlate: 'AGX 9033', driverName: 'S. Ndlovu', cargoType: 'Dry van', expectedDestination: 'Forbes', status: 'ASSIGNED', assignedDockId: 'D1' },
+    { id: 'q-seed-3', licensePlate: 'AFM 1187', driverName: 'K. Sibanda', cargoType: 'Tanker', expectedDestination: 'Chirundu', status: 'QUARANTINED' },
+    { id: 'q-seed-4', licensePlate: 'ABZ 9901', driverName: 'R. Dube', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED' },
+    { id: 'q-seed-6', licensePlate: 'ADP 3357', driverName: 'J. Banda', cargoType: 'Flatbed', expectedDestination: 'Chirundu', status: 'PENDING_OVERRIDE' },
+    { id: 'q-seed-7', licensePlate: 'AEW 7712', driverName: 'M. Hove', cargoType: 'Dry van', expectedDestination: 'Forbes', status: 'OVERRIDE_APPROVED' },
+    { id: 'q-seed-8', licensePlate: 'AFX 6640', driverName: 'D. Mutasa', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED' },
+  ]
+  for (const q of shiftQueue) {
+    await db.doc(`facilities/${FACILITY}/queue/${q.id}`).set(
+      { ...q, entryTimestamp: new Date(), createdAt: new Date() },
+      { merge: true },
+    )
+  }
+
+  const shiftAlerts = [
+    { id: 'quar-q-seed-3', type: 'COMPLIANCE_FAILURE', severity: 'CRITICAL', status: 'ACTIVE', relatedEntityType: 'queueEntry', relatedEntityId: 'q-seed-3', message: 'AFM 1187 quarantined: Axle 2 overloaded by 1,400kg. Rebalancing or override required.' },
+    { id: 'wait-q-seed-4', type: 'EXCESSIVE_WAIT', severity: 'HIGH', status: 'ACTIVE', relatedEntityType: 'queueEntry', relatedEntityId: 'q-seed-4', message: 'ABZ 9901 waiting 74m (exceeds 60m threshold).' },
+  ]
+  for (const a of shiftAlerts) {
+    await db.doc(`facilities/${FACILITY}/alerts/${a.id}`).set(
+      { ...a, escalationLevel: 0, triggeredAt: new Date(), createdAt: new Date() },
+      { merge: true },
+    )
+  }
+
   console.log(`Seeded facility "${FACILITY}" (target: ${process.env.FIRESTORE_EMULATOR_HOST ?? 'live project'})`)
 }
 

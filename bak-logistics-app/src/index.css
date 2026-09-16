@@ -1,16 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  /* BAK industrial identity — navy + yard amber on sunlit paper */
-  --bak-navy: #0f172a;
-  --bak-navy-soft: #1e293b;
-  --bak-amber: #b45309;
+  /* BAK gantry-industrial identity — midnight gantry, signal amber, sunlit paper */
+  --bak-navy: #0b1526;
+  --bak-navy-soft: #16233c;
+  --bak-navy-ink: #e8edf5;
+  --bak-amber: #c2570b;
+  --bak-amber-bright: #f59e0b;
   --bak-amber-bg: #fef3c7;
-  --bak-paper: #f6f4ec;
+  --bak-paper: #f4f1e8;
   --bak-surface: #ffffff;
-  --bak-ink: #0f172a;
-  --bak-ink-2: #334155;
-  --bak-border: #e2e8f0;
+  --bak-surface-2: #faf9f4;
+  --bak-ink: #101c30;
+  --bak-ink-2: #3d4c63;
+  --bak-ink-3: #68778f;
+  --bak-border: #dde3ec;
+  --bak-border-strong: #b9c4d4;
   --bak-status-queued: #1d4ed8;
   --bak-status-queued-bg: #dbeafe;
   --bak-status-pass: #047857;
@@ -19,17 +24,33 @@
   --bak-status-fail-bg: #fee2e2;
   --bak-status-warn: #b45309;
   --bak-status-warn-bg: #fef3c7;
-  --bak-focus: #2563eb;
+  --bak-focus: #1d4ed8;
+  --bak-radius: 14px;
+  --bak-radius-sm: 10px;
+  --bak-shadow-1: 0 1px 2px rgb(11 21 38 / 0.07);
+  --bak-shadow-2: 0 6px 20px -8px rgb(11 21 38 / 0.22);
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
-/* Base: sunlit-yard legibility — no faint gray body text */
+/* Base: sunlit-yard legibility — system stack only (no webfont payload on yard data) */
 html {
   -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
 }
 body {
-  background: var(--bak-paper);
+  background:
+    radial-gradient(1200px 300px at 50% -120px, rgb(245 158 11 / 0.10), transparent 70%),
+    repeating-linear-gradient(0deg, transparent 0 27px, rgb(11 21 38 / 0.014) 27px 28px),
+    var(--bak-paper);
   color: var(--bak-ink);
+  font-family: var(--font-sans);
   font-feature-settings: "tnum" 1, "cv05" 1;
+  -webkit-font-smoothing: antialiased;
+}
+::selection {
+  background: var(--bak-amber-bright);
+  color: var(--bak-navy);
 }
 
 /* 48x48dp minimum touch targets (PRD NFR), color-blind safe: never color-alone */
@@ -48,6 +69,19 @@ button, a, input, select, [role="button"] {
   border-radius: 6px;
 }
 
+/* Eyebrow — section kicker above titles (editorial + industrial) */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bak-amber);
+}
+/* stylelint-disable-next-line -- dark-surface variant */
+.on-dark .eyebrow {
+  color: var(--bak-amber-bright);
+}
+
 /* Branded status language — signature element. Shape + text, never color-only. */
 .status-badge {
   font-weight: 700;
@@ -60,59 +94,146 @@ button, a, input, select, [role="button"] {
   border-radius: 999px;
   padding: 4px 12px;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   border: 1px solid transparent;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .pill-queued { background: var(--bak-status-queued-bg); color: var(--bak-status-queued); border-color: #bfdbfe; }
 .pill-pass { background: var(--bak-status-pass-bg); color: var(--bak-status-pass); border-color: #a7f3d0; }
 .pill-fail { background: var(--bak-status-fail-bg); color: var(--bak-status-fail); border-color: #fecaca; }
 .pill-warn { background: var(--bak-status-warn-bg); color: var(--bak-status-warn); border-color: #fde68a; }
-.pill-neutral { background: #f1f5f9; color: var(--bak-ink-2); border-color: var(--bak-border); }
-.pill-live { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+.pill-neutral { background: #eef2f7; color: var(--bak-ink-2); border-color: var(--bak-border); }
+.pill-live { background: #dcfce7; color: #166534; border-color: #86efac; }
 .pill-demo { background: #ffedd5; color: #9a3412; border-color: #fed7aa; }
+
+/* Gantry header — midnight slab with signal-amber rule */
+.gantry {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.06), transparent 40%),
+    var(--bak-navy);
+  border-bottom: 3px solid var(--bak-amber-bright);
+}
+.gantry-mark {
+  background: linear-gradient(135deg, var(--bak-amber-bright), #d97706);
+  box-shadow: 0 2px 8px rgb(245 158 11 / 0.45);
+}
+.nav-pill {
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.nav-active {
+  background: #fff;
+  color: var(--bak-navy) !important;
+  box-shadow: var(--bak-shadow-1);
+}
 
 /* Section rhythm — composed, not uniform card stacks */
 .page-title {
-  font-size: 1.5rem;
-  line-height: 1.2;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font-size: 1.65rem;
+  line-height: 1.15;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 .page-sub {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
   color: var(--bak-ink-2);
   max-width: 62ch;
 }
 .card {
   background: var(--bak-surface);
   border: 1px solid var(--bak-border);
-  border-radius: 14px;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+  border-radius: var(--bak-radius);
+  box-shadow: var(--bak-shadow-1);
 }
+.card-raised {
+  box-shadow: var(--bak-shadow-2);
+}
+/* Status spine — the yard signature: 4px rule encodes state alongside shape+text */
+.spine { position: relative; }
+.spine::before {
+  content: "";
+  position: absolute;
+  inset-block: 12px;
+  inset-inline-start: 0;
+  width: 4px;
+  border-radius: 999px;
+  background: var(--bak-border-strong);
+}
+.spine-queued::before { background: var(--bak-status-queued); }
+.spine-pass::before { background: var(--bak-status-pass); }
+.spine-fail::before { background: var(--bak-status-fail); }
+.spine-warn::before { background: var(--bak-amber-bright); }
+.spine-neutral::before { background: var(--bak-border-strong); }
+
 .btn-primary {
-  background: var(--bak-navy);
+  background: linear-gradient(180deg, var(--bak-navy-soft), var(--bak-navy));
   color: #fff;
-  font-weight: 700;
-  border-radius: 10px;
+  font-weight: 750;
+  border-radius: var(--bak-radius-sm);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  box-shadow: 0 2px 6px rgb(11 21 38 / 0.28);
+  transition: transform 0.06s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 .btn-primary:hover { background: var(--bak-navy-soft); }
-.btn-primary:disabled { opacity: 0.55; }
+.btn-primary:active { transform: translateY(1px); box-shadow: none; }
+.btn-primary:disabled { opacity: 0.55; box-shadow: none; }
 .btn-accent {
-  background: var(--bak-amber);
+  background: linear-gradient(180deg, #d97706, var(--bak-amber));
   color: #fff;
-  font-weight: 700;
-  border-radius: 10px;
+  font-weight: 750;
+  border-radius: var(--bak-radius-sm);
+  border: 1px solid rgb(0 0 0 / 0.12);
+  box-shadow: 0 2px 6px rgb(194 87 11 / 0.35);
+  transition: transform 0.06s ease, box-shadow 0.15s ease;
 }
+.btn-accent:active { transform: translateY(1px); box-shadow: none; }
 .field {
-  border-radius: 10px;
-  border: 1px solid #cbd5e1;
+  border-radius: var(--bak-radius-sm);
+  border: 1.5px solid var(--bak-border-strong);
   background: #fff;
   font-size: 16px; /* prevents iOS zoom on focus */
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .field:focus {
   border-color: var(--bak-focus);
+  box-shadow: 0 0 0 3px rgb(29 78 216 / 0.18);
+  outline: none;
+}
+.field::placeholder { color: var(--bak-ink-3); }
+
+/* Data numerals — plates, weights, times always tabular */
+.tnum, .tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.font-data { font-family: var(--font-data); }
+
+/* Meter — progress with track + amber fill */
+.meter {
+  height: 10px;
+  border-radius: 999px;
+  background: #e5e9f0;
+  border: 1px solid var(--bak-border);
+  overflow: hidden;
+}
+.meter > div {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--bak-amber-bright), var(--bak-amber));
+  transition: width 0.3s ease;
+}
+
+/* Subtle scrollbar + main rhythm */
+main {
+  padding-bottom: 3rem;
+}
+footer.yard-foot {
+  border-top: 1px solid var(--bak-border);
+  color: var(--bak-ink-3);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -120,4 +241,5 @@ button, a, input, select, [role="button"] {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+  html { scroll-behavior: auto; }
 }
