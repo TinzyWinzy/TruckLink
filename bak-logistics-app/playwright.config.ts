@@ -27,10 +27,11 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: ['**/prod-smoke.spec.ts'] },
     {
       name: 'production',
       use: { ...devices['Desktop Chrome'], baseURL: 'https://bak-five.vercel.app' },
+      testMatch: ['**/prod-smoke.spec.ts'],
     },
   ],
   // PW_PROD=1 targets the deployed URL — no local server needed.
