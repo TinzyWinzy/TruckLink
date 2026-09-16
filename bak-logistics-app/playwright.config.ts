@@ -26,12 +26,21 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:5199',
     trace: 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: {
-    command: 'npx vite --port 5199 --strictPort --host 127.0.0.1',
-    url: 'http://127.0.0.1:5199',
-    reuseExistingServer: false,
-    timeout: 90000,
-    env: demoEnv,
-  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'production',
+      use: { ...devices['Desktop Chrome'], baseURL: 'https://bak-five.vercel.app' },
+    },
+  ],
+  // PW_PROD=1 targets the deployed URL — no local server needed.
+  webServer: process.env.PW_PROD
+    ? undefined
+    : {
+        command: 'npx vite --port 5199 --strictPort --host 127.0.0.1',
+        url: 'http://127.0.0.1:5199',
+        reuseExistingServer: false,
+        timeout: 90000,
+        env: demoEnv,
+      },
 })
