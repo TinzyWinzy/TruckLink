@@ -8,10 +8,25 @@ import { initializeApp } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore'
 import { logger } from 'firebase-functions/v2'
+import { defineSecret } from 'firebase-functions/params'
 import { hashAuditEntry } from './audit.js'
 
 initializeApp()
 const db = getFirestore()
+
+// 2nd-gen functions do NOT inherit Secret Manager values into process.env
+// unless bound here — without this the chain fail-closes (refuses to append).
+const auditSalt = defineSecret('AUDIT_SALT')
+
+function resolveSalt(facilityId: string): string | undefined {
+  const direct = process.env[`AUDIT_SALT_${facilityId}`] ?? process.env.AUDIT_SALT
+  if (direct) return direct
+  try {
+    return auditSalt.value()
+  } catch {
+    return undefined
+  }
+}
 
 async function appendAuditLog(
   facilityId: string,
@@ -20,7 +35,7 @@ async function appendAuditLog(
   const col = db.collection(`facilities/${facilityId}/auditLogs`)
   const metaRef = db.doc(`facilities/${facilityId}/_meta/audit`)
   // Fail-closed (H3): a missing salt must not silently chain onto a default.
-  const salt = process.env[`AUDIT_SALT_${facilityId}`] ?? process.env.AUDIT_SALT
+  const salt = resolveSalt(facilityId)
   if (!salt) {
     logger.error(`AUDIT_SALT (or AUDIT_SALT_${facilityId}) unset — refusing to append audit entry`)
     return
@@ -57,7 +72,10 @@ async function appendAuditLog(
 
 // --- Queue triggers (Spec §9.3) ----------------------------------------------
 export const onQueueEntryCreated = onDocumentCreated(
-  'facilities/{facilityId}/queue/{queueEntryId}',
+  {
+    document: 'facilities/{facilityId}/queue/{queueEntryId}',
+    secrets: [auditSalt],
+  },
   async (event) => {
     const { facilityId, queueEntryId } = event.params
     const data = event.data?.data()
@@ -73,7 +91,10 @@ export const onQueueEntryCreated = onDocumentCreated(
 )
 
 export const onQueueEntryStatusChanged = onDocumentUpdated(
-  'facilities/{facilityId}/queue/{queueEntryId}',
+  {
+    document: 'facilities/{facilityId}/queue/{queueEntryId}',
+    secrets: [auditSalt],
+  },
   async (event) => {
     const { facilityId, queueEntryId } = event.params
     const before = event.data?.before.data()
@@ -110,7 +131,10 @@ export const onQueueEntryStatusChanged = onDocumentUpdated(
 
 // --- Compliance trigger -------------------------------------------------------
 export const onComplianceCheckCompleted = onDocumentCreated(
-  'facilities/{facilityId}/complianceChecks/{checkId}',
+  {
+    document: 'facilities/{facilityId}/complianceChecks/{checkId}',
+    secrets: [auditSalt],
+  },
   async (event) => {
     const { facilityId, checkId } = event.params
     const data = event.data?.data()

@@ -1,6 +1,7 @@
 {
   "projects": {
     "staging": "radbit-bak-staging",
+    "pilot": "radbit-sme-hub-ck05x",
     "prod": "radbit-bak-prod",
     "default": "radbit-bak-staging"
   }
