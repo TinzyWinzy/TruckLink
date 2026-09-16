@@ -74,6 +74,17 @@ test('DISPATCH cannot acknowledge — read-only by design', async ({ page }) => 
   await expect(page.getByRole('button', { name: 'Acknowledge' })).toHaveCount(0)
 })
 
+test('entry ID flows board → check without typing', async ({ page }) => {
+  await page.goto('/?demo=1&role=dispatch')
+  await expect(page).toHaveURL(/\/queue$/)
+  const row = page.locator('li', { hasText: 'AEH 4521' })
+  await row.getByRole('button', { name: /Copy entry ID/ }).click()
+  await expect(page.getByText(/copied/)).toBeVisible()
+  await row.getByRole('link', { name: /Check AEH 4521/ }).click()
+  await expect(page).toHaveURL(/\/compliance\?entry=/)
+  await expect(page.getByLabel('Queue entry ID')).toHaveValue('q1')
+})
+
 test('EXECUTIVE exports the SLA week as CSV', async ({ page }) => {
   await page.goto('/?demo=1&role=executive')
   await expect(page).toHaveURL(/\/reports$/)

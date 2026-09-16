@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { validateLoad } from '../lib/validation/compliance'
 import { enqueueOfflineAction, isOnline } from '../lib/offline/db'
 import { isLive } from '../lib/firebase'
@@ -40,6 +41,15 @@ export default function ComplianceCheck() {
   const [overrideMsg, setOverrideMsg] = useState<string | null>(null)
   const connRef = useRef<SerialConnection | null>(null)
   const live = isLive()
+  const [searchParams] = useSearchParams()
+
+  // Queue board "Check →" shortcut (?entry=) fills the ID — no more typing
+  // IDs from memory. Runs once per link; manual edits afterwards are kept.
+  useEffect(() => {
+    const fromBoard = (searchParams.get('entry') ?? '').trim()
+    if (fromBoard) setEntryId(fromBoard)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -178,12 +188,10 @@ export default function ComplianceCheck() {
       />
       <div className="space-y-3">
         <Section step="1" title="Vehicle" sub="Which truck are you standing next to?">
-          {live && (
-            <label className="block text-sm font-bold">
+          <label className="block text-sm font-bold">
               Queue entry ID
-              <input value={entryId} onChange={(e) => setEntryId(e.target.value)} placeholder="Copy from Queue board" className="field touch-target mt-1 w-full px-3" />
+              <input value={entryId} onChange={(e) => setEntryId(e.target.value)} placeholder={live ? 'Tap Check → on the Queue board' : 'Training reference — tap Check → on the Queue board'} className="field touch-target mt-1 w-full px-3 font-data" />
             </label>
-          )}
           <label className="mt-2 block text-sm font-bold">
             Corridor / route (S.I. table)
             <select value={routeType} onChange={(e) => setRouteType(e.target.value)} className="field touch-target mt-1 w-full px-3">

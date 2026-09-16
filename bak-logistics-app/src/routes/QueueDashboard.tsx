@@ -4,6 +4,7 @@ import { enqueueOfflineAction, isOnline } from '../lib/offline/db'
 import { isLive } from '../lib/firebase'
 import type { LiveRow } from '../lib/live'
 import { useSession } from '../store/session'
+import { Link } from 'react-router-dom'
 import { DEMO_QUEUE } from '../lib/demoData'
 import { EmptyState, PageHeader, StatusPill, spineForStatus } from '../components/ui'
 
@@ -45,6 +46,11 @@ function mapLive(r: LiveRow): Row {
 }
 
 const SEED: Row[] = DEMO_QUEUE
+
+/** Short readable tail of an entry ID for the board — full ID copies on tap. */
+function shortId(id: string): string {
+  return id.length > 10 ? `…${id.slice(-8)}` : id
+}
 
 export default function QueueDashboard() {
   const { role, displayName } = useSession()
@@ -125,6 +131,33 @@ export default function QueueDashboard() {
     }
   }
 
+  async function copyId(id: string) {
+    const done = async () => setNotice(`✔ ID ${shortId(id)} copied — paste it in the check screen.`)
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(id)
+        await done()
+        return
+      }
+      throw new Error('no clipboard API')
+    } catch {
+      // Older yard WebViews: select-and-copy fallback.
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = id
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+        await done()
+      } catch {
+        setError(`Entry ID is ${id} — type it into the check screen.`)
+      }
+    }
+  }
+
   async function release(id: string) {
     setError(null)
     try {
@@ -182,8 +215,26 @@ export default function QueueDashboard() {
               <strong className="tnum text-lg tracking-tight">{r.plate}</strong>
               <StatusPill status={r.rawStatus} symbol={SYMBOL[r.rawStatus]} />
               <span className="w-full text-sm text-slate-600 sm:w-auto">{r.driver} · {r.cargo} → {r.dest} · in {r.enteredAt}</span>
+              <span className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:ml-auto">
+                <button
+                  type="button"
+                  onClick={() => void copyId(r.id)}
+                  aria-label={`Copy entry ID for ${r.plate}`}
+                  title="Copy full entry ID"
+                  className="touch-target rounded-lg border border-slate-300 bg-white px-2 font-data text-xs font-bold text-slate-600 hover:border-slate-500"
+                >
+                  ID {shortId(r.id)} ⧉
+                </button>
+                <Link
+                  to={`/compliance?entry=${encodeURIComponent(r.id)}`}
+                  aria-label={`Check ${r.plate}`}
+                  className="touch-target rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white"
+                >
+                  Check →
+                </Link>
+              </span>
               {(r.rawStatus === 'COMPLETED' || r.rawStatus === 'OVERRIDE_APPROVED') && live && canRelease && (
-                <button type="button" onClick={() => void release(r.id)} className="btn-accent touch-target ml-auto rounded-lg px-4 text-sm" aria-label={`Release ${r.plate}`}>
+                <button type="button" onClick={() => void release(r.id)} className="btn-accent touch-target rounded-lg px-4 text-sm" aria-label={`Release ${r.plate}`}>
                   Release {r.plate} →
                 </button>
               )}
