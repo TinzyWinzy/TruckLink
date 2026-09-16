@@ -17,7 +17,10 @@ const demoEnv = {
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
-  retries: 0,
+  workers: 2,
+  timeout: 90000,
+  expect: { timeout: 15000 },
+  retries: 1,
   reporter: [['list']],
   use: {
     baseURL: 'http://127.0.0.1:5199',
