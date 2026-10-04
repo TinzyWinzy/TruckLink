@@ -1,4 +1,5 @@
-"""Yard endpoints (SAD v2 section 11): board digest, queue, docks, alerts.
+"""Yard endpoints (SAD v2 section 11): board digest, queue, docks, alerts,
+reports and the admin demo seed/reset.
 
 Ports of bak-logistics-app/src/lib/powersync/operations.ts:
   registerVehiclePS / assignDockPS / releaseVehiclePS / acknowledgeAlertPS.
@@ -7,7 +8,11 @@ the gate is engine.can_transition(status, "RELEASED") - one FSM, one truth.
 """
 from __future__ import annotations
 
+import csv
+import io
+
 from django.db import IntegrityError, transaction
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -18,7 +23,10 @@ from core.audit import append_audit
 from core.audit_views import resolve_facility
 from core.rbac import RoleAccess
 from trip.permissions import belongs_to_organisation, in_facility
-from yard.models import Alert, Dock, QueueEntry
+from yard.models import (
+    Alert, ComplianceCheck, ComplianceConfig, Dock, Equipment, QueueEntry,
+)
+from yard.reports import compute_turnaround_stats, parse_range
 
 from .serializers import (
     AlertSerializer, DockAssignSerializer, DockCreateSerializer, DockSerializer,
@@ -345,3 +353,262 @@ class AlertAckView(APIView):
                 actor=request.user,
             )
         return Response({"ok": True, "alert": AlertSerializer(alert).data})
+
+
+def _report_queryset(request):
+    facility, err = resolve_facility(request)
+    if err is not None:
+        return None, None, err
+    start, end, range_err = parse_range(request.query_params)
+    if range_err is not None:
+        return None, None, Response({"ok": False, "error": range_err}, status=400)
+    qs = QueueEntry.objects.filter(facility=facility)
+    if start is not None:
+        qs = qs.filter(entry_timestamp__gte=start)
+    if end is not None:
+        qs = qs.filter(entry_timestamp__lte=end)
+    return facility, qs, None
+
+
+class TurnaroundReportView(APIView):
+    """Turnaround/wait stats over queue rows (live.ts computeTurnaroundStats)."""
+
+    permission_classes = [IsAuthenticated, RoleAccess]
+    rbac_resource = "reports"
+
+    def get(self, request):
+        facility, qs, err = _report_queryset(request)
+        if err is not None:
+            return err
+        stats = compute_turnaround_stats(list(qs), now=timezone.now())
+        return Response({
+            "ok": True,
+            "facility": {"id": facility.id, "name": facility.name, "slug": facility.slug},
+            "from": request.query_params.get("from"),
+            "to": request.query_params.get("to"),
+            "stats": stats,
+        })
+
+
+class ReportExportView(APIView):
+    permission_classes = [IsAuthenticated, RoleAccess]
+    rbac_resource = "reports"
+
+    def get(self, request):
+        facility, qs, err = _report_queryset(request)
+        if err is not None:
+            return err
+        rows = qs.order_by("entry_timestamp")
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow([
+            "id", "reg_number", "driver_name", "haulier", "vehicle_type",
+            "cargo_type", "status", "entry_timestamp", "exit_timestamp",
+            "dwell_duration_seconds",
+        ])
+        for row in rows:
+            writer.writerow([
+                row.id, row.reg_number, row.driver_name, row.haulier,
+                row.vehicle_type, row.cargo_type, row.status,
+                row.entry_timestamp.isoformat(),
+                row.exit_timestamp.isoformat() if row.exit_timestamp else "",
+                row.dwell_duration_seconds if row.dwell_duration_seconds is not None else "",
+            ])
+        resp = HttpResponse(buf.getvalue(), content_type="text/csv")
+        resp["Content-Disposition"] = f'attachment; filename="turnaround-{facility.slug}.csv"'
+        return resp
+
+
+# --- Admin demo yard (seed / reset) -----------------------------------------
+
+DEMO_DOCKS = [
+    ("Dock 1", 24000.0, "OCCUPIED"),
+    ("Dock 2", 24000.0, "AVAILABLE"),
+    ("Dock 3", 18000.0, "AVAILABLE"),
+    ("Dock 4", 24000.0, "MAINTENANCE"),
+]
+
+DEMO_EQUIPMENT = [
+    ("FL-01", "FORKLIFT", "AVAILABLE"),
+    ("FL-02", "FORKLIFT", "OCCUPIED"),
+    ("TR-01", "OTHER", "AVAILABLE"),
+]
+
+# id, reg, driver, cargo, vehicle_type, status, dock name or None
+DEMO_QUEUE = [
+    ("q-seed-1", "AEH 4521", "T. Moyo", "Container", "CONTAINER", "QUEUED", None),
+    ("q-seed-2", "AGX 9033", "S. Ndlovu", "Dry van", "DRY_VAN", "ASSIGNED", "Dock 1"),
+    ("q-seed-3", "AFM 1187", "K. Sibanda", "Tanker", "TANKER", "QUARANTINED", None),
+    ("q-seed-4", "ABZ 9901", "R. Dube", "Container", "CONTAINER", "QUEUED", None),
+    ("q-seed-6", "ADP 3357", "J. Banda", "Flatbed", "FLATBED", "PENDING_OVERRIDE", None),
+    ("q-seed-7", "AEW 7712", "M. Hove", "Dry van", "DRY_VAN", "OVERRIDE_APPROVED", None),
+    ("q-seed-8", "AFX 6640", "D. Mutasa", "Container", "CONTAINER", "QUEUED", None),
+]
+
+DEMO_ALERTS = [
+    (
+        "COMPLIANCE_FAILURE", "CRITICAL",
+        "AFM 1187 quarantined: Axle 2 overloaded by 1,400kg. Rebalancing or override required.",
+    ),
+    (
+        "EXCESSIVE_WAIT", "HIGH",
+        "ABZ 9901 waiting 74m (exceeds 60m threshold).",
+    ),
+]
+
+
+def _facility_from_body(request):
+    from core.models import Facility
+
+    facility_id = request.data.get("facility")
+    if not facility_id:
+        return None, Response(
+            {"ok": False, "error": "facility required in body"}, status=400,
+        )
+    facility = Facility.objects.filter(pk=facility_id).first()
+    if facility is None or not in_facility(request.user, facility):
+        return None, Response({"ok": False, "error": "not found"}, status=404)
+    return facility, None
+
+
+class AdminSeedView(APIView):
+    """Idempotent demo yard (BAK live.ts seedDemoFacility). Re-run resets
+    seeded statuses - that is what a re-demo wants."""
+
+    permission_classes = [IsAuthenticated, RoleAccess]
+    rbac_resource = "admin"
+
+    def post(self, request):
+        facility, err = _facility_from_body(request)
+        if err is not None:
+            return err
+        created = {"docks": 0, "equipment": 0, "queue": 0, "alerts": 0, "config": 0}
+        updated = dict(created)
+
+        with transaction.atomic():
+            for name, capacity, status in DEMO_DOCKS:
+                obj, was_created = Dock.objects.update_or_create(
+                    facility=facility, name=name,
+                    defaults={
+                        "organisation": facility.organisation,
+                        "capacity_kg": capacity,
+                        "status": status,
+                    },
+                )
+                if was_created:
+                    created["docks"] += 1
+                else:
+                    updated["docks"] += 1
+
+            for name, kind, status in DEMO_EQUIPMENT:
+                obj, was_created = Equipment.objects.update_or_create(
+                    facility=facility, name=name,
+                    defaults={
+                        "organisation": facility.organisation,
+                        "kind": kind,
+                        "status": status,
+                    },
+                )
+                if was_created:
+                    created["equipment"] += 1
+                else:
+                    updated["equipment"] += 1
+
+            docks_by_name = {d.name: d for d in Dock.objects.filter(facility=facility)}
+            for seed_id, reg, driver, cargo, vtype, status, dock_name in DEMO_QUEUE:
+                obj, was_created = QueueEntry.objects.update_or_create(
+                    facility=facility, idempotency_key=seed_id,
+                    defaults={
+                        "organisation": facility.organisation,
+                        "reg_number": reg,
+                        "driver_name": driver,
+                        "cargo_type": cargo,
+                        "vehicle_type": vtype,
+                        "status": status,
+                        "assigned_dock": docks_by_name.get(dock_name),
+                        "created_by": request.user,
+                    },
+                )
+                if was_created:
+                    created["queue"] += 1
+                else:
+                    updated["queue"] += 1
+
+            dock1 = docks_by_name.get("Dock 1")
+            seed2 = QueueEntry.objects.filter(
+                facility=facility, idempotency_key="q-seed-2",
+            ).first()
+            if dock1 is not None and seed2 is not None:
+                Dock.objects.filter(pk=dock1.pk).update(
+                    current_entry=seed2, status="OCCUPIED",
+                )
+
+            for category, severity, message in DEMO_ALERTS:
+                obj, was_created = Alert.objects.update_or_create(
+                    facility=facility, message=message,
+                    defaults={
+                        "organisation": facility.organisation,
+                        "category": category,
+                        "severity": severity,
+                        "acknowledged": False,
+                    },
+                )
+                if was_created:
+                    created["alerts"] += 1
+                else:
+                    updated["alerts"] += 1
+
+            for route in engine.SI_ROUTES:
+                for vehicle, limits in engine.DEFAULT_SI_TABLES_BY_ROUTE[route].items():
+                    obj, was_created = ComplianceConfig.objects.update_or_create(
+                        organisation=facility.organisation,
+                        route_type=route,
+                        vehicle_type=vehicle,
+                        defaults={"axle_limits": limits, "is_active": True},
+                    )
+                    if was_created:
+                        created["config"] += 1
+                    else:
+                        updated["config"] += 1
+
+            append_audit(
+                facility=facility,
+                action="SEED_YARD",
+                payload={"facilityId": facility.id, "created": created,
+                         "updated": updated},
+                actor=request.user,
+            )
+        return Response({"ok": True, "created": created, "updated": updated})
+
+
+class AdminResetView(APIView):
+    """Clear the facility's demo yard (queue/docks/equipment/alerts/checks/
+    config). Users, org, facility and the audit chain are untouched; the
+    reset itself is appended to the chain (audited, ADMIN-only)."""
+
+    permission_classes = [IsAuthenticated, RoleAccess]
+    rbac_resource = "admin"
+    rbac_action = "update"
+
+    def post(self, request):
+        facility, err = _facility_from_body(request)
+        if err is not None:
+            return err
+        deleted = {}
+        with transaction.atomic():
+            for model in (Alert, ComplianceCheck, QueueEntry, Dock, Equipment,
+                          ComplianceConfig):
+                if model is ComplianceConfig:
+                    count, _ = model.objects.filter(
+                        organisation=facility.organisation,
+                    ).delete()
+                else:
+                    count, _ = model.objects.filter(facility=facility).delete()
+                deleted[model.__name__] = count
+            append_audit(
+                facility=facility,
+                action="RESET_YARD",
+                payload={"facilityId": facility.id, "deleted": deleted},
+                actor=request.user,
+            )
+        return Response({"ok": True, "deleted": deleted})

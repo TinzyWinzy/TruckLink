@@ -16,7 +16,9 @@ from rest_framework.views import APIView
 from core.audit import append_audit
 from core.audit_views import resolve_facility
 from core.rbac import RoleAccess
-from trip.permissions import belongs_to_organisation, in_facility
+from trip.permissions import (
+    belongs_to_organisation, in_facility, scope_organisation,
+)
 from yard.models import (
     Alert, CheckStatus, ComplianceCheck, ComplianceConfig, QueueEntry,
 )
@@ -181,6 +183,28 @@ class ComplianceListView(APIView):
         return Response(
             {"ok": True, "check": _serialize_check(check)}, status=201,
         )
+
+
+class ComplianceConfigListView(APIView):
+    """Tenant S.I. axle-limit rows (org-scoped; client merges with bundled
+    pilot tables exactly like BAK's resolveSiLimits chain)."""
+
+    permission_classes = [IsAuthenticated, RoleAccess]
+    rbac_resource = "compliance_config"
+
+    def get(self, request):
+        rows = scope_organisation(
+            ComplianceConfig.objects.filter(is_active=True), request.user,
+        )
+        data = [
+            {
+                "route_type": row.route_type,
+                "vehicle_type": row.vehicle_type,
+                "axle_limits": row.axle_limits,
+            }
+            for row in rows
+        ]
+        return Response({"ok": True, "count": len(data), "config": data})
 
 
 class ComplianceOverrideRequestView(APIView):

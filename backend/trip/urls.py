@@ -53,6 +53,10 @@ urlpatterns = [
     # Compliance engine (compliance app)
     path("compliance/", compliance_views.ComplianceListView.as_view()),
     path(
+        "compliance/config/",
+        compliance_views.ComplianceConfigListView.as_view(),
+    ),
+    path(
         "compliance/<int:pk>/override-request/",
         compliance_views.ComplianceOverrideRequestView.as_view(),
     ),
@@ -69,6 +73,11 @@ urlpatterns = [
     path("docks/<int:pk>/assign/", yard_views.DockAssignView.as_view()),
     path("alerts/", yard_views.AlertListView.as_view()),
     path("alerts/<int:pk>/ack/", yard_views.AlertAckView.as_view()),
+    # Reports + admin demo yard (yard app)
+    path("reports/turnaround/", yard_views.TurnaroundReportView.as_view()),
+    path("reports/export.csv", yard_views.ReportExportView.as_view()),
+    path("admin/seed/", yard_views.AdminSeedView.as_view()),
+    path("admin/reset/", yard_views.AdminResetView.as_view()),
     # Admin
     path("admin/metrics/", admin_views.metrics),
     path("admin/trips/", admin_views.trips_list),
