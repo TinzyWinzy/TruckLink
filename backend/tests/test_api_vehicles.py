@@ -67,7 +67,10 @@ class TestVehicleCRUD:
         v = Vehicle.objects.create(plate="DEL 000", organisation=org)
         resp = api_client.delete(f"{URL}{v.id}/")
         assert resp.status_code == 200
-        assert not Vehicle.objects.filter(pk=v.id).exists()
+        v.refresh_from_db()
+        assert v.is_deleted is True
+        listed = [x["id"] for x in api_client.get(URL).json()["vehicles"]]
+        assert v.id not in listed
 
     def test_get_non_existent_returns_404(self, api_client, org):
         resp = api_client.get(f"{URL}99999/")

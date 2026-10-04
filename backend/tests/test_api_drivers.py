@@ -56,7 +56,10 @@ class TestDriverCRUD:
         d = Driver.objects.create(name="Delete Me", organisation=org)
         resp = api_client.delete(f"{URL}{d.id}/")
         assert resp.status_code == 200
-        assert not Driver.objects.filter(pk=d.id).exists()
+        d.refresh_from_db()
+        assert d.is_deleted is True
+        listed = [x["id"] for x in api_client.get(URL).json()["drivers"]]
+        assert d.id not in listed
 
     def test_get_non_existent_returns_404(self, api_client, org):
         resp = api_client.get(f"{URL}99999/")

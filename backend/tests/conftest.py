@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "spotter_backend.settings")
+os.environ.setdefault("DJANGO_SECRET_KEY", "pytest-local-only-not-a-secret")
 
 import django  # noqa: E402
 django.setup()
@@ -63,8 +64,60 @@ def _synthetic_route(coords):
     }
 
 
+@pytest.fixture(autouse=True)
+def _reset_throttle_cache():
+    """DRF throttles count in the shared cache; reset every test so
+    AnonRateThrottle (10/h) never leaks across tests."""
+    from django.core.cache import cache
+    cache.clear()
+    yield
+    cache.clear()
+
+
 @pytest.fixture
-def api_client():
+def default_org(db):
+    """The single org every test object belongs to (slug='default')."""
+    from trip.models import Organisation
+    return Organisation.objects.get_or_create(
+        slug="default", defaults={"name": "Test Fleet"},
+    )[0]
+
+
+@pytest.fixture
+def auth_user(default_org):
+    """Staff-adjacent operator: real user + profile bound to the default org,
+    with a real DRF token (so tests may override credentials later)."""
+    from django.contrib.auth import get_user_model
+    from rest_framework.authtoken.models import Token
+    from trip.models import UserProfile
+
+    User = get_user_model()
+    user, _ = User.objects.get_or_create(username="ops")
+    if not user.has_usable_password():
+        user.set_password("ops-pass-123")
+        user.save()
+    profile, _ = UserProfile.objects.get_or_create(
+        user=user, defaults={"organisation": default_org},
+    )
+    if profile.organisation_id != default_org.id:
+        profile.organisation = default_org
+        profile.save(update_fields=["organisation"])
+    Token.objects.get_or_create(user=user)
+    return user
+
+
+@pytest.fixture
+def api_client(auth_user):
+    """Authenticated API client — the default for endpoint tests.
+    Anonymous behaviour must be tested with `anon_client`."""
+    client = APIClient()
+    client.credentials(HTTP_AUTHORIZATION=f"Token {auth_user.auth_token.key}")
+    return client
+
+
+@pytest.fixture
+def anon_client():
+    """Unauthenticated client for AllowAny endpoints (health, services)."""
     return APIClient()
 
 

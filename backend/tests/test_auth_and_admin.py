@@ -63,8 +63,8 @@ class TestAdmin:
         api_client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
         return user
 
-    def test_metrics_requires_auth(self, api_client, org):
-        resp = api_client.get("/api/admin/metrics/")
+    def test_metrics_requires_auth(self, anon_client, org):
+        resp = anon_client.get("/api/admin/metrics/")
         assert resp.status_code == 401
 
     def test_metrics_returns_kpi_structure(self, api_client, mock_geo_router, org):
