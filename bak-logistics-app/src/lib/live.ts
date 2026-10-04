@@ -310,6 +310,7 @@ export async function submitComplianceLive(input: {
         gvm_rating: input.gvmRating,
         route_type: input.routeType ?? 'DEFAULT',
         vehicle_type: input.vehicleType,
+        client_key: input.key,
       },
     },
   )

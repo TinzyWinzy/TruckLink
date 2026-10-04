@@ -102,6 +102,15 @@ class ComplianceListView(APIView):
             or not in_facility(user, entry.facility)
         ):
             return Response({"ok": False, "error": "not found"}, status=404)
+        client_key = validated.get("client_key") or ""
+        if client_key:
+            existing = ComplianceCheck.objects.filter(
+                organisation=entry.organisation, client_key=client_key,
+            ).first()
+            if existing is not None:
+                return Response(
+                    {"ok": True, "check": _serialize_check(existing), "replayed": True},
+                )
         if entry.status == "RELEASED":
             return Response(
                 {"ok": False, "error": "cannot check a released entry"}, status=409,
@@ -150,6 +159,7 @@ class ComplianceListView(APIView):
                     "axles": result["axles"],
                     "gvm_status": result["gvm_status"],
                 },
+                client_key=client_key,
                 status=CheckStatus.PASSED if passed else CheckStatus.QUARANTINED,
                 inspector=user,
             )

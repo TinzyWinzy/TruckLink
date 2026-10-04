@@ -304,6 +304,23 @@ class TestComplianceApi:
         assert "+1500kg, fine $750" in alert.message
         assert verify_chain(default_facility)["ok"] is True
 
+    def test_client_key_replay_is_idempotent(
+        self, dispatch_client, queue_entry, default_facility,
+    ):
+        """PWA offline outbox may replay a completed write — same client_key
+        must return the first check, never a second write (SAD §8 outbox)."""
+        body = _overload_payload(queue_entry) | {"client_key": "offline-replay-1"}
+        first = dispatch_client.post(self.URL, body, format="json")
+        assert first.status_code == 201
+        second = dispatch_client.post(self.URL, body, format="json")
+        assert second.status_code == 200
+        assert second.json()["replayed"] is True
+        assert second.json()["check"]["id"] == first.json()["check"]["id"]
+        assert ComplianceCheck.objects.count() == 1
+        assert Alert.objects.count() == 1
+        assert AuditLog.objects.filter(action="SUBMIT_COMPLIANCE").count() == 1
+        assert verify_chain(default_facility)["ok"] is True
+
     def test_operations_role_cannot_create(self, api_client, payload):
         assert api_client.post(self.URL, payload, format="json").status_code == 403
 

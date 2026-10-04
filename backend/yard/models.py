@@ -218,6 +218,9 @@ class ComplianceCheck(models.Model):
     overload_kg = models.FloatField(default=0.0)
     overload_fee_usd = models.FloatField(default=0.0)
     checklist_results = models.JSONField(default=dict, blank=True)
+    # Client-supplied idempotency key (PWA offline outbox replay) — same check
+    # never writes twice. Empty for direct/API calls.
+    client_key = models.CharField(max_length=64, blank=True, default='', db_index=True)
     status = models.CharField(
         max_length=24, choices=CheckStatus.choices, default=CheckStatus.PASSED,
     )
