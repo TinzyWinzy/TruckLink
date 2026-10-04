@@ -3,6 +3,7 @@ from django.urls import path
 from compliance import views as compliance_views
 from core import views as core_views
 from core import audit_views as core_audit_views
+from yard import views as yard_views
 from . import views, auth_views, admin_views
 
 urlpatterns = [
@@ -59,6 +60,15 @@ urlpatterns = [
         "compliance/<int:pk>/override-approve/",
         compliance_views.ComplianceOverrideApproveView.as_view(),
     ),
+    # Yard: board, queue, docks, alerts (yard app)
+    path("yard/board/", yard_views.YardBoardView.as_view()),
+    path("queue/", yard_views.QueueListView.as_view()),
+    path("queue/<int:pk>/", yard_views.QueueDetailView.as_view()),
+    path("queue/<int:pk>/release/", yard_views.QueueReleaseView.as_view()),
+    path("docks/", yard_views.DockListView.as_view()),
+    path("docks/<int:pk>/assign/", yard_views.DockAssignView.as_view()),
+    path("alerts/", yard_views.AlertListView.as_view()),
+    path("alerts/<int:pk>/ack/", yard_views.AlertAckView.as_view()),
     # Admin
     path("admin/metrics/", admin_views.metrics),
     path("admin/trips/", admin_views.trips_list),
