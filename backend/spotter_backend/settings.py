@@ -65,6 +65,8 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'corsheaders',
     'trip',
+    'core',
+    'yard',
     'whatsapp',
 ]
 

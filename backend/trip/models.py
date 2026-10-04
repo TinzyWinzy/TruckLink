@@ -5,6 +5,16 @@ from django.conf import settings
 from django.db import models
 
 
+class UserRole(models.TextChoices):
+    """Six BAK roles (bak-logistics-app/src/store/session.ts). Server-authoritative."""
+    DISPATCH_SUPERVISOR = 'DISPATCH_SUPERVISOR', 'Dispatch Supervisor'
+    FACILITY_MANAGER = 'FACILITY_MANAGER', 'Facility Manager'
+    OPERATIONS_SUPERVISOR = 'OPERATIONS_SUPERVISOR', 'Operations Supervisor'
+    EXECUTIVE = 'EXECUTIVE', 'Executive'
+    ADMIN = 'ADMIN', 'Admin'
+    COMPLIANCE_OFFICER = 'COMPLIANCE_OFFICER', 'Compliance Officer'
+
+
 class CommodityCategory(models.Model):
     """Grouping for commodity types (Agriculture, Mining, Fuel, etc.)."""
     name = models.CharField(max_length=50, unique=True)
@@ -100,6 +110,13 @@ class UserProfile(models.Model):
         Organisation, on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name="members",
+    )
+    role = models.CharField(
+        max_length=32, choices=UserRole.choices,
+        default=UserRole.OPERATIONS_SUPERVISOR,
+    )
+    facilities = models.ManyToManyField(
+        "core.Facility", blank=True, related_name="members",
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
