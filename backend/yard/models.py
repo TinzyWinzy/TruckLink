@@ -222,6 +222,10 @@ class ComplianceCheck(models.Model):
     )
     timestamp = models.DateTimeField(default=timezone.now)
     override_reason = models.TextField(blank=True, default='')
+    override_requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='compliance_overrides_requested',
+    )
     override_authorizer = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='compliance_overrides_approved',

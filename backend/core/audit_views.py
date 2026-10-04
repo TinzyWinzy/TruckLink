@@ -21,7 +21,7 @@ from trip.permissions import in_facility
 from yard.models import AuditLog
 
 
-def _resolve_facility(request):
+def resolve_facility(request):
     facility_id = request.query_params.get("facility")
     if not facility_id:
         return None, Response(
@@ -40,7 +40,7 @@ class AuditListView(APIView):
     rbac_action = "read"
 
     def get(self, request):
-        facility, err = _resolve_facility(request)
+        facility, err = resolve_facility(request)
         if err is not None:
             return err
         rows = AuditLog.objects.filter(facility=facility).select_related("actor")
@@ -66,7 +66,7 @@ class AuditVerifyView(APIView):
     rbac_action = "read"
 
     def get(self, request):
-        facility, err = _resolve_facility(request)
+        facility, err = resolve_facility(request)
         if err is not None:
             return err
         result = verify_chain(facility)
@@ -79,7 +79,7 @@ class AuditExportView(APIView):
     rbac_action = "read"
 
     def get(self, request):
-        facility, err = _resolve_facility(request)
+        facility, err = resolve_facility(request)
         if err is not None:
             return err
         buf = io.StringIO()

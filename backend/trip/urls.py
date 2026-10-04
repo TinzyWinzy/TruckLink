@@ -1,5 +1,6 @@
 """URL routes."""
 from django.urls import path
+from compliance import views as compliance_views
 from core import views as core_views
 from core import audit_views as core_audit_views
 from . import views, auth_views, admin_views
@@ -48,6 +49,16 @@ urlpatterns = [
     path("audit/", core_audit_views.AuditListView.as_view()),
     path("audit/verify/", core_audit_views.AuditVerifyView.as_view()),
     path("audit/export.csv", core_audit_views.AuditExportView.as_view()),
+    # Compliance engine (compliance app)
+    path("compliance/", compliance_views.ComplianceListView.as_view()),
+    path(
+        "compliance/<int:pk>/override-request/",
+        compliance_views.ComplianceOverrideRequestView.as_view(),
+    ),
+    path(
+        "compliance/<int:pk>/override-approve/",
+        compliance_views.ComplianceOverrideApproveView.as_view(),
+    ),
     # Admin
     path("admin/metrics/", admin_views.metrics),
     path("admin/trips/", admin_views.trips_list),

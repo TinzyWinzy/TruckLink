@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     'trip',
     'core',
     'yard',
+    'compliance',
     'whatsapp',
 ]
 
