@@ -19,6 +19,8 @@ def org():
 @pytest.mark.django_db
 class TestDashboardEnhanced:
     def _login_admin(self, api_client):
+        from core.models import Facility
+        from trip.models import UserProfile, UserRole
         user, _ = User.objects.get_or_create(
             username="admin",
             defaults={"password": "admin", "is_staff": True},
@@ -26,6 +28,19 @@ class TestDashboardEnhanced:
         if not user.check_password("admin"):
             user.set_password("admin")
             user.save()
+        org, _ = Organisation.objects.get_or_create(
+            slug="default", defaults={"name": "Test Fleet"},
+        )
+        profile, _ = UserProfile.objects.get_or_create(
+            user=user, defaults={"organisation": org, "role": UserRole.ADMIN},
+        )
+        profile.organisation = org
+        profile.role = UserRole.ADMIN
+        profile.save(update_fields=["organisation", "role"])
+        fac, _ = Facility.objects.get_or_create(
+            organisation=org, slug="main-yard", defaults={"name": "Main Yard"},
+        )
+        profile.facilities.add(fac)
         resp = api_client.post("/api/auth/login/", {
             "username": "admin", "password": "admin",
         }, format="json")

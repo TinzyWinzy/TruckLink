@@ -45,13 +45,28 @@ class LoginSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    is_admin = serializers.BooleanField(source="is_staff", read_only=True)
+    is_admin = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
     driver_id = serializers.SerializerMethodField()
     organisation_id = serializers.SerializerMethodField()
+    organisation = serializers.SerializerMethodField()
+    facilities = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "username", "is_admin", "driver_id", "organisation_id", "date_joined"]
+        fields = [
+            "id", "username", "is_admin", "role", "driver_id",
+            "organisation_id", "organisation", "facilities", "date_joined",
+        ]
+
+    def get_is_admin(self, obj):
+        from .permissions import get_user_role
+        from .models import UserRole
+        return get_user_role(obj) == UserRole.ADMIN
+
+    def get_role(self, obj):
+        from .permissions import get_user_role
+        return get_user_role(obj)
 
     def get_driver_id(self, obj):
         try:
@@ -68,6 +83,22 @@ class UserSerializer(serializers.ModelSerializer):
         except Driver.DoesNotExist:
             pass
         return None
+
+    def get_organisation(self, obj):
+        profile = getattr(obj, "profile", None)
+        if profile is None or profile.organisation_id is None:
+            return None
+        org = profile.organisation
+        return {"id": org.id, "name": org.name, "slug": org.slug}
+
+    def get_facilities(self, obj):
+        profile = getattr(obj, "profile", None)
+        if profile is None:
+            return []
+        return [
+            {"id": f.id, "name": f.name, "slug": f.slug}
+            for f in profile.facilities.all()
+        ]
 
 
 class CommodityCategorySerializer(serializers.ModelSerializer):

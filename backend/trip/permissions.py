@@ -1,7 +1,22 @@
-"""Custom DRF permission classes and helpers for organisation isolation."""
+"""Custom DRF permission classes and helpers for tenant/facility isolation.
+
+SAD v2 §5: staff (is_staff) bypass is REMOVED for production — everyone is
+scoped by their UserProfile organisation/facility membership. The ADMIN role
+replaces the old is_staff shortcut for admin surfaces.
+"""
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
-from .models import Organisation
+from .models import Organisation, UserRole
+
+
+def get_user_role(user):
+    """Return the user's UserRole value or None (no profile / anonymous)."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return None
+    profile = getattr(user, "profile", None)
+    if profile is None:
+        return None
+    return profile.role
 
 
 def get_user_organisation(user):
@@ -17,19 +32,15 @@ def get_user_organisation(user):
 
 
 def scope_organisation(qs, user, org_field="organisation"):
-    """Filter a queryset to the user's organisation."""
+    """Filter a queryset to the user's organisation (no bypass: SAD §5)."""
     org = get_user_organisation(user)
     if org is None:
         return qs.none()
-    if user.is_staff:
-        return qs
     return qs.filter(**{org_field: org})
 
 
 def belongs_to_organisation(obj, user):
-    """Check if an object belongs to the user's organisation."""
-    if user.is_staff:
-        return True
+    """Check if an object belongs to the user's organisation (no bypass)."""
     org = get_user_organisation(user)
     if org is None:
         return False
@@ -37,6 +48,38 @@ def belongs_to_organisation(obj, user):
     if obj_org is None:
         obj_org = getattr(obj, "organisation_id", None)
     return obj_org == org
+
+
+def user_facilities(user):
+    """Facilities the user may act inside (profile.facilities M2M)."""
+    if not getattr(user, "is_authenticated", False):
+        from core.models import Facility
+        return Facility.objects.none()
+    profile = getattr(user, "profile", None)
+    if profile is None:
+        from core.models import Facility
+        return Facility.objects.none()
+    return profile.facilities.all()
+
+
+def in_facility(user, facility):
+    """True if the user is a member of the given facility (firestore inFacility)."""
+    if facility is None:
+        return False
+    return user_facilities(user).filter(pk=facility.pk).exists()
+
+
+def scope_facility(qs, user, facility_field="facility"):
+    """Filter a queryset to facilities the user belongs to (SAD §5)."""
+    if not getattr(user, "is_authenticated", False):
+        return qs.none()
+    profile = getattr(user, "profile", None)
+    if profile is None:
+        return qs.none()
+    fids = list(profile.facilities.values_list("id", flat=True))
+    if not fids:
+        return qs.none()
+    return qs.filter(**{f"{facility_field}__in": fids})
 
 
 VALID_STATUS_TRANSITIONS = {
@@ -60,22 +103,21 @@ def validate_status_transition(old_status, new_status):
 
 
 class IsAdmin(BasePermission):
-    """Allow only Django staff/admin users (fleet owner)."""
+    """ADMIN role only (replaces the is_staff shortcut — SAD §5)."""
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.is_staff)
-
+        return get_user_role(request.user) == UserRole.ADMIN
 
 
 class IsOwnerOrReadOnly(BasePermission):
-    """Allow staff users full access; others read-only."""
+    """ADMIN role full access; other authenticated roles read-only."""
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
         if request.method in SAFE_METHODS:
             return True
-        return request.user.is_staff
+        return get_user_role(request.user) == UserRole.ADMIN
 
 
 class IsInOrganisation(BasePermission):

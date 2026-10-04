@@ -84,9 +84,20 @@ def default_org(db):
 
 
 @pytest.fixture
-def auth_user(default_org):
-    """Staff-adjacent operator: real user + profile bound to the default org,
-    with a real DRF token (so tests may override credentials later)."""
+def default_facility(default_org):
+    """The facility every test operator belongs to."""
+    from core.models import Facility
+    fac, _ = Facility.objects.get_or_create(
+        organisation=default_org, slug="main-yard",
+        defaults={"name": "Main Yard"},
+    )
+    return fac
+
+
+@pytest.fixture
+def auth_user(default_org, default_facility):
+    """Staff-adjacent operator: real user + profile bound to the default org
+    and facility, with a real DRF token (so tests may override credentials)."""
     from django.contrib.auth import get_user_model
     from rest_framework.authtoken.models import Token
     from trip.models import UserProfile
@@ -102,6 +113,7 @@ def auth_user(default_org):
     if profile.organisation_id != default_org.id:
         profile.organisation = default_org
         profile.save(update_fields=["organisation"])
+    profile.facilities.add(default_facility)
     Token.objects.get_or_create(user=user)
     return user
 

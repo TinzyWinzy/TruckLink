@@ -1,5 +1,6 @@
 """URL routes."""
 from django.urls import path
+from core import views as core_views
 from . import views, auth_views, admin_views
 
 urlpatterns = [
@@ -36,8 +37,12 @@ urlpatterns = [
     # Auth
     path("auth/register/", auth_views.register),
     path("auth/login/", auth_views.login_view),
+    path("auth/pin/", auth_views.pin_login),
     path("auth/logout/", auth_views.logout_view),
     path("auth/me/", auth_views.me),
+    # Tenancy (core app)
+    path("tenancy/signup/", core_views.tenancy_signup),
+    path("admin/pins/", core_views.provision_pin),
     # Admin
     path("admin/metrics/", admin_views.metrics),
     path("admin/trips/", admin_views.trips_list),

@@ -187,7 +187,7 @@ def trip_estimate(request):
     if data.get("vehicle_id"):
         try:
             vehicle = Vehicle.objects.get(pk=data["vehicle_id"])
-            if user_org and vehicle.organisation_id != user_org.id and not request.user.is_staff:
+            if user_org and vehicle.organisation_id != user_org.id:
                 vehicle = None
         except Vehicle.DoesNotExist:
             return Response(
@@ -197,7 +197,7 @@ def trip_estimate(request):
     if data.get("driver_id"):
         try:
             driver = Driver.objects.get(pk=data["driver_id"])
-            if user_org and driver.organisation_id != user_org.id and not request.user.is_staff:
+            if user_org and driver.organisation_id != user_org.id:
                 driver = None
         except Driver.DoesNotExist:
             return Response(
@@ -281,7 +281,7 @@ def trip_plan(request):
     if data.get("driver_id"):
         try:
             driver = Driver.objects.get(pk=data["driver_id"])
-            if org and driver.organisation_id != org.id and not request.user.is_staff:
+            if org and driver.organisation_id != org.id:
                 return Response(
                     {"ok": False, "error": "Driver does not belong to your organisation"},
                     status=status.HTTP_403_FORBIDDEN,
@@ -295,7 +295,7 @@ def trip_plan(request):
     if data.get("vehicle_id"):
         try:
             vehicle = Vehicle.objects.get(pk=data["vehicle_id"])
-            if org and vehicle.organisation_id != org.id and not request.user.is_staff:
+            if org and vehicle.organisation_id != org.id:
                 return Response(
                     {"ok": False, "error": "Vehicle does not belong to your organisation"},
                     status=status.HTTP_403_FORBIDDEN,
@@ -441,7 +441,7 @@ def trip_detail(request, pk):
     except Trip.DoesNotExist:
         return Response({"ok": False, "error": "not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if not belongs_to_organisation(trip, request.user) and not request.user.is_staff:
+    if not belongs_to_organisation(trip, request.user):
         return Response({"ok": False, "error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == "GET":
@@ -463,7 +463,7 @@ def trip_update_status(request, pk):
     except Trip.DoesNotExist:
         return Response({"ok": False, "error": "not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if not belongs_to_organisation(trip, request.user) and not request.user.is_staff:
+    if not belongs_to_organisation(trip, request.user):
         return Response({"ok": False, "error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
     new_status = request.data.get("status")
@@ -550,7 +550,7 @@ def vehicle_detail(request, pk):
     except Vehicle.DoesNotExist:
         return Response({"ok": False, "error": "not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if not belongs_to_organisation(vehicle, request.user) and not request.user.is_staff:
+    if not belongs_to_organisation(vehicle, request.user):
         return Response({"ok": False, "error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == "GET":
@@ -582,7 +582,7 @@ def fuel_list(request):
 
     # Verify trip belongs to user's org
     trip_id = s.validated_data.get("trip")
-    if trip_id and not request.user.is_staff:
+    if trip_id:
         try:
             trip = Trip.objects.get(pk=trip_id.pk if hasattr(trip_id, 'pk') else trip_id)
             if not belongs_to_organisation(trip, request.user):
@@ -628,7 +628,7 @@ def driver_detail(request, pk):
     except Driver.DoesNotExist:
         return Response({"ok": False, "error": "not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if not belongs_to_organisation(driver, request.user) and not request.user.is_staff:
+    if not belongs_to_organisation(driver, request.user):
         return Response({"ok": False, "error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == "GET":
@@ -656,7 +656,7 @@ def trip_positions(request, pk):
     except Trip.DoesNotExist:
         return Response({"ok": False, "error": "not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if not belongs_to_organisation(trip, request.user) and not request.user.is_staff:
+    if not belongs_to_organisation(trip, request.user):
         return Response({"ok": False, "error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == "GET":
@@ -698,7 +698,7 @@ def trip_sos(request, pk):
     except Trip.DoesNotExist:
         return Response({"ok": False, "error": "not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if not belongs_to_organisation(trip, request.user) and not request.user.is_staff:
+    if not belongs_to_organisation(trip, request.user):
         return Response({"ok": False, "error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
     trip.sos_triggered_at = timezone.now()
@@ -727,7 +727,7 @@ def trip_sos_acknowledge(request, pk):
     except Trip.DoesNotExist:
         return Response({"ok": False, "error": "not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if not belongs_to_organisation(trip, request.user) and not request.user.is_staff:
+    if not belongs_to_organisation(trip, request.user):
         return Response({"ok": False, "error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
     trip.sos_acknowledged_at = timezone.now()
@@ -1082,7 +1082,7 @@ def booking_assign(request, pk):
     except Trip.DoesNotExist:
         return Response({"ok": False, "error": "not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if not belongs_to_organisation(trip, request.user) and not request.user.is_staff:
+    if not belongs_to_organisation(trip, request.user):
         return Response({"ok": False, "error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
     if trip.status not in ("confirmed", "assigned"):
@@ -1139,7 +1139,7 @@ def booking_images(request, pk):
     except Trip.DoesNotExist:
         return Response({"ok": False, "error": "not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if not belongs_to_organisation(trip, request.user) and not request.user.is_staff:
+    if not belongs_to_organisation(trip, request.user):
         return Response({"ok": False, "error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == "GET":
