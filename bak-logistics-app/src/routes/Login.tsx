@@ -1,21 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession, roleFromSlug, type Role } from '../store/session'
-import { isLive } from '../lib/firebase'
+import { isLive } from '../lib/api'
 import { landingPathForRole } from '../lib/gates'
-import { parsePinCredentials } from '../lib/pin'
 
-/** Firebase speaks in codes — the yard team needs plain language. */
+/** Backend speaks plain errors — map them to yard language. */
 function friendlyAuthError(raw: string, pinMode = false): string {
-  if (/INVALID_LOGIN_CREDENTIALS|INVALID_PASSWORD|INVALID_EMAIL|user-not-found/i.test(raw))
+  if (/invalid credentials/i.test(raw))
     return pinMode
       ? '✖ Staff ID or PIN did not match. Check for typos — then try again.'
       : '✖ Email or password did not match. Check for typos, caps lock, or a trailing space from autofill — then try again.'
-  if (/TOO_MANY_ATTEMPTS|too-many-requests/i.test(raw))
-    return '✖ Too many attempts — wait a minute, then try once more carefully.'
-  if (/NETWORK|network-request-failed/i.test(raw))
+  if (/no job assigned/i.test(raw)) return `✖ ${raw}`
+  if (/Network unreachable|network/i.test(raw))
     return '⏳ Network problem — the yard Wi-Fi may be down. Work continues offline where supported.'
-  if (/No role claim/i.test(raw)) return `✖ ${raw}`
   return `✖ ${raw}`
 }
 
@@ -60,12 +57,14 @@ export default function Login() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function signInWith(emailValue: string, passwordValue: string, pinMode = false) {
+  async function signInWith(value: string, secret: string, pinMode = false) {
     setBusy(true)
     setError(null)
     try {
-      const { signInLive } = await import('../lib/live')
-      const s = await signInLive(emailValue.trim(), passwordValue)
+      const live = await import('../lib/live')
+      const s = pinMode
+        ? await live.signInPinLive(value, secret)
+        : await live.signInLive(value, secret)
       signInReal(s.uid, s.role, s.displayName)
       navigate(landingPathForRole(s.role))
     } catch (e) {
@@ -80,14 +79,17 @@ export default function Login() {
   }
 
   async function signInPin() {
-    let creds: { email: string; password: string }
-    try {
-      creds = parsePinCredentials(staffId, pin)
-    } catch (e) {
-      setError(`✖ ${(e as Error).message}`)
+    const id = staffId.trim().toUpperCase()
+    const digits = pin.trim()
+    if (!id) {
+      setError('✖ Enter your Staff ID (e.g. TRK-07-DEMO).')
       return
     }
-    await signInWith(creds.email, creds.password, true)
+    if (!/^\d{4,12}$/.test(digits)) {
+      setError('✖ PIN must be 4–12 digits.')
+      return
+    }
+    await signInWith(id, digits, true)
   }
 
   function demoTabsBlock() {

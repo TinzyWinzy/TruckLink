@@ -101,6 +101,7 @@ export default function ComplianceCheck() {
         weights,
         limits: limits as [number, number, number],
         routeType,
+        vehicleType,
         totalWeight: Number(total),
         gvmRating: Number(gvm),
         supervisorId: userId ?? 'unknown',

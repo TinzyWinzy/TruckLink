@@ -1,26 +1,16 @@
 /**
- * Live Firestore data layer (MVP slice). Every export degrades gracefully:
- * - No Firebase config  -> demo mode, screens use local seeds.
- * - Configured + offline -> writes join the offline queue, replayed on reconnect.
- * - Configured + online  -> real-time subscriptions + transactional writes.
+ * Live yard data layer — REST adapter over the Trucki Django backend.
+ *
+ * Export names and camelCase row shapes match the old Firestore layer, so
+ * routes consume this unchanged:
+ * - `VITE_API_URL` unset       -> demo mode, screens use local seeds.
+ * - configured + signed out    -> subscribe returns null (gated by isRealLive).
+ * - configured + real session  -> polling reads + idempotent REST writes.
+ *
+ * Server is authoritative for compliance + overrides (SAD §9); the client
+ * only renders. Firebase survives solely for web push (push.ts / sw.ts).
  */
-import {
-  collection,
-  doc,
-  getDoc,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  runTransaction,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  type DocumentData,
-  type Unsubscribe,
-} from 'firebase/firestore'
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth'
-import { auth, db, facilityId, isLive } from './firebase'
+import { apiFetch, clearToken, facilityId, isLive, setToken } from './api'
 import { isRealLive } from './liveGate'
 import {
   listPendingActions,
@@ -28,10 +18,9 @@ import {
   removePendingAction,
   type PendingAction,
 } from './offline/db'
-import { validateLoad } from './validation/compliance'
 import { resolveSiLimits, type SiRemoteConfig } from './validation/siTables'
 
-export { isLive }
+export { facilityId, isLive }
 export interface LiveRow extends Record<string, unknown> {
   id: string
 }
@@ -47,216 +36,253 @@ const ROLES = [
 
 export type LiveRole = (typeof ROLES)[number]
 
+function hasRole(value: unknown): value is LiveRole {
+  return typeof value === 'string' && (ROLES as readonly string[]).includes(value)
+}
+
+interface SessionUser {
+  uid: string
+  role: LiveRole
+  displayName: string
+}
+
+function sessionFrom(user: {
+  id?: string | number
+  username?: string
+  role?: string
+}): SessionUser {
+  if (!hasRole(user.role)) {
+    clearToken()
+    throw new Error(
+      'This account has no job assigned — ask your supervisor to set up your account.',
+    )
+  }
+  return {
+    uid: String(user.id ?? ''),
+    role: user.role,
+    displayName: user.username ?? 'Trucki user',
+  }
+}
+
 // --- Auth (FR-C1) --------------------------------------------------------------
 
 export async function signInLive(
   email: string,
   password: string,
-): Promise<{ uid: string; role: LiveRole; displayName: string }> {
-  if (!auth) throw new Error('Sign-in not connected (practice mode)')
-  const cred = await signInWithEmailAndPassword(auth, email, password)
-  const token = await cred.user.getIdTokenResult()
-  const role = token.claims.role as string | undefined
-  if (!role || !(ROLES as readonly string[]).includes(role)) {
-    await signOut(auth)
-    throw new Error('This account has no job assigned — ask your supervisor to set up your account.')
-  }
-  return {
-    uid: cred.user.uid,
-    role: role as LiveRole,
-    displayName: cred.user.displayName ?? cred.user.email ?? 'Trucki user',
+): Promise<SessionUser> {
+  if (!isLive()) throw new Error('Sign-in not connected (practice mode)')
+  const data = await apiFetch<{ token: string; user: { id: number; username: string; role?: string } }>(
+    '/auth/login/',
+    { method: 'POST', body: { username: email, password } },
+  )
+  setToken(data.token)
+  return sessionFrom(data.user)
+}
+
+/** Shift-PIN login: TRK staff id + PIN straight to the backend (SAD §5). */
+export async function signInPinLive(
+  staffId: string,
+  pin: string,
+): Promise<SessionUser> {
+  if (!isLive()) throw new Error('Sign-in not connected (practice mode)')
+  const data = await apiFetch<{ token: string; user: { id: number; username: string; role?: string } }>(
+    '/auth/pin/',
+    { method: 'POST', body: { staff_id: staffId.trim(), pin: pin.trim() } },
+  )
+  setToken(data.token)
+  return sessionFrom(data.user)
+}
+
+/** Rehydrate a signed-in session after refresh (token in localStorage).
+ * Returns null when signed out, demo mode, or offline at boot. */
+export async function restoreSessionLive(): Promise<SessionUser | null> {
+  if (!isLive()) return null
+  try {
+    const data = await apiFetch<{ user: { id: number; username: string; role?: string } }>(
+      '/auth/me/',
+    )
+    return sessionFrom(data.user)
+  } catch {
+    return null
   }
 }
 
 export async function signOutLive(): Promise<void> {
-  if (auth) await signOut(auth)
+  try {
+    if (isLive()) await apiFetch('/auth/logout/', { method: 'POST' })
+  } catch {
+    // Token already dead — clearing below is what matters.
+  }
+  clearToken()
 }
 
-// --- One-time staging seed (ADMIN only, idempotent merges) -----------------------
+// --- One-time demo yard (ADMIN only, idempotent) -------------------------------
 
 export async function seedDemoFacility(): Promise<void> {
-  await setDoc(
-    doc(collection(db!, 'facilities'), facilityId),
-    {
-      name: 'Demo Yard',
-      timezone: 'Africa/Harare',
-      operatingHours: { open: '06:00', close: '22:00' },
-      dockCount: 4,
-      equipmentFleetSize: 3,
-      waitThresholdMinutes: 60,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  )
-  for (const d of [
-    { id: 'D1', name: 'Dock 1', capacity: 24000, status: 'OCCUPIED' },
-    { id: 'D2', name: 'Dock 2', capacity: 24000, status: 'AVAILABLE' },
-    { id: 'D3', name: 'Dock 3', capacity: 18000, status: 'AVAILABLE' },
-    { id: 'D4', name: 'Dock 4', capacity: 24000, status: 'MAINTENANCE' },
-  ]) {
-    await setDoc(doc(col('docks'), d.id), { ...d, currentAssignment: null, createdAt: serverTimestamp() }, { merge: true })
+  await apiFetch('/admin/seed/', { method: 'POST', body: { facility: facilityId } })
+}
+
+// --- Reads (polling adapter for the old onSnapshot API) ------------------------
+
+const POLL_MS = 5000
+
+type Feed = 'queue' | 'docks' | 'alerts' | 'auditLogs' | 'equipment'
+
+function facQS(): string {
+  return `facility=${encodeURIComponent(facilityId)}`
+}
+
+function mapQueue(r: Record<string, unknown>): LiveRow {
+  return {
+    id: String(r.id),
+    licensePlate: r.reg_number,
+    driverName: r.driver_name,
+    haulier: r.haulier,
+    vehicleType: r.vehicle_type,
+    cargoType: r.cargo_type,
+    expectedDestination: r.expected_destination,
+    status: r.status,
+    assignedDockId: r.assigned_dock ?? null,
+    entryTimestamp: r.entry_timestamp,
+    exitTimestamp: r.exit_timestamp,
+    dwellDurationSeconds: r.dwell_duration_seconds,
+    updatedAt: r.updated_at,
   }
-  for (const e of [
-    { id: 'FL-01', type: 'FORKLIFT', status: 'AVAILABLE' },
-    { id: 'FL-02', type: 'FORKLIFT', status: 'IN_USE' },
-    { id: 'TR-01', type: 'TRAILER', status: 'AVAILABLE' },
-  ]) {
-    await setDoc(doc(col('equipment'), e.id), { ...e, currentAssignment: null, createdAt: serverTimestamp() }, { merge: true })
+}
+
+function mapDock(r: Record<string, unknown>): LiveRow {
+  return {
+    id: String(r.id),
+    name: r.name,
+    status: r.status,
+    currentAssignment: r.current_entry ?? null,
+    capacityKg: r.capacity_kg,
   }
-  await setDoc(
-    doc(col('complianceConfig'), 'default'),
-    {
-      axleLimits: { default: [8000, 9000, 9000] },
-      // S.I. 129/2015 tables per vehicle type (pilot values — BAK to confirm with VID schedule).
-      siTables: {
-        DEFAULT: [8000, 9000, 9000],
-        FLATBED: [8000, 9000, 9000],
-        TANKER: [8000, 8000, 9000],
-        REFRIGERATED: [7500, 9000, 9000],
-        CONTAINER: [8000, 9000, 9000],
-        DRY_VAN: [8000, 9000, 9000],
-      },
-      // Phase 3: corridor-scoped overrides. Same pilot values until BAK/VID
-      // confirms per-corridor schedules — edit in Firestore, no redeploy.
-      siTablesByRoute: {
-        BEITBRIDGE: {
-          DEFAULT: [8000, 9000, 9000],
-          FLATBED: [8000, 9000, 9000],
-          TANKER: [8000, 8000, 9000],
-          REFRIGERATED: [7500, 9000, 9000],
-          CONTAINER: [8000, 9000, 9000],
-          DRY_VAN: [8000, 9000, 9000],
-        },
-        CHIRUNDU: {
-          DEFAULT: [8000, 9000, 9000],
-          FLATBED: [8000, 9000, 9000],
-          TANKER: [8000, 8000, 9000],
-          REFRIGERATED: [7500, 9000, 9000],
-          CONTAINER: [8000, 9000, 9000],
-          DRY_VAN: [8000, 9000, 9000],
-        },
-        FORBES: {
-          DEFAULT: [8000, 9000, 9000],
-          FLATBED: [8000, 9000, 9000],
-          TANKER: [8000, 8000, 9000],
-          REFRIGERATED: [7500, 9000, 9000],
-          CONTAINER: [8000, 9000, 9000],
-          DRY_VAN: [8000, 9000, 9000],
-        },
-        HARARE_LOCAL: {
-          DEFAULT: [8000, 9000, 9000],
-          FLATBED: [8000, 9000, 9000],
-          TANKER: [8000, 8000, 9000],
-          REFRIGERATED: [7500, 9000, 9000],
-          CONTAINER: [8000, 9000, 9000],
-          DRY_VAN: [8000, 9000, 9000],
-        },
-      },
-      requiredChecklistItems: [
-        { itemId: 'driver-license', label: 'Driver license verified', mandatory: true },
-        { itemId: 'vehicle-reg', label: 'Vehicle registration verified', mandatory: true },
-        { itemId: 'cargo-manifest', label: 'Cargo manifest attached', mandatory: true },
-        { itemId: 'weight-cert', label: 'Weight certificate recorded', mandatory: true },
-        { itemId: 'axle-calc', label: 'Axle load calculation within limits', mandatory: true },
-      ],
-      overridePolicy: { requiresSecondaryApproval: true, autoEscalateAfterMinutes: 30 },
-    },
-    { merge: true },
-  )
-  // the gatekeeper walkthrough shift — same 8-truck morning as demoData.ts.
-  // Idempotent merges; safe to re-run. Skipped silently when docs exist?
-  // No — merge overwrites status, which is exactly what a re-demo wants.
-  const shiftQueue = [
-    { id: 'q-seed-1', licensePlate: 'AEH 4521', driverName: 'T. Moyo', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED' },
-    { id: 'q-seed-2', licensePlate: 'AGX 9033', driverName: 'S. Ndlovu', cargoType: 'Dry van', expectedDestination: 'Forbes', status: 'ASSIGNED', assignedDockId: 'D1' },
-    { id: 'q-seed-3', licensePlate: 'AFM 1187', driverName: 'K. Sibanda', cargoType: 'Tanker', expectedDestination: 'Chirundu', status: 'QUARANTINED' },
-    { id: 'q-seed-4', licensePlate: 'ABZ 9901', driverName: 'R. Dube', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED' },
-    { id: 'q-seed-6', licensePlate: 'ADP 3357', driverName: 'J. Banda', cargoType: 'Flatbed', expectedDestination: 'Chirundu', status: 'PENDING_OVERRIDE' },
-    { id: 'q-seed-7', licensePlate: 'AEW 7712', driverName: 'M. Hove', cargoType: 'Dry van', expectedDestination: 'Forbes', status: 'OVERRIDE_APPROVED' },
-    { id: 'q-seed-8', licensePlate: 'AFX 6640', driverName: 'D. Mutasa', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED' },
-  ]
-  for (const q of shiftQueue) {
-    await setDoc(
-      doc(col('queue'), q.id),
-      { ...q, entryTimestamp: serverTimestamp(), createdAt: serverTimestamp() },
-      { merge: true },
+}
+
+function mapAlert(r: Record<string, unknown>): LiveRow {
+  const acknowledged = Boolean(r.acknowledged)
+  return {
+    id: String(r.id),
+    severity: r.severity,
+    message: r.message,
+    type: r.category,
+    status: acknowledged ? 'ACKNOWLEDGED' : 'ACTIVE',
+    acknowledged,
+    acknowledgedBy: r.acknowledged_by ?? null,
+    relatedQueueEntry: r.related_queue_entry ?? null,
+    timestamp: r.timestamp,
+  }
+}
+
+function shortId(raw: unknown): string {
+  const s = String(raw ?? '')
+  return s.length > 12 ? s.slice(0, 8) : s
+}
+
+function mapAudit(r: Record<string, unknown>): LiveRow {
+  let payload: Record<string, unknown> = {}
+  try {
+    const raw = r.payload
+    payload = typeof raw === 'string' ? (JSON.parse(raw) as Record<string, unknown>) : ((raw as Record<string, unknown>) ?? {})
+  } catch {
+    payload = {}
+  }
+  const checkId = payload.checkId ?? payload.check_id
+  const entryId = payload.queueEntryId ?? payload.queue_entry_id ?? payload.id
+  const entityType = checkId ? 'check' : entryId ? 'queue' : ''
+  const entityId = checkId ?? entryId
+  return {
+    id: String(r.id),
+    action: r.action,
+    entityType,
+    entityId: shortId(entityId),
+    actor: r.actor ?? r.actor_ref ?? '',
+    currentHash: r.hash,
+    previousHash: r.previous_hash,
+    timestamp: r.timestamp,
+    payload,
+  }
+}
+
+async function fetchFeed(name: Feed, max: number): Promise<LiveRow[]> {
+  if (name === 'auditLogs') {
+    const data = await apiFetch<{ entries?: Record<string, unknown>[] }>(
+      `/audit/?${facQS()}`,
     )
+    return (data.entries ?? []).slice(0, max).map(mapAudit)
   }
-  const shiftAlerts = [
-    { id: 'quar-q-seed-3', type: 'COMPLIANCE_FAILURE', severity: 'CRITICAL', status: 'ACTIVE', relatedEntityType: 'queueEntry', relatedEntityId: 'q-seed-3', message: 'AFM 1187 quarantined: Axle 2 overloaded by 1,400kg. Rebalancing or override required.' },
-    { id: 'wait-q-seed-4', type: 'EXCESSIVE_WAIT', severity: 'HIGH', status: 'ACTIVE', relatedEntityType: 'queueEntry', relatedEntityId: 'q-seed-4', message: 'ABZ 9901 waiting 74m (exceeds 60m threshold).' },
-  ]
-  for (const a of shiftAlerts) {
-    await setDoc(
-      doc(col('alerts'), a.id),
-      { ...a, escalationLevel: 0, triggeredAt: serverTimestamp(), createdAt: serverTimestamp() },
-      { merge: true },
-    )
+  if (name === 'equipment') {
+    // No equipment read API in R1 (board covers queue/docks/alerts).
+    return []
   }
+  const board = await apiFetch<{
+    queue?: Record<string, unknown>[]
+    docks?: Record<string, unknown>[]
+    alerts?: Record<string, unknown>[]
+  }>(`/yard/board/?${facQS()}`)
+  if (name === 'queue') return (board.queue ?? []).map(mapQueue)
+  if (name === 'docks') return (board.docks ?? []).map(mapDock)
+  return (board.alerts ?? []).map(mapAlert)
 }
 
-function col(name: string) {
-  if (!db) throw new Error('Yard system not connected')
-  return collection(db, `facilities/${facilityId}/${name}`)
-}
-
-function toRows(snapshot: { docs: Array<{ id: string; data: () => DocumentData }> }): LiveRow[] {
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))
-}
-
+/** Poll a feed every POLL_MS (REST replacement for Firestore onSnapshot). */
 export function subscribe(
-  name: 'queue' | 'docks' | 'alerts' | 'auditLogs' | 'equipment',
+  name: Feed,
   cb: (rows: LiveRow[]) => void,
   max = 100,
-): Unsubscribe | null {
+): (() => void) | null {
   if (!isRealLive()) return null
-  const q =
-    name === 'queue' || name === 'auditLogs'
-      ? query(col(name), orderBy(name === 'queue' ? 'entryTimestamp' : 'timestamp', 'desc'), limit(max))
-      : query(col(name), limit(max))
-  return onSnapshot(
-    q,
-    (snap) => cb(toRows(snap)),
-    (err) => {
-      // Never leave Firestore denials uncaught: almost always signed-out state
-      // or a token minted before role claims were set — recover via sign out/in.
-      console.warn(
-        `[live] ${name} listener denied (${err.code}). Sign out and sign back in to refresh role claims; check ADMIN set {role, facilities} on the account.`,
-      )
-    },
-  )
+  let stopped = false
+  let warned = false
+  const tick = async () => {
+    if (stopped) return
+    try {
+      const rows = await fetchFeed(name, max)
+      if (!stopped) cb(rows)
+    } catch (err) {
+      if (!warned) {
+        warned = true
+        console.warn(`[live] ${name} poll failed: ${(err as Error).message}`)
+      }
+    }
+  }
+  void tick()
+  const timer = setInterval(() => void tick(), POLL_MS)
+  return () => {
+    stopped = true
+    clearInterval(timer)
+  }
 }
 
-// --- Writes (all idempotent: callers pass the offline action ID as doc ID) ----
+// --- Writes (all idempotent where the server supports it) ----------------------
 
 export async function registerVehicleLive(
-  data: { licensePlate: string; driverName: string; cargoType: string; expectedDestination: string },
+  data: {
+    licensePlate: string
+    driverName: string
+    cargoType: string
+    expectedDestination: string
+  },
   key: string,
 ): Promise<void> {
-  await setDoc(
-    doc(col('queue'), `q-${key}`),
-    {
-      ...data,
-      licensePlate: data.licensePlate.toUpperCase(),
-      status: 'QUEUED',
-      entryTimestamp: serverTimestamp(),
-      createdAt: serverTimestamp(),
+  await apiFetch('/queue/', {
+    method: 'POST',
+    body: {
+      facility: facilityId,
+      reg_number: data.licensePlate.toUpperCase(),
+      driver_name: data.driverName ?? '',
+      cargo_type: data.cargoType ?? '',
+      expected_destination: data.expectedDestination ?? '',
+      idempotency_key: `q-${key}`,
     },
-    { merge: true },
-  )
+  })
 }
 
 export async function assignDockLive(queueEntryId: string, dockId: string): Promise<void> {
-  if (!db) throw new Error('Firestore not configured (demo mode)')
-  const qRef = doc(col('queue'), queueEntryId)
-  const dRef = doc(col('docks'), dockId)
-  await runTransaction(db, async (tx) => {
-    const dock = await tx.get(dRef)
-    if (!dock.exists() || dock.get('status') !== 'AVAILABLE') {
-      throw new Error('Dock is not available')
-    }
-    tx.update(qRef, { status: 'ASSIGNED', assignedDockId: dockId, updatedAt: serverTimestamp() })
-    tx.update(dRef, { status: 'OCCUPIED', currentAssignment: queueEntryId })
+  await apiFetch(`/docks/${encodeURIComponent(String(dockId))}/assign/`, {
+    method: 'POST',
+    body: { queue_entry: queueEntryId },
   })
 }
 
@@ -265,67 +291,33 @@ export async function submitComplianceLive(input: {
   weights: [number, number, number]
   limits?: [number, number, number]
   routeType?: string
+  vehicleType?: string
   totalWeight: number
   gvmRating: number
   supervisorId: string
   key: string
 }): Promise<'PASS' | 'FAIL'> {
-  const result = validateLoad({
-    axleConfiguration: '2-4-2',
-    measuredWeights: [...input.weights],
-    limits: [...(input.limits ?? [8000, 9000, 9000])],
-    totalWeight: input.totalWeight,
-    gvmRating: input.gvmRating,
-  })
-  const checkId = `c-${input.key}`
-  await setDoc(
-    doc(col('complianceChecks'), checkId),
+  // Server resolves S.I. limits from tenant config and returns the final
+  // verdict (SAD §9) — the local validateLoad copy stays demo-only.
+  const data = await apiFetch<{ check: { overall_status: 'PASS' | 'FAIL' } }>(
+    '/compliance/',
     {
-      queueEntryId: input.queueEntryId,
-      routeType: input.routeType ?? 'DEFAULT',
-      axleLoads: input.weights,
-      totalWeight: input.totalWeight,
-      gvmRating: input.gvmRating,
-      overallStatus: result.overallStatus,
-      violations: result.violations,
-      supervisorId: input.supervisorId,
-      completedAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
-    },
-    { merge: true },
-  )
-  if (result.overallStatus === 'FAIL') {
-    await updateDoc(doc(col('queue'), input.queueEntryId), {
-      status: 'QUARANTINED',
-      updatedAt: serverTimestamp(),
-    })
-    // Same deterministic ID the Cloud Function writes — set-merge, no duplicates.
-    await setDoc(
-      doc(col('alerts'), `quar-${input.queueEntryId}`),
-      {
-        type: 'COMPLIANCE_FAILURE',
-        severity: 'CRITICAL',
-        relatedEntityType: 'queueEntry',
-        relatedEntityId: input.queueEntryId,
-        message: `Vehicle quarantined: ${result.violations.join('; ')}`,
-        status: 'ACTIVE',
-        escalationLevel: 0,
-        triggeredAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
+      method: 'POST',
+      body: {
+        queue_entry: input.queueEntryId,
+        axle_weights: input.weights,
+        total_weight: input.totalWeight,
+        gvm_rating: input.gvmRating,
+        route_type: input.routeType ?? 'DEFAULT',
+        vehicle_type: input.vehicleType,
       },
-      { merge: true },
-    )
-  }
-  const outcome: 'PASS' | 'FAIL' = result.overallStatus === 'PASS' ? 'PASS' : 'FAIL'
-  return outcome
+    },
+  )
+  return data.check.overall_status === 'PASS' ? 'PASS' : 'FAIL'
 }
 
-export async function acknowledgeAlertLive(alertId: string, by: string): Promise<void> {
-  await updateDoc(doc(col('alerts'), alertId), {
-    status: 'ACKNOWLEDGED',
-    acknowledgedBy: by,
-    acknowledgedAt: serverTimestamp(),
-  })
+export async function acknowledgeAlertLive(alertId: string, _by = ''): Promise<void> {
+  await apiFetch(`/alerts/${encodeURIComponent(alertId)}/ack/`, { method: 'POST' })
 }
 
 export interface ChecklistItem {
@@ -338,6 +330,14 @@ export interface ComplianceConfig {
   limits: number[]
   checklist: ChecklistItem[]
 }
+
+const FALLBACK_CHECKLIST: ChecklistItem[] = [
+  { itemId: 'driver-license', label: 'Driver license verified', mandatory: true },
+  { itemId: 'vehicle-reg', label: 'Vehicle registration verified', mandatory: true },
+  { itemId: 'cargo-manifest', label: 'Cargo manifest attached', mandatory: true },
+  { itemId: 'weight-cert', label: 'Weight certificate recorded', mandatory: true },
+  { itemId: 'axle-calc', label: 'Axle load calculation within limits', mandatory: true },
+]
 
 /** Resolve axle limits for a vehicle type with DEFAULT fallback (S.I. tables).
  * Phase 3: route-aware. `route` is optional for backwards compat — callers
@@ -353,40 +353,33 @@ export function resolveAxleLimits(
   return resolveSiLimits(route ?? 'DEFAULT', vehicleType, remote)
 }
 
-export async function getComplianceConfig(vehicleType = 'DEFAULT', route = 'DEFAULT'): Promise<ComplianceConfig> {
+export async function getComplianceConfig(
+  vehicleType = 'DEFAULT',
+  route = 'DEFAULT',
+): Promise<ComplianceConfig> {
   const fallback: ComplianceConfig = {
     limits: resolveSiLimits(route, vehicleType, undefined),
-    checklist: [
-      { itemId: 'driver-license', label: 'Driver license verified', mandatory: true },
-      { itemId: 'vehicle-reg', label: 'Vehicle registration verified', mandatory: true },
-      { itemId: 'cargo-manifest', label: 'Cargo manifest attached', mandatory: true },
-      { itemId: 'weight-cert', label: 'Weight certificate recorded', mandatory: true },
-      { itemId: 'axle-calc', label: 'Axle load calculation within limits', mandatory: true },
-    ],
+    checklist: FALLBACK_CHECKLIST,
   }
   if (!isRealLive()) return fallback
   try {
-    const { getDoc } = await import('firebase/firestore')
-    const snap = await getDoc(doc(col('complianceConfig'), 'default'))
-    if (!snap.exists()) return fallback
-    const data = snap.data() as {
-      axleLimits?: { default?: number[] }
-      siTables?: Record<string, number[]>
-      siTablesByRoute?: Record<string, Record<string, number[]>>
-      requiredChecklistItems?: ChecklistItem[]
+    const data = await apiFetch<{
+      config?: { route_type: string; vehicle_type: string; axle_limits: number[] }[]
+    }>('/compliance/config/')
+    const siTablesByRoute: Record<string, Record<string, number[]>> = {}
+    for (const row of data.config ?? []) {
+      const r = String(row.route_type).toUpperCase()
+      const v = String(row.vehicle_type).toUpperCase()
+      ;(siTablesByRoute[r] ??= {})[v] = row.axle_limits
     }
-    return {
-      limits: resolveSiLimits(route, vehicleType, data),
-      checklist: data.requiredChecklistItems?.length ? data.requiredChecklistItems : fallback.checklist,
-    }
+    const remote: SiRemoteConfig = { siTablesByRoute }
+    return { limits: resolveSiLimits(route, vehicleType, remote), checklist: fallback.checklist }
   } catch {
     return fallback
   }
 }
 
-/** Secondary-approver rule, stable-ID form (canonical — both paths unify here).
- * PowerSync compares `inspector_id` vs `authorizerId`; Firestore compares
- * `overrideRequest.requestedById` vs approver userId. */
+/** Secondary-approver rule, stable-ID form (canonical — both paths unify here). */
 export function isSelfApprovalById(
   requestedById: string | null | undefined,
   approverId: string,
@@ -396,7 +389,7 @@ export function isSelfApprovalById(
 }
 
 /** Legacy display-name form (pre-ID override docs). Kept for grandfathered
- * records only — new writes always carry `requestedById`. */
+ * records only — new writes always carry stable IDs. */
 export function isSelfApproval(
   requestedBy: string | null | undefined,
   approver: string,
@@ -405,37 +398,63 @@ export function isSelfApproval(
   return r.length > 0 && r === approver.trim()
 }
 
-export async function requestOverrideLive(queueEntryId: string, reason: string, userId: string, displayName = userId): Promise<void> {
+/** The backend keys overrides on the compliance CHECK, the screens key on the
+ * queue ENTRY — resolve entry -> latest check in the required status. */
+async function resolveCheckId(
+  entryId: string,
+  wantStatus: 'QUARANTINED' | 'PENDING_OVERRIDE',
+): Promise<string> {
+  const data = await apiFetch<{ checks?: Record<string, unknown>[] }>(
+    `/compliance/?${facQS()}`,
+  )
+  const match = (data.checks ?? [])
+    .filter(
+      (c) => String(c.queue_entry_id) === entryId && String(c.status) === wantStatus,
+    )
+    .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)))[0]
+  if (!match) {
+    throw new Error(
+      wantStatus === 'QUARANTINED'
+        ? 'No quarantined check found for this entry — run the compliance check first.'
+        : 'No override pending for this entry.',
+    )
+  }
+  return String(match.id)
+}
+
+export async function requestOverrideLive(
+  queueEntryId: string,
+  reason: string,
+  _userId = '',
+  _displayName = '',
+): Promise<void> {
   if (!reason.trim()) throw new Error('Override reason is required.')
-  await updateDoc(doc(col('queue'), queueEntryId), {
-    status: 'PENDING_OVERRIDE',
-    overrideRequest: { reason: reason.trim(), requestedBy: displayName, requestedById: userId, requestedAt: serverTimestamp() },
-    updatedAt: serverTimestamp(),
+  const checkId = await resolveCheckId(queueEntryId, 'QUARANTINED')
+  await apiFetch(`/compliance/${checkId}/override-request/`, {
+    method: 'POST',
+    body: { reason: reason.trim() },
   })
 }
 
-export async function approveOverrideLive(queueEntryId: string, approved: boolean, userId: string, notes = ''): Promise<void> {
-  // Secondary-approver enforcement on stable user IDs (parity with
-  // approveOverridePS): the requester cannot approve their own override.
-  const snap = await getDoc(doc(col('queue'), queueEntryId))
-  const req = snap.exists()
-    ? (snap.data().overrideRequest as { requestedBy?: string; requestedById?: string } | undefined)
-    : undefined
-  if (isSelfApprovalById(req?.requestedById, userId)) {
-    throw new Error('Secondary approval violation: approver cannot be the override requester.')
-  }
-  await updateDoc(doc(col('queue'), queueEntryId), {
-    status: approved ? 'OVERRIDE_APPROVED' : 'QUARANTINED',
-    overrideDecision: { approved, by: userId, notes, decidedAt: serverTimestamp() },
-    updatedAt: serverTimestamp(),
+export async function approveOverrideLive(
+  queueEntryId: string,
+  approved: boolean,
+  _userId = '',
+  notes = '',
+): Promise<void> {
+  const checkId = await resolveCheckId(queueEntryId, 'PENDING_OVERRIDE')
+  await apiFetch(`/compliance/${checkId}/override-approve/`, {
+    method: 'POST',
+    body: {
+      reason: notes.trim() || (approved ? 'Approved' : 'Rejected'),
+      approved,
+    },
   })
 }
 
 export async function releaseVehicleLive(queueEntryId: string): Promise<void> {
-  await updateDoc(doc(col('queue'), queueEntryId), {
-    status: 'RELEASED',
-    exitTimestamp: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+  await apiFetch(`/queue/${encodeURIComponent(queueEntryId)}/release/`, {
+    method: 'POST',
   })
 }
 
@@ -527,7 +546,9 @@ async function replayOne(action: PendingAction): Promise<void> {
       const p = action.payload as {
         queueEntryId: string
         weights: [number, number, number]
+        limits?: [number, number, number]
         routeType?: string
+        vehicleType?: string
         totalWeight: number
         gvmRating: number
         supervisorId: string

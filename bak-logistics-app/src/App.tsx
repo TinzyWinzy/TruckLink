@@ -1,7 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { Suspense, lazy, useEffect, type ReactNode } from 'react'
 import Layout from './components/Layout'
-import { useSession, type Role } from './store/session'
+import { useSession } from './store/session'
 import { canVisit, landingPathForRole, type RouteKey } from './lib/gates'
 
 const Login = lazy(() => import('./routes/Login'))
@@ -47,53 +47,28 @@ function Fallback() {
   return <p role="status" className="p-6 text-sm">Loading Trucki…</p>
 }
 
-/** Restore real yard sessions across refresh. Firebase Auth persists the
- * user, but the role lives in the store — without this, every reload drops
- * a signed-in staffer back to the gate. Practice sessions restore separately
- * from sessionStorage (session.ts); this handles real sign-ins only. */
+/** Restore real yard sessions across refresh. The API token persists in
+ * localStorage; this revalidates it against /auth/me/ at boot. Practice
+ * sessions restore separately from sessionStorage (session.ts). */
 function AuthRestore() {
   const { signInReal } = useSession()
   const navigate = useNavigate()
   useEffect(() => {
-    let unsub: (() => void) | undefined
     let cancelled = false
-    ;(async () => {
+    void (async () => {
       try {
-        const [{ auth }, { onAuthStateChanged }] = await Promise.all([
-          import('./lib/firebase'),
-          import('firebase/auth'),
-        ])
-        if (!auth || cancelled) return
-        unsub = onAuthStateChanged(auth, (user) => {
-          void (async () => {
-            if (!user || cancelled) return
-            try {
-              const token = await user.getIdTokenResult()
-              const r = token.claims.role as string | undefined
-              const roles: Role[] = [
-                'DISPATCH_SUPERVISOR',
-                'FACILITY_MANAGER',
-                'OPERATIONS_SUPERVISOR',
-                'EXECUTIVE',
-                'ADMIN',
-                'COMPLIANCE_OFFICER',
-              ]
-              if (!r || !roles.includes(r as Role)) return
-              if (useSession.getState().role) return // demo tap or fresh sign-in already holds the shift
-              signInReal(user.uid, r as Role, user.displayName ?? user.email ?? 'Trucki user')
-              if (window.location.pathname === '/') navigate(landingPathForRole(r as Role))
-            } catch {
-              // Token unreadable (offline boot) — staffer signs in again.
-            }
-          })()
-        })
+        const { restoreSessionLive } = await import('./lib/live')
+        if (useSession.getState().role) return // demo tap or fresh sign-in already holds the shift
+        const s = await restoreSessionLive()
+        if (!s || cancelled) return
+        signInReal(s.uid, s.role, s.displayName)
+        if (window.location.pathname === '/') navigate(landingPathForRole(s.role))
       } catch {
-        // Demo mode (no Firebase) — nothing to restore.
+        // Offline boot or dead token — staffer signs in again.
       }
     })()
     return () => {
       cancelled = true
-      unsub?.()
     }
   }, [navigate, signInReal])
   return null

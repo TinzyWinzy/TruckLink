@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { facilityId } from '../lib/firebase'
+import { facilityId } from '../lib/api'
 import { useLive } from '../lib/liveGate'
 import { computeTurnaroundStats, queueToCsv, type LiveRow } from '../lib/live'
 import {

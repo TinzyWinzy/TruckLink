@@ -84,7 +84,11 @@ export default function Alerts() {
     }
     try {
       if (live) {
-        await (await import('../lib/live')).approveOverrideLive(alertId, true, userId ?? displayName)
+        const row = alerts.find((a) => a.id === alertId)
+        const entryId = String(row?.relatedQueueEntry ?? alertId)
+        const m = await import('../lib/live')
+        await m.approveOverrideLive(entryId, true, userId ?? displayName, overrideReason.trim())
+        await m.acknowledgeAlertLive(alertId, displayName)
       } else {
         await approveOverridePS({
           facilityId: 'demo-facility',
@@ -95,8 +99,8 @@ export default function Alerts() {
           // In demo fallback, mark local state
         })
         setAlerts((a) => a.map((x) => (x.id === alertId ? { ...x, status: 'OVERRIDE_APPROVED' } : x)))
+        await acknowledgeAlertPS('demo-facility', alertId, userId || 'demo-supervisor').catch(() => {})
       }
-      await acknowledgeAlertPS('demo-facility', alertId, userId || 'demo-supervisor').catch(() => {})
       setOverrideTarget(null)
       setOverrideReason('')
       setMessage('✔ Quarantine override approved and recorded in audit log.')

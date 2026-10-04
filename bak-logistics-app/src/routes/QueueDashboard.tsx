@@ -32,8 +32,15 @@ const SYMBOL: Record<string, string> = {
 function mapLive(r: LiveRow): Row {
   const rawStatus = String(r.status ?? 'QUEUED')
   const ts = r.entryTimestamp as { toDate?: () => Date } | string | undefined
-  const enteredAt =
-    typeof ts === 'string' ? ts : (ts?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) ?? '—')
+  let enteredAt = '—'
+  if (typeof ts === 'string' && ts) {
+    const parsed = new Date(ts)
+    enteredAt = Number.isNaN(parsed.getTime())
+      ? ts
+      : parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  } else if (ts && typeof ts === 'object' && typeof ts.toDate === 'function') {
+    enteredAt = ts.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
   return {
     id: r.id,
     plate: String(r.licensePlate ?? '—'),
