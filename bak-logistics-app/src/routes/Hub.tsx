@@ -10,18 +10,18 @@ export default function Hub() {
     <div className="max-w-2xl">
       <PageHeader
         title="Information hub"
-        sub="What BAK Intel is, what the law demands, who does what, and what to do when things break."
+        sub="What Trucki is, what the law demands, who does what, and what to do when things break."
         mode={live ? 'live' : 'demo'}
       />
       <div className="space-y-3">
-        <Section title="What is this system?" sub="BAK Intel in one paragraph">
+        <Section title="What is this system?" sub="Trucki in one paragraph">
           <p className="text-[15px] leading-relaxed">
-            BAK Intel is a local-first overlay on the Harare yard: it registers arrivals, assigns docks,
+            Trucki is a local-first overlay on the yard: it registers arrivals, assigns docks,
             validates every dispatch against ZINARA axle law <strong>before</strong> the truck leaves, and keeps
             an append-only audit trail. It does not replace the WMS — it stops illegal trucks at the gate.
           </p>
           <Link to="/guide" className="btn-primary touch-target mt-3 inline-block rounded-lg px-4 py-2 text-sm">
-            Start Tafadzwa's walkthrough →
+            Start the gatekeeper's walkthrough →
           </Link>
         </Section>
 
@@ -48,7 +48,7 @@ export default function Hub() {
         <Section title="When things break" sub="Yard-first fixes, in order">
           <ul className="list-decimal space-y-1 pl-5 text-sm leading-relaxed">
             <li><strong>Offline (■ OFFLINE):</strong> keep registering — entries queue with ⏳ and sync on reconnect. Dock moves wait for signal.</li>
-            <li><strong>PIN fails:</strong> check caps on BAK-07-TAFADZWA, 4–12 digits, no trailing space. After 3 tries, ask your supervisor — do not share PINs.</li>
+            <li><strong>PIN fails:</strong> check caps on TRK-07-DEMO, 4–12 digits, no trailing space. After 3 tries, ask your supervisor — do not share PINs.</li>
             <li><strong>Scale won't pair:</strong> use Chrome on the yard tablet → ⚖ Read from weighbridge → pick the scale port. Typing still works.</li>
             <li><strong>Permission error:</strong> sign out → sign in again. Still blocked → ask your supervisor to check your account.</li>
             <li><strong>Quarantined truck at the gate:</strong> do not wave it through. Rebalance at Bay 4 or run the override path — both are audited.</li>
@@ -62,7 +62,7 @@ export default function Hub() {
               ['Pre-departure check', '/compliance', '4 steps: vehicle → weights → checks → validate.'],
               ['Dock board', '/docks', 'Tap a free dock → oldest truck assigns.'],
               ['Alerts', '/alerts', 'CRITICAL first; acknowledge what you own.'],
-              ['Shift performance', '/reports', 'Overdue, turnaround, CSV export for Takudzwa.'],
+              ['Shift performance', '/reports', 'Overdue, turnaround, CSV export for the manager.'],
               ['Audit trail', '/audit', 'Hash-chained proof. Read-only for most.'],
             ].map(([label, to, blurb]) => (
               <li key={to} className="card flex items-center gap-3 px-4 py-3">

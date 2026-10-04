@@ -50,7 +50,7 @@ if (firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId) {
   const messaging = getMessaging(fbApp)
   onBackgroundMessage(messaging, (payload) => {
     const data = (payload.data ?? {}) as Record<string, string>
-    void self.registration.showNotification(payload.notification?.title ?? 'BAK OpShield', {
+    void self.registration.showNotification(payload.notification?.title ?? 'Trucki', {
       body: payload.notification?.body ?? '',
       data: { url: data.url ?? '/alerts' },
     })
@@ -80,7 +80,7 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('message', (event) => {
   const e = event as unknown as { data?: { type?: string; title?: string; body?: string } }
   if (e.data?.type === 'SHOW_NOTIFICATION') {
-    void self.registration.showNotification(e.data.title ?? 'BAK OpShield', {
+    void self.registration.showNotification(e.data.title ?? 'Trucki', {
       body: e.data.body ?? '',
       data: { url: '/alerts' },
     })

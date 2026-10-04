@@ -64,7 +64,7 @@ export async function signInLive(
   return {
     uid: cred.user.uid,
     role: role as LiveRole,
-    displayName: cred.user.displayName ?? cred.user.email ?? 'BAK user',
+    displayName: cred.user.displayName ?? cred.user.email ?? 'Trucki user',
   }
 }
 
@@ -78,7 +78,7 @@ export async function seedDemoFacility(): Promise<void> {
   await setDoc(
     doc(collection(db!, 'facilities'), facilityId),
     {
-      name: 'BAK Pilot Facility',
+      name: 'Demo Yard',
       timezone: 'Africa/Harare',
       operatingHours: { open: '06:00', close: '22:00' },
       dockCount: 4,
@@ -163,7 +163,7 @@ export async function seedDemoFacility(): Promise<void> {
     },
     { merge: true },
   )
-  // Tafadzwa walkthrough shift — same 8-truck morning as demoData.ts.
+  // the gatekeeper walkthrough shift — same 8-truck morning as demoData.ts.
   // Idempotent merges; safe to re-run. Skipped silently when docs exist?
   // No — merge overwrites status, which is exactly what a re-demo wants.
   const shiftQueue = [

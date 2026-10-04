@@ -44,7 +44,7 @@ function RoleGuard({ route, children }: { route: RouteKey; children: ReactNode }
 }
 
 function Fallback() {
-  return <p role="status" className="p-6 text-sm">Loading BAK module…</p>
+  return <p role="status" className="p-6 text-sm">Loading Trucki…</p>
 }
 
 /** Restore real yard sessions across refresh. Firebase Auth persists the
@@ -80,7 +80,7 @@ function AuthRestore() {
               ]
               if (!r || !roles.includes(r as Role)) return
               if (useSession.getState().role) return // demo tap or fresh sign-in already holds the shift
-              signInReal(user.uid, r as Role, user.displayName ?? user.email ?? 'BAK user')
+              signInReal(user.uid, r as Role, user.displayName ?? user.email ?? 'Trucki user')
               if (window.location.pathname === '/') navigate(landingPathForRole(r as Role))
             } catch {
               // Token unreadable (offline boot) — staffer signs in again.

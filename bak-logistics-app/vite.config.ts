@@ -17,9 +17,9 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
       },
       manifest: {
-        name: 'BAK Operational Intelligence Layer',
-        short_name: 'BAK Intel',
-        description: 'Yard capacity + pre-departure compliance overlay for BAK Logistics.',
+        name: 'Trucki Operations Platform',
+        short_name: 'Trucki',
+        description: 'Yard queue and pre-departure compliance for African logistics operators.',
         theme_color: '#0f172a',
         background_color: '#ffffff',
         display: 'standalone',

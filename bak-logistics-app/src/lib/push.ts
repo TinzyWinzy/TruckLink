@@ -47,7 +47,7 @@ export async function subscribePush(userId: string, role: string): Promise<strin
   if (!res.ok) throw new Error(`Subscribe failed: ${res.status}`)
   // Foreground messages while the app is open.
   onMessage(messaging, (payload) => {
-    const title = payload.notification?.title ?? 'BAK OpShield'
+    const title = payload.notification?.title ?? 'Trucki'
     const body = payload.notification?.body ?? ''
     if (navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'SHOW_NOTIFICATION', title, body })

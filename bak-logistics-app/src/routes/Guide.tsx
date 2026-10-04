@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLive } from '../lib/liveGate'
-import { TAFADZWA_STEPS } from '../lib/demoData'
+import { GUIDE_STEPS } from '../lib/demoData'
 import { PageHeader, Section } from '../components/ui'
 
-/** System Guide — Tafadzwa's click-by-click walkthrough. Progress persists per tablet. */
+/** System Guide — the gatekeeper's click-by-click walkthrough. Progress persists per tablet. */
 const KEY = 'bak-guide-progress-v1'
 
 function load(): Record<string, boolean> {
@@ -18,7 +18,7 @@ function load(): Record<string, boolean> {
 export default function Guide() {
   const [done, setDone] = useState<Record<string, boolean>>(load)
   const live = useLive()
-  const finished = TAFADZWA_STEPS.filter((s) => done[s.n]).length
+  const finished = GUIDE_STEPS.filter((s) => done[s.n]).length
 
   function toggle(n: string) {
     setDone((d) => {
@@ -35,26 +35,26 @@ export default function Guide() {
   return (
     <div className="max-w-2xl">
       <PageHeader
-        title={`Tafadzwa's walkthrough · ${finished}/${TAFADZWA_STEPS.length}`}
+        title={`the gatekeeper's walkthrough · ${finished}/${GUIDE_STEPS.length}`}
         sub={live ? 'Yard walkthrough — ticks save on this tablet. Do it once here, you can do it on shift.' : 'Practice walkthrough — training shift, works offline. Ticks save on this tablet.'}
         mode={live ? 'live' : 'demo'}
       />
-      <div className="mb-4 h-2.5 overflow-hidden rounded bg-slate-200" role="img" aria-label={`Progress ${finished} of ${TAFADZWA_STEPS.length}`}>
-        <div className="h-2.5 rounded bg-emerald-700 transition-all" style={{ width: `${(finished / TAFADZWA_STEPS.length) * 100}%` }} />
+      <div className="mb-4 h-2.5 overflow-hidden rounded bg-slate-200" role="img" aria-label={`Progress ${finished} of ${GUIDE_STEPS.length}`}>
+        <div className="h-2.5 rounded bg-emerald-700 transition-all" style={{ width: `${(finished / GUIDE_STEPS.length) * 100}%` }} />
       </div>
-      {finished === TAFADZWA_STEPS.length && (
+      {finished === GUIDE_STEPS.length && (
         <p role="status" className="card mb-3 border-2 border-emerald-700 bg-emerald-50 p-4 text-sm font-extrabold text-emerald-900">
           ✔ Walkthrough complete — you can run a shift. Next: do steps 1–2 on a real truck with a supervisor watching.
         </p>
       )}
       <div className="space-y-3">
-        {TAFADZWA_STEPS.map((s) => {
+        {GUIDE_STEPS.map((s) => {
           const checked = !!done[s.n]
           return (
             <Section key={s.n} step={s.n} title={s.title} sub={s.where}>
               <p className="text-[15px] leading-relaxed">{s.what}</p>
               <p className="mt-2 rounded-lg bg-amber-50 p-3 text-sm leading-relaxed text-amber-900">
-                <strong>Tafadzwa, note:</strong> {s.tafadzwa}
+                <strong>the gatekeeper, note:</strong> {s.note}
               </p>
               <p className="mt-2 text-sm font-semibold text-emerald-900">Done when: {s.done}</p>
               <div className="mt-3 flex flex-wrap gap-2">

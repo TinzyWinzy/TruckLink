@@ -84,15 +84,15 @@ export default function Layout({ children }: { children: ReactNode }) {
     <div className="on-dark min-h-screen text-slate-900">
       <header className="gantry sticky top-0 z-10 text-white shadow-lg">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-3">
-          <Link to={role ? landingPathForRole(role) : '/queue'} className="flex items-center gap-2.5" aria-label="BAK Intel home">
+          <Link to={role ? landingPathForRole(role) : '/queue'} className="flex items-center gap-2.5" aria-label="Trucki home">
             <span aria-hidden="true" className="gantry-mark flex h-9 w-9 items-center justify-center rounded-xl text-base font-black text-slate-900">
               B
             </span>
             <span className="leading-none">
               <span className="block text-[10px] font-extrabold uppercase tracking-[0.18em] text-amber-400">
-                Harare · Yard
+                Yard · Demo
               </span>
-              <span className="block text-lg font-extrabold tracking-tight">BAK Intel</span>
+              <span className="block text-lg font-extrabold tracking-tight">Trucki</span>
             </span>
           </Link>
           <div className="flex flex-wrap items-center gap-1.5" role="status" aria-label="Yard state">
@@ -166,7 +166,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       </header>
       <main className="mx-auto w-full max-w-6xl px-4 py-6">{children}</main>
       <footer className="yard-foot mx-auto w-full max-w-6xl px-4 py-4 text-xs">
-        BAK Intel · Harare yard overlay · {live ? 'connected' : 'training mode'} · Works offline — queued work syncs on reconnect.
+        Trucki · yard operations · {live ? 'connected' : 'training mode'} · Works offline — queued work syncs on reconnect.
       </footer>
     </div>
   )

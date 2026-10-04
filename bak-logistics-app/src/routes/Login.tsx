@@ -48,7 +48,7 @@ export default function Login() {
   const { role: activeRole } = useSession()
 
   // Econet-style deep link: ?demo=1&role=dispatch signs straight into the
-  // practice shift — the shareable validation link for Tafadzwa. Test-only:
+  // practice shift — the shareable validation link for the gatekeeper. Test-only:
   // practice sessions never touch yard data.
   useEffect(() => {
     if (!allowDemo) return
@@ -149,7 +149,7 @@ export default function Login() {
               B
             </span>
             <div className="min-w-0">
-              <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-amber-700">BAK Logistics · Harare yard</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-amber-700">Trucki · Yard Operations</p>
               <h1 className="text-lg font-extrabold leading-tight tracking-tight">Gate sign-in</h1>
             </div>
             <span className={`ml-auto shrink-0 ${live ? 'pill pill-live' : 'pill pill-demo'}`}>{live ? '● LIVE' : '■ PRACTICE'}</span>
@@ -186,7 +186,7 @@ export default function Login() {
                 <>
                   <label className="mt-4 block text-sm font-bold" htmlFor="staffId">
                     Staff ID
-                    <input id="staffId" type="text" autoComplete="username" autoFocus placeholder="BAK-07-TAFADZWA" value={staffId} onChange={(e) => setStaffId(e.target.value.toUpperCase())} className="field touch-target mt-1 w-full px-3 text-center font-data tracking-[0.12em]" autoCapitalize="characters" />
+                    <input id="staffId" type="text" autoComplete="username" autoFocus placeholder="TRK-07-DEMO" value={staffId} onChange={(e) => setStaffId(e.target.value.toUpperCase())} className="field touch-target mt-1 w-full px-3 text-center font-data tracking-[0.12em]" autoCapitalize="characters" />
                   </label>
                   <label className="mt-3 block text-sm font-bold" htmlFor="pin">
                     PIN

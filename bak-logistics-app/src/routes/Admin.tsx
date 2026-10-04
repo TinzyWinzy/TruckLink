@@ -44,7 +44,7 @@ export default function Admin() {
           </button>
           {message && <p role="status" className="mt-2 text-sm font-bold">{message}</p>}
           {message && message.startsWith('✔') && (
-            <p className="mt-2 text-sm">Next: open <a className="underline" href="/guide">/guide</a> with Tafadzwa, then <a className="underline" href="/queue">/queue</a>.</p>
+            <p className="mt-2 text-sm">Next: open <a className="underline" href="/guide">/guide</a> with the gatekeeper, then <a className="underline" href="/queue">/queue</a>.</p>
           )}
         </Section>
         <Section title="Add a person" sub="Three steps — the job travels with the account.">

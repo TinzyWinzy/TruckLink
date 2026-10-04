@@ -33,7 +33,7 @@ export function parsePinCredentials(
 ): { email: string; password: string } {
   const id = normalizeStaffId(staffId)
   const digits = pin.trim()
-  if (!id) throw new Error('Enter your Staff ID (e.g. BAK-07-TAFADZWA).')
+  if (!id) throw new Error('Enter your Staff ID (e.g. TRK-07-DEMO).')
   if (!/^\d{4,12}$/.test(digits)) throw new Error('PIN must be 4–12 digits.')
   return { email: pinEmail(id), password: pinPassword(digits) }
 }
