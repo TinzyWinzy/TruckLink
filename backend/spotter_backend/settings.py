@@ -216,3 +216,8 @@ TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN", "")
 TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
 TWILIO_WHATSAPP_NUMBER = os.environ.get("TWILIO_WHATSAPP_NUMBER", "")
+
+# ---------------------------------------------------------------------------
+# Audit chain (SAD §6) — fail-closed when empty: appends refuse to run.
+# ---------------------------------------------------------------------------
+AUDIT_SALT = os.environ.get("AUDIT_SALT", "")
