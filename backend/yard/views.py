@@ -106,6 +106,7 @@ class QueueListView(APIView):
                     haulier=validated.get("haulier", ""),
                     vehicle_type=validated.get("vehicle_type", ""),
                     cargo_type=validated.get("cargo_type", ""),
+                    expected_destination=validated.get("expected_destination", ""),
                     status="QUEUED",
                     idempotency_key=key,
                     created_by=request.user,
@@ -121,6 +122,7 @@ class QueueListView(APIView):
                         "haulier": entry.haulier,
                         "vehicleType": entry.vehicle_type,
                         "cargoType": entry.cargo_type,
+                        "expectedDestination": entry.expected_destination,
                         "actorId": request.user.username,
                     },
                     actor=request.user,
@@ -434,39 +436,42 @@ DEMO_EQUIPMENT = [
     ("TR-01", "OTHER", "AVAILABLE"),
 ]
 
-# id, reg, driver, cargo, vehicle_type, status, dock name or None
+# id, reg, driver, cargo, vehicle_type, status, dock name or None, destination
 DEMO_QUEUE = [
-    ("q-seed-1", "AEH 4521", "T. Moyo", "Container", "CONTAINER", "QUEUED", None),
-    ("q-seed-2", "AGX 9033", "S. Ndlovu", "Dry van", "DRY_VAN", "ASSIGNED", "Dock 1"),
-    ("q-seed-3", "AFM 1187", "K. Sibanda", "Tanker", "TANKER", "QUARANTINED", None),
-    ("q-seed-4", "ABZ 9901", "R. Dube", "Container", "CONTAINER", "QUEUED", None),
-    ("q-seed-6", "ADP 3357", "J. Banda", "Flatbed", "FLATBED", "PENDING_OVERRIDE", None),
-    ("q-seed-7", "AEW 7712", "M. Hove", "Dry van", "DRY_VAN", "OVERRIDE_APPROVED", None),
-    ("q-seed-8", "AFX 6640", "D. Mutasa", "Container", "CONTAINER", "QUEUED", None),
+    ("q-seed-1", "AEH 4521", "T. Moyo", "Container", "CONTAINER", "QUEUED", None, "Beitbridge"),
+    ("q-seed-2", "AGX 9033", "S. Ndlovu", "Dry van", "DRY_VAN", "ASSIGNED", "Dock 1", "Forbes"),
+    ("q-seed-3", "AFM 1187", "K. Sibanda", "Tanker", "TANKER", "QUARANTINED", None, "Chirundu"),
+    ("q-seed-4", "ABZ 9901", "R. Dube", "Container", "CONTAINER", "QUEUED", None, "Beitbridge"),
+    ("q-seed-6", "ADP 3357", "J. Banda", "Flatbed", "FLATBED", "PENDING_OVERRIDE", None, "Chirundu"),
+    ("q-seed-7", "AEW 7712", "M. Hove", "Dry van", "DRY_VAN", "OVERRIDE_APPROVED", None, "Forbes"),
+    ("q-seed-8", "AFX 6640", "D. Mutasa", "Container", "CONTAINER", "QUEUED", None, "Beitbridge"),
 ]
 
+# category, severity, message, related seed queue entry id
 DEMO_ALERTS = [
     (
         "COMPLIANCE_FAILURE", "CRITICAL",
         "AFM 1187 quarantined: Axle 2 overloaded by 1,400kg. Rebalancing or override required.",
+        "q-seed-3",
     ),
     (
         "EXCESSIVE_WAIT", "HIGH",
         "ABZ 9901 waiting 74m (exceeds 60m threshold).",
+        "q-seed-4",
     ),
 ]
 
 
 def _facility_from_body(request):
-    from core.models import Facility
+    from core.audit_views import find_facility
 
-    facility_id = request.data.get("facility")
-    if not facility_id:
+    facility_ref = request.data.get("facility")
+    if not facility_ref:
         return None, Response(
             {"ok": False, "error": "facility required in body"}, status=400,
         )
-    facility = Facility.objects.filter(pk=facility_id).first()
-    if facility is None or not in_facility(request.user, facility):
+    facility = find_facility(str(facility_ref), request.user)
+    if facility is None:
         return None, Response({"ok": False, "error": "not found"}, status=404)
     return facility, None
 
@@ -515,7 +520,7 @@ class AdminSeedView(APIView):
                     updated["equipment"] += 1
 
             docks_by_name = {d.name: d for d in Dock.objects.filter(facility=facility)}
-            for seed_id, reg, driver, cargo, vtype, status, dock_name in DEMO_QUEUE:
+            for seed_id, reg, driver, cargo, vtype, status, dock_name, dest in DEMO_QUEUE:
                 obj, was_created = QueueEntry.objects.update_or_create(
                     facility=facility, idempotency_key=seed_id,
                     defaults={
@@ -524,6 +529,7 @@ class AdminSeedView(APIView):
                         "driver_name": driver,
                         "cargo_type": cargo,
                         "vehicle_type": vtype,
+                        "expected_destination": dest,
                         "status": status,
                         "assigned_dock": docks_by_name.get(dock_name),
                         "created_by": request.user,
@@ -543,7 +549,10 @@ class AdminSeedView(APIView):
                     current_entry=seed2, status="OCCUPIED",
                 )
 
-            for category, severity, message in DEMO_ALERTS:
+            for category, severity, message, seed_id in DEMO_ALERTS:
+                related = QueueEntry.objects.filter(
+                    facility=facility, idempotency_key=seed_id,
+                ).first()
                 obj, was_created = Alert.objects.update_or_create(
                     facility=facility, message=message,
                     defaults={
@@ -551,6 +560,7 @@ class AdminSeedView(APIView):
                         "category": category,
                         "severity": severity,
                         "acknowledged": False,
+                        "related_queue_entry": related,
                     },
                 )
                 if was_created:

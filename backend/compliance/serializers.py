@@ -23,3 +23,4 @@ class ComplianceCreateSerializer(serializers.Serializer):
 
 class OverrideSerializer(serializers.Serializer):
     reason = serializers.CharField(required=True, allow_blank=False)
+    approved = serializers.BooleanField(required=False, default=True)

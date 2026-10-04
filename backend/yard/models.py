@@ -59,6 +59,7 @@ class QueueEntry(models.Model):
     haulier = models.CharField(max_length=120, blank=True, default='')
     vehicle_type = models.CharField(max_length=50, blank=True, default='')
     cargo_type = models.CharField(max_length=100, blank=True, default='')
+    expected_destination = models.CharField(max_length=120, blank=True, default='')
     status = models.CharField(
         max_length=24, choices=QueueEntryStatus.choices, default=QueueEntryStatus.QUEUED,
     )
@@ -173,6 +174,10 @@ class Alert(models.Model):
     severity = models.CharField(max_length=16, choices=AlertSeverity.choices)
     message = models.TextField()
     category = models.CharField(max_length=50, default='GENERAL')
+    related_queue_entry = models.ForeignKey(
+        "QueueEntry", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="alerts",
+    )
     acknowledged = models.BooleanField(default=False)
     acknowledged_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,

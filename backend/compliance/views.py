@@ -164,6 +164,7 @@ class ComplianceListView(APIView):
                     facility=entry.facility,
                     severity="CRITICAL",
                     category="COMPLIANCE",
+                    related_queue_entry=entry,
                     message=(
                         f"QUARANTINE: {reg} failed axle check "
                         f"(+{okg:g}kg, fine ${fee:g}). Rebalancing required."
@@ -229,6 +230,10 @@ class ComplianceOverrideRequestView(APIView):
             check.status = CheckStatus.PENDING_OVERRIDE
             check.override_requester = request.user
             check.save(update_fields=["status", "override_requester", "updated_at"])
+            entry = check.queue_entry
+            if entry.status == "QUARANTINED":
+                entry.status = "PENDING_OVERRIDE"
+                entry.save(update_fields=["status", "updated_at"])
             append_audit(
                 facility=check.facility,
                 action="REQUEST_OVERRIDE",
@@ -255,6 +260,7 @@ class ComplianceOverrideApproveView(APIView):
         serializer = OverrideSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         reason = serializer.validated_data["reason"]
+        approved = serializer.validated_data["approved"]
 
         approver = request.user
         requester = check.override_requester or check.inspector
@@ -276,21 +282,38 @@ class ComplianceOverrideApproveView(APIView):
             )
 
         with transaction.atomic():
-            check.status = CheckStatus.OVERRIDE_APPROVED
-            check.override_authorizer = approver
-            check.override_reason = reason
-            check.save(
-                update_fields=[
-                    "status", "override_authorizer", "override_reason", "updated_at",
-                ],
-            )
             entry = check.queue_entry
-            if entry.status != "RELEASED":
-                entry.status = "OVERRIDE_APPROVED"
-                entry.save(update_fields=["status", "updated_at"])
+            if approved:
+                check.status = CheckStatus.OVERRIDE_APPROVED
+                check.override_authorizer = approver
+                check.override_reason = reason
+                check.save(
+                    update_fields=[
+                        "status", "override_authorizer", "override_reason",
+                        "updated_at",
+                    ],
+                )
+                if entry.status != "RELEASED":
+                    entry.status = "OVERRIDE_APPROVED"
+                    entry.save(update_fields=["status", "updated_at"])
+                action = "APPROVE_OVERRIDE"
+            else:
+                check.status = CheckStatus.QUARANTINED
+                check.override_authorizer = approver
+                check.override_reason = reason
+                check.save(
+                    update_fields=[
+                        "status", "override_authorizer", "override_reason",
+                        "updated_at",
+                    ],
+                )
+                if entry.status == "PENDING_OVERRIDE":
+                    entry.status = "QUARANTINED"
+                    entry.save(update_fields=["status", "updated_at"])
+                action = "REJECT_OVERRIDE"
             append_audit(
                 facility=check.facility,
-                action="APPROVE_OVERRIDE",
+                action=action,
                 payload={"checkId": str(check.id), "reason": reason},
                 actor=approver,
             )

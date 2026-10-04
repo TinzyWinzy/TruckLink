@@ -14,9 +14,10 @@ class QueueEntrySerializer(serializers.ModelSerializer):
         model = QueueEntry
         fields = [
             "id", "facility", "reg_number", "driver_name", "haulier",
-            "vehicle_type", "cargo_type", "status", "assigned_dock",
-            "entry_timestamp", "exit_timestamp", "dwell_duration_seconds",
-            "idempotency_key", "created_at", "updated_at",
+            "vehicle_type", "cargo_type", "expected_destination", "status",
+            "assigned_dock", "entry_timestamp", "exit_timestamp",
+            "dwell_duration_seconds", "idempotency_key", "created_at",
+            "updated_at",
         ]
         read_only_fields = [
             "id", "facility", "entry_timestamp", "exit_timestamp",
@@ -31,6 +32,9 @@ class QueueCreateSerializer(serializers.Serializer):
     haulier = serializers.CharField(required=False, allow_blank=True, default="")
     vehicle_type = serializers.CharField(required=False, allow_blank=True, default="")
     cargo_type = serializers.CharField(required=False, allow_blank=True, default="")
+    expected_destination = serializers.CharField(
+        required=False, allow_blank=True, default="", max_length=120,
+    )
     idempotency_key = serializers.CharField(
         required=False, allow_blank=True, default="", max_length=64,
     )
@@ -66,6 +70,6 @@ class AlertSerializer(serializers.ModelSerializer):
     class Meta:
         model = Alert
         fields = ["id", "facility", "severity", "message", "category",
-                  "acknowledged", "acknowledged_by", "acknowledged_at",
-                  "timestamp", "updated_at"]
+                  "related_queue_entry", "acknowledged", "acknowledged_by",
+                  "acknowledged_at", "timestamp", "updated_at"]
         read_only_fields = fields

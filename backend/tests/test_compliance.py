@@ -496,3 +496,43 @@ class TestOverrideFlow:
             {"reason": "x"}, format="json",
         )
         assert resp.status_code == 404
+
+    def test_request_syncs_entry_to_pending(
+        self, default_org, default_facility, queue_entry, auth_user, api_client,
+    ):
+        check = _quarantined_check(
+            default_org, default_facility, queue_entry, auth_user,
+        )
+        resp = api_client.post(
+            f"/api/compliance/{check.id}/override-request/",
+            {"reason": "scale re-calibrated"}, format="json",
+        )
+        assert resp.status_code == 200
+        queue_entry.refresh_from_db()
+        assert queue_entry.status == "PENDING_OVERRIDE"
+
+    def test_reject_returns_entry_to_quarantine(
+        self, default_org, default_facility, queue_entry, auth_user,
+        api_client, ops2_client,
+    ):
+        check = _quarantined_check(
+            default_org, default_facility, queue_entry, auth_user,
+        )
+        api_client.post(
+            f"/api/compliance/{check.id}/override-request/",
+            {"reason": "manual re-weigh"}, format="json",
+        )
+        resp = ops2_client.post(
+            f"/api/compliance/{check.id}/override-approve/",
+            {"reason": "weights still over", "approved": False},
+            format="json",
+        )
+        assert resp.status_code == 200
+        check.refresh_from_db()
+        assert check.status == CheckStatus.QUARANTINED
+        assert check.override_authorizer.username == "ops2"
+        queue_entry.refresh_from_db()
+        assert queue_entry.status == "QUARANTINED"
+        actions = set(AuditLog.objects.values_list("action", flat=True))
+        assert "REJECT_OVERRIDE" in actions
+        assert verify_chain(default_facility)["ok"] is True

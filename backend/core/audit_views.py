@@ -22,16 +22,31 @@ from yard.models import AuditLog
 
 
 def resolve_facility(request):
-    facility_id = request.query_params.get("facility")
-    if not facility_id:
+    facility_ref = request.query_params.get("facility")
+    if not facility_ref:
         return None, Response(
             {"ok": False, "error": "facility query param required"},
             status=400,
         )
-    facility = Facility.objects.filter(pk=facility_id, is_deleted=False).first()
-    if facility is None or not in_facility(request.user, facility):
+    facility = find_facility(facility_ref, request.user)
+    if facility is None:
         return None, Response({"ok": False, "error": "not found"}, status=404)
     return facility, None
+
+
+def find_facility(ref, user):
+    """Resolve a facility by pk OR slug (VITE_FACILITY_ID may be either);
+    must belong to the caller — 404, never an existence oracle."""
+    qs = Facility.objects.filter(is_deleted=False)
+    try:
+        facility = qs.filter(pk=ref).first()
+    except (TypeError, ValueError):
+        facility = None
+    if facility is None:
+        facility = qs.filter(slug=ref).first()
+    if facility is None or not in_facility(user, facility):
+        return None
+    return facility
 
 
 class AuditListView(APIView):

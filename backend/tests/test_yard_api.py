@@ -119,6 +119,11 @@ class TestBoard:
         foreign = Facility.objects.create(organisation=org, name="F", slug="f")
         assert api_client.get(self.URL, {"facility": foreign.id}).status_code == 404
 
+    def test_slug_facility_param(self, api_client, default_facility, queue_entry):
+        resp = api_client.get(self.URL, {"facility": "main-yard"})
+        assert resp.status_code == 200
+        assert resp.json()["facility"]["slug"] == "main-yard"
+
 
 @pytest.mark.django_db
 class TestQueueCreate:
@@ -132,11 +137,13 @@ class TestQueueCreate:
             "haulier": "Hauliers (Pvt) Ltd",
             "vehicle_type": "DRY_VAN",
             "cargo_type": "Maize",
+            "expected_destination": "Beitbridge",
         }, format="json")
         assert resp.status_code == 201
         entry = resp.json()["queue_entry"]
         assert entry["reg_number"] == "ABC 123"  # normalized uppercase (BAK)
         assert entry["status"] == "QUEUED"
+        assert entry["expected_destination"] == "Beitbridge"
         assert AuditLog.objects.filter(action="CREATE_QUEUE_ENTRY").count() == 1
         assert verify_chain(default_facility)["ok"] is True
 
