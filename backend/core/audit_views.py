@@ -36,17 +36,19 @@ def resolve_facility(request):
 
 def find_facility(ref, user):
     """Resolve a facility by pk OR slug (VITE_FACILITY_ID may be either);
-    must belong to the caller — 404, never an existence oracle."""
+    must belong to the caller — 404, never an existence oracle. Slugs are
+    unique per organisation only, so slug matches are scanned for membership."""
     qs = Facility.objects.filter(is_deleted=False)
     try:
         facility = qs.filter(pk=ref).first()
     except (TypeError, ValueError):
         facility = None
-    if facility is None:
-        facility = qs.filter(slug=ref).first()
-    if facility is None or not in_facility(user, facility):
-        return None
-    return facility
+    if facility is not None:
+        return facility if in_facility(user, facility) else None
+    for candidate in qs.filter(slug=ref):
+        if in_facility(user, candidate):
+            return candidate
+    return None
 
 
 class AuditListView(APIView):

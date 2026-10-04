@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from core.models import Facility
 from yard.models import Alert, Dock, QueueEntry
 
 
@@ -26,7 +25,8 @@ class QueueEntrySerializer(serializers.ModelSerializer):
 
 
 class QueueCreateSerializer(serializers.Serializer):
-    facility = serializers.PrimaryKeyRelatedField(queryset=Facility.objects.all())
+    # pk or slug — the PWA only knows VITE_FACILITY_ID (either form).
+    facility = serializers.CharField(min_length=1, max_length=100)
     reg_number = serializers.CharField(min_length=2, max_length=20)
     driver_name = serializers.CharField(required=False, allow_blank=True, default="")
     haulier = serializers.CharField(required=False, allow_blank=True, default="")
@@ -55,7 +55,8 @@ class DockSerializer(serializers.ModelSerializer):
 
 
 class DockCreateSerializer(serializers.Serializer):
-    facility = serializers.PrimaryKeyRelatedField(queryset=Facility.objects.all())
+    # pk or slug — see QueueCreateSerializer.facility.
+    facility = serializers.CharField(min_length=1, max_length=100)
     name = serializers.CharField(min_length=1, max_length=100)
     capacity_kg = serializers.FloatField(required=False, min_value=0, default=0.0)
 

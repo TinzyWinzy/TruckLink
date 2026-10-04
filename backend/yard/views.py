@@ -20,7 +20,7 @@ from rest_framework.views import APIView
 
 from compliance import engine
 from core.audit import append_audit
-from core.audit_views import resolve_facility
+from core.audit_views import find_facility, resolve_facility
 from core.rbac import RoleAccess
 from trip.permissions import belongs_to_organisation, in_facility
 from yard.models import (
@@ -90,8 +90,8 @@ class QueueListView(APIView):
         serializer = QueueCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
-        facility = validated["facility"]
-        if not in_facility(request.user, facility):
+        facility = find_facility(str(validated["facility"]), request.user)
+        if facility is None:
             return Response({"ok": False, "error": "not found"}, status=404)
 
         reg = validated["reg_number"].upper()
@@ -237,8 +237,8 @@ class DockListView(APIView):
         serializer = DockCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
-        facility = validated["facility"]
-        if not in_facility(request.user, facility):
+        facility = find_facility(str(validated["facility"]), request.user)
+        if facility is None:
             return Response({"ok": False, "error": "not found"}, status=404)
         try:
             dock = Dock.objects.create(
