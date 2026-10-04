@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isLive } from '../lib/firebase'
+import { useLive } from '../lib/liveGate'
 import type { LiveRow } from '../lib/live'
 import { isPushAvailable, pushState, subscribePush, type PushState } from '../lib/push'
 import { useSession } from '../store/session'
@@ -16,7 +16,7 @@ export default function Alerts() {
   const [message, setMessage] = useState<string | null>(null)
   const [overrideTarget, setOverrideTarget] = useState<string | null>(null)
   const [overrideReason, setOverrideReason] = useState('')
-  const live = isLive()
+  const live = useLive()
   const active = alerts.filter((a) => String(a.status) === 'ACTIVE' || !a.acknowledged)
   const canApproveOverride = role === 'OPERATIONS_SUPERVISOR' || role === 'FACILITY_MANAGER' || role === 'ADMIN'
   const canAck = canAckAlert(role)
@@ -24,7 +24,7 @@ export default function Alerts() {
   const [pushBusy, setPushBusy] = useState(false)
 
   useEffect(() => {
-    if (!isPushAvailable()) return
+    if (!isPushAvailable() || !live) return
     let on = true
     void pushState()
       .then((s) => {
@@ -36,7 +36,7 @@ export default function Alerts() {
     return () => {
       on = false
     }
-  }, [])
+  }, [live])
 
   async function enablePush() {
     setPushBusy(true)
@@ -117,7 +117,7 @@ export default function Alerts() {
           {message}
         </p>
       )}
-      {push !== 'unsupported' && push !== 'on' && (
+      {live && push !== 'unsupported' && push !== 'on' && (
         <div className="card mb-3 flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
           <span className="font-semibold">Free push alerts {push === 'denied' ? '(blocked in browser settings)' : 'are off'}.</span>
           <button

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isLive } from '../lib/firebase'
+import { useLive } from '../lib/liveGate'
 import type { LiveRow } from '../lib/live'
 import { isOnline } from '../lib/offline/db'
 import { EmptyState, PageHeader, StatusPill, spineForStatus } from '../components/ui'
@@ -32,7 +32,7 @@ export default function DockBoard() {
   const [docks, setDocks] = useState<Dock[]>(SEED)
   const [queuedIds, setQueuedIds] = useState<string[]>([])
   const [message, setMessage] = useState<string | null>(null)
-  const live = isLive()
+  const live = useLive()
   const free = docks.filter((d) => d.rawStatus === 'AVAILABLE').length
 
   useEffect(() => {

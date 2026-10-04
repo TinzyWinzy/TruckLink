@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { queueEntrySchema } from '../lib/validation/compliance'
 import { enqueueOfflineAction, isOnline } from '../lib/offline/db'
-import { isLive } from '../lib/firebase'
+import { useLive } from '../lib/liveGate'
 import type { LiveRow } from '../lib/live'
 import { useSession } from '../store/session'
 import { Link } from 'react-router-dom'
@@ -62,7 +62,7 @@ export default function QueueDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [filter, setFilter] = useState('ALL')
-  const live = isLive()
+  const live = useLive()
 
   useEffect(() => {
     if (!live) return

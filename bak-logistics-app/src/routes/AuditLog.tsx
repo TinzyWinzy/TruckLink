@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isLive } from '../lib/firebase'
+import { useLive } from '../lib/liveGate'
 import type { LiveRow } from '../lib/live'
 import { EmptyState, PageHeader, StatusPill } from '../components/ui'
 import { DEMO_AUDIT } from '../lib/demoData'
@@ -8,7 +8,7 @@ const SEED: LiveRow[] = DEMO_AUDIT as unknown as LiveRow[]
 
 export default function AuditLog() {
   const [logs, setLogs] = useState<LiveRow[]>(SEED)
-  const live = isLive()
+  const live = useLive()
 
   useEffect(() => {
     if (!live) return

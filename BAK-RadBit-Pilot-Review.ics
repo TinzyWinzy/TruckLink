@@ -1,0 +1,22 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//RadBit Studios//Pilot Review//EN
+CALSCALE:GREGORIAN
+METHOD:REQUEST
+BEGIN:VEVENT
+UID:bak-radbit-pilot-20260930@radbitstudios.co.zw
+DTSTAMP:20260929T120000Z
+DTSTART:202609330T090000
+DTEND:20260930T093000
+SUMMARY:BAK Logistics × RadBit Studios — Yard & Compliance Pilot Review
+DESCRIPTION:Prototype walkthrough\, validation of BAK's current yard/dispatch/compliance workflow\, and discussion of potential pilot scope.
+LOCATION:Microsoft Teams
+ORGANIZER;CN=Tinotenda Brandon Duma:mailto:brandontinoz@gmail.com
+ATTENDEE;CN=Takudzwa Mandiwanza:mailto:takudzwa@baklogistics.co.zw
+STATUS:CONFIRMED
+BEGIN:VALARM
+TRIGGER:-PT15M
+ACTION:DISPLAY
+END:VALARM
+END:VEVENT
+END:VCALENDAR

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { isLive } from '../lib/firebase'
+import { useLive } from '../lib/liveGate'
 import { TAFADZWA_STEPS } from '../lib/demoData'
 import { PageHeader, Section } from '../components/ui'
 
@@ -17,7 +17,7 @@ function load(): Record<string, boolean> {
 
 export default function Guide() {
   const [done, setDone] = useState<Record<string, boolean>>(load)
-  const live = isLive()
+  const live = useLive()
   const finished = TAFADZWA_STEPS.filter((s) => done[s.n]).length
 
   function toggle(n: string) {

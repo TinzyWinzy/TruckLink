@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { isLive } from '../lib/firebase'
+import { useLive } from '../lib/liveGate'
 import { useSession } from '../store/session'
 import { PageHeader, Section } from '../components/ui'
 
@@ -7,7 +7,7 @@ export default function Admin() {
   const { role } = useSession()
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const live = isLive()
+  const live = useLive()
 
   if (role !== 'ADMIN') {
     return (

@@ -16,6 +16,16 @@ declare const self: ServiceWorkerGlobalScope & {
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 
+// Deployed updates must take over open tabs immediately. Without this the new
+// worker waits until EVERY tab closes, so yard tablets keep serving the old
+// precached bundle (stale code / stale permission behaviour) for days.
+self.addEventListener('install', () => {
+  void self.skipWaiting()
+})
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
+})
+
 // SAD §4.1: NetworkFirst for API reads (5s timeout, 24h / 100-entry cap).
 registerRoute(
   /\/api\/.*$/i,

@@ -3,7 +3,7 @@ import { pendingActionCount, pendingActionCountSyncInitial, isOnline } from '../
 import { useSession, isPracticeSession, type Role, canAccess } from '../store/session'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState, type ReactNode } from 'react'
-import { isLive } from '../lib/firebase'
+import { useLive } from '../lib/liveGate'
 import { ROUTE_GATES, landingPathForRole } from '../lib/gates'
 
 const PRIMARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] = [
@@ -32,7 +32,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const practice = isPracticeSession(userId)
   const [pending, setPending] = useState(pendingActionCountSyncInitial)
   const [critical, setCritical] = useState(0)
-  const live = isLive()
+  const live = useLive()
 
   useEffect(() => {
     const sync = async () => {

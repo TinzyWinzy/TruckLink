@@ -21,6 +21,7 @@ import {
 } from 'firebase/firestore'
 import { signInWithEmailAndPassword, signOut } from 'firebase/auth'
 import { auth, db, facilityId, isLive } from './firebase'
+import { isRealLive } from './liveGate'
 import {
   listPendingActions,
   recordActionFailure,
@@ -208,7 +209,7 @@ export function subscribe(
   cb: (rows: LiveRow[]) => void,
   max = 100,
 ): Unsubscribe | null {
-  if (!isLive()) return null
+  if (!isRealLive()) return null
   const q =
     name === 'queue' || name === 'auditLogs'
       ? query(col(name), orderBy(name === 'queue' ? 'entryTimestamp' : 'timestamp', 'desc'), limit(max))
@@ -363,7 +364,7 @@ export async function getComplianceConfig(vehicleType = 'DEFAULT', route = 'DEFA
       { itemId: 'axle-calc', label: 'Axle load calculation within limits', mandatory: true },
     ],
   }
-  if (!isLive()) return fallback
+  if (!isRealLive()) return fallback
   try {
     const { getDoc } = await import('firebase/firestore')
     const snap = await getDoc(doc(col('complianceConfig'), 'default'))
@@ -541,7 +542,7 @@ async function replayOne(action: PendingAction): Promise<void> {
 
 /** Replay queued offline actions in order. Returns { done, failed }. */
 export async function flushPendingActions(): Promise<{ done: number; failed: number }> {
-  if (!isLive() || typeof navigator !== 'undefined' && !navigator.onLine) return { done: 0, failed: 0 }
+  if (!isRealLive() || typeof navigator !== 'undefined' && !navigator.onLine) return { done: 0, failed: 0 }
   let done = 0
   let failed = 0
   for (const action of await listPendingActions()) {

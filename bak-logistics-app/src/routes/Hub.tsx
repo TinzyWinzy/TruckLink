@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom'
-import { isLive } from '../lib/firebase'
+import { useLive } from '../lib/liveGate'
 import { ROLE_CARDS, SI_CARDS } from '../lib/demoData'
 import { PageHeader, Section } from '../components/ui'
 
 /** Information Hub — the yard's answer wall. Visit by every role. */
 export default function Hub() {
-  const live = isLive()
+  const live = useLive()
   return (
     <div className="max-w-2xl">
       <PageHeader

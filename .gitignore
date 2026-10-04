@@ -1,6 +1,8 @@
 # BAK repo root ignores (app has its own .gitignore too)
 node_modules/
 dist/
+# Trucki lives in its own repo (TinzyWinzy/SpotterAiAssessment) — grafted at B0
+/spotterAI/
 functions/lib/
 functions/node_modules/
 .env.local

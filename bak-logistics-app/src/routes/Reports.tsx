@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { facilityId, isLive } from '../lib/firebase'
+import { facilityId } from '../lib/firebase'
+import { useLive } from '../lib/liveGate'
 import { computeTurnaroundStats, queueToCsv, type LiveRow } from '../lib/live'
 import {
   fetchHeatmap,
@@ -31,7 +32,7 @@ export default function Reports() {
   const [heatmap, setHeatmap] = useState<HeatmapBucket[] | null>(null)
   const [surge, setSurge] = useState<SurgeStatus | null>(null)
   const [roi, setRoi] = useState<RoiSummary | null>(null)
-  const live = isLive()
+  const live = useLive()
   const analytics = isAnalyticsLive()
 
   useEffect(() => {

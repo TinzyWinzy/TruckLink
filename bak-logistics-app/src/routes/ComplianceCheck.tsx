@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { validateLoad } from '../lib/validation/compliance'
 import { enqueueOfflineAction, isOnline } from '../lib/offline/db'
-import { isLive } from '../lib/firebase'
+import { useLive } from '../lib/liveGate'
 import { useSession } from '../store/session'
 import { connectWeighbridge, isWebSerialSupported, type SerialConnection } from '../lib/weighbridge/serial'
 import type { ChecklistItem } from '../lib/live'
@@ -40,7 +40,7 @@ export default function ComplianceCheck() {
   const [overrideReason, setOverrideReason] = useState('')
   const [overrideMsg, setOverrideMsg] = useState<string | null>(null)
   const connRef = useRef<SerialConnection | null>(null)
-  const live = isLive()
+  const live = useLive()
   const [searchParams] = useSearchParams()
 
   // Queue board "Check →" shortcut (?entry=) fills the ID — no more typing
