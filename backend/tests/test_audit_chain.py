@@ -173,3 +173,74 @@ class TestAuditApi:
         body = resp.content.decode()
         assert "previous_hash" in body.splitlines()[0]
         assert len(body.splitlines()) == 2  # header + one row
+
+
+@pytest.mark.django_db
+class TestAuditLivePath:
+    """G1 closeout (SAD §14 release-blocking): real API writes land in the
+    chain, API verify passes, and an out-of-band tamper trips 409."""
+
+    URL = "/api/audit/"
+
+    @pytest.fixture
+    def live_dispatch(self, default_org, default_facility):
+        user = User.objects.create_user(username="live_dispatch", password="x")
+        from trip.models import UserProfile, UserRole
+        profile = UserProfile.objects.create(
+            user=user, organisation=default_org, role=UserRole.DISPATCH_SUPERVISOR,
+        )
+        profile.facilities.add(default_facility)
+        token, _ = Token.objects.get_or_create(user=user)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        return client
+
+    def test_api_writes_then_verify_then_tamper_409(
+        self, live_dispatch, compliance_client, facility,
+    ):
+        created = live_dispatch.post(
+            "/api/queue/",
+            {
+                "facility": facility.slug,
+                "reg_number": "LIVE 001",
+                "driver_name": "Chain Test",
+                "cargo_type": "Container",
+                "expected_destination": "Beitbridge",
+            },
+            format="json",
+        )
+        assert created.status_code == 201
+        entry_id = created.json()["queue_entry"]["id"]
+
+        checked = live_dispatch.post(
+            "/api/compliance/",
+            {
+                "queue_entry": entry_id,
+                "axle_weights": [6000, 8000, 8000],
+                "total_weight": 22000,
+                "gvm_rating": 24000,
+            },
+            format="json",
+        )
+        assert checked.status_code == 201
+
+        listing = compliance_client.get(self.URL, {"facility": facility.id})
+        assert listing.status_code == 200
+        actions = [e["action"] for e in listing.json()["entries"]]
+        assert "CREATE_QUEUE_ENTRY" in actions
+        assert "SUBMIT_COMPLIANCE" in actions
+        assert listing.json()["count"] == len(actions)
+
+        verify = compliance_client.get("/api/audit/verify/", {"facility": facility.id})
+        assert verify.status_code == 200
+        assert verify.json()["ok"] is True
+
+        # Attacker with DB access rewrites history mid-chain.
+        AuditLog.objects.filter(action="CREATE_QUEUE_ENTRY").update(
+            payload='{"hijacked": true}',
+        )
+        tampered = compliance_client.get(
+            "/api/audit/verify/", {"facility": facility.id},
+        )
+        assert tampered.status_code == 409
+        assert tampered.json()["ok"] is False
