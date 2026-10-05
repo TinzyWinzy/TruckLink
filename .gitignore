@@ -15,3 +15,7 @@ ui-debug.log
 *-firebase-adminsdk-*.json
 
 .vercel
+
+# SAD §13: env files never leave the machine; sqlite is dev-only
+.env.production
+*.sqlite3

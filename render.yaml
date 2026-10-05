@@ -1,0 +1,55 @@
+# Render blueprint (SAD §13): DEBUG=False, explicit ALLOWED_HOSTS, explicit
+# CORS origin list — CORS_ALLOW_ALL_ORIGINS is never set (BAK/Trucki findings).
+# Secrets stay out of git: JWT/session signing, audit salt, DB URL, VAPID and
+# Twilio credentials are dashboard env vars (sync:false) or generated below.
+services:
+  - type: web
+    name: trucki-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt && python manage.py migrate --noinput
+    startCommand: gunicorn spotter_backend.wsgi:application --bind 0.0.0.0:$PORT
+    healthCheckPath: /api/health/
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.14.2"
+      - key: DEBUG
+        value: "False"
+      # Explicit per SAD §13. Suffix match covers *.onrender.com hostnames;
+      # add your custom domain here when it exists.
+      - key: ALLOWED_HOSTS
+        value: trucki-api.onrender.com,.onrender.com
+      # Replace with the Vercel project's actual origin (SAD §13: demo = Vercel
+      # project `trucki`). Never CORS_ALLOW_ALL_ORIGINS.
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://trucki.vercel.app
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: AUDIT_SALT
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: trucki-db
+          property: connectionString
+      - key: VAPID_CLAIMS_EMAIL
+        value: security@trucki.app
+      # Set from `python manage.py generate_vapid_keys` (dashboard, sync:false):
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      # Twilio legs stay LOGGED until credentialled (SAD §10):
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_NUMBER
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+
+databases:
+  - name: trucki-db
+    databaseName: trucki
+    plan: free

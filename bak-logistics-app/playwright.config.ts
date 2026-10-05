@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
-// Demo-mode harness: blank Firebase keys force isLive()=false so gate sign-in
-// renders the role-switcher tabs (.env.local would otherwise boot live staging).
+// Demo-mode harness: blank Firebase keys + empty VITE_API_URL force
+// isLive()=false so gate sign-in renders the role-switcher tabs (.env.local
+// would otherwise boot live mode — process env must override it).
 const demoEnv = {
   VITE_FIREBASE_API_KEY: 'x',
   VITE_FIREBASE_AUTH_DOMAIN: 'x',
@@ -10,6 +11,7 @@ const demoEnv = {
   VITE_FIREBASE_MESSAGING_SENDER_ID: 'x',
   VITE_FIREBASE_APP_ID: '',
   VITE_FACILITY_ID: 'demo-facility',
+  VITE_API_URL: '',
   VITE_SYNC_API_URL: '',
   VITE_POWERSYNC_URL: '',
 }
@@ -27,12 +29,23 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: ['**/prod-smoke.spec.ts'] },
     {
-      name: 'production',
-      use: { ...devices['Desktop Chrome'], baseURL: 'https://bak-five.vercel.app' },
-      testMatch: ['**/prod-smoke.spec.ts'],
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      // prod-smoke targets the deployed site; e2e/live needs the Django
+      // bootstrap harness (playwright.live.config.ts).
+      testIgnore: ['**/prod-smoke.spec.ts', '**/live/**'],
     },
+    // Only with PW_PROD=1: the deployed site needs no local webServer.
+    ...(process.env.PW_PROD
+      ? [
+          {
+            name: 'production',
+            use: { ...devices['Desktop Chrome'], baseURL: 'https://bak-five.vercel.app' },
+            testMatch: ['**/prod-smoke.spec.ts'],
+          },
+        ]
+      : []),
   ],
   // PW_PROD=1 targets the deployed URL — no local server needed.
   webServer: process.env.PW_PROD
