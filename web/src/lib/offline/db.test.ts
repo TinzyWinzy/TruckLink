@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import Dexie from 'dexie'
 import {
   __resetOfflineMigration,
   db,
+  LocalAppDatabase,
   enqueueOfflineAction,
   listPendingActions,
   pendingActionCount,
@@ -18,6 +20,34 @@ beforeEach(async () => {
 })
 
 describe('offline action queue (Dexie/IndexedDB)', () => {
+  it('upgrades v2 pending work without losing ownership, failures or capture time', async () => {
+    const name = 'isolated-story-outbox-upgrade'
+    const old = new Dexie(name)
+    old.version(2).stores({ pendingActions: 'id, actionType, timestamp, actorId, facilityId, state',
+      inspections: '++id, vehicleReg, status, timestamp, synced', syncQueue: '++id, action, timestamp' })
+    const original = { id: 'retained', actionType: 'queue.create', payload: { licensePlate: 'HISTORY' },
+      timestamp: 123, actorId: 'original-actor', facilityId: 'original-site', apiBase: 'http://original-api',
+      state: 'BLOCKED', retryCount: 5, lastError: 'Needs supervisor review' }
+    await old.table('pendingActions').add(original)
+    old.close()
+    const upgraded = new LocalAppDatabase(name)
+    try {
+      await upgraded.open()
+      expect(await upgraded.pendingActions.get('retained')).toMatchObject({ ...original, sequence: 1 })
+    } finally { upgraded.close(); await Dexie.delete(name) }
+  })
+  it('preserves capture order when equal timestamps have reverse-sorted IDs', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000)
+    const ids = vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('ffffffff-ffff-4fff-8fff-ffffffffffff')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000000')
+    try {
+      const first = await enqueueOfflineAction('queue.create', { licensePlate: 'FIRST' })
+      const second = await enqueueOfflineAction('compliance.submit', { queueEntryId: 'FIRST' })
+      expect((await listPendingActions()).map(action => action.id)).toEqual([first.id, second.id])
+      expect(first.timestamp).toBe(second.timestamp)
+    } finally { clock.mockRestore(); ids.mockRestore() }
+  })
   it('enqueues and lists in chronological order', async () => {
     const a = await enqueueOfflineAction('queue.create', { licensePlate: 'AEH 4521' })
     const b = await enqueueOfflineAction('queue.create', { licensePlate: 'AGX 9033' })

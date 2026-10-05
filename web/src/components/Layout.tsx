@@ -90,18 +90,19 @@ export default function Layout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="on-dark min-h-screen text-slate-900">
-      <header className="gantry sticky top-0 z-10 text-white shadow-lg">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-3">
+    <div className="bak-workbench min-h-screen text-slate-900">
+      <a href="#main-content" className="skip-link">Skip to workspace</a>
+      <header className="gantry bak-masthead text-white">
+        <div className="masthead-inner flex flex-wrap items-center gap-x-4 gap-y-3">
           <Link to={role ? landingPathForRole(role) : '/queue'} className="flex items-center gap-2.5" aria-label="Trucki home">
             <span aria-hidden="true" className="gantry-mark flex h-9 w-9 items-center justify-center rounded-xl text-base font-black text-slate-900">
               B
             </span>
             <span className="leading-none">
               <span className="block text-[10px] font-extrabold uppercase tracking-[0.18em] text-amber-400">
-                Yard · Demo
+                {practice ? 'Practice workspace' : 'Regulatory & yard operations'}
               </span>
-              <span className="block text-lg font-extrabold tracking-tight">Trucki</span>
+              <span className="block text-lg font-extrabold tracking-tight">BAK INTEL</span>
             </span>
           </Link>
           <div className="flex flex-wrap items-center gap-1.5" role="status" aria-label="Yard state">
@@ -156,14 +157,18 @@ export default function Layout({ children }: { children: ReactNode }) {
             Sign out
           </button>
         </div>
+      </header>
+      <div className="workbench-body">
+      <aside className="workspace-rail">
+        <div className="rail-heading"><span className="eyebrow">Workspace</span><p>{role?.replace(/_/g, ' ').toLowerCase()}</p></div>
         {/* Weighted nav — 3 primary jobs, hub/guide + rest secondary (Hick's Law) */}
-        <nav aria-label="Primary" className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-4 pb-2.5 pt-2">
+        <nav aria-label="Primary" className="workspace-navigation">
           {visible(PRIMARY, role).map((item) => (
             <Link key={item.to} to={item.to} aria-current={pathname === item.to ? 'page' : undefined} className={linkCls(item.to)}>
               {item.label}
             </Link>
           ))}
-          <span aria-hidden="true" className="mx-1 h-5 w-px bg-white/20" />
+          <span aria-hidden="true" className="navigation-divider" />
           {visible(SECONDARY, role).map((item) => (
             <Link key={item.to} to={item.to} aria-current={pathname === item.to ? 'page' : undefined} className={linkCls(item.to)}>
               {item.label}
@@ -175,11 +180,15 @@ export default function Layout({ children }: { children: ReactNode }) {
             </Link>
           ))}
         </nav>
-      </header>
-      <main className="mx-auto w-full max-w-6xl px-4 py-6">{children}</main>
-      <footer className="yard-foot mx-auto w-full max-w-6xl px-4 py-4 text-xs">
-        Trucki · yard operations · {live ? 'connected' : 'training mode'} · Works offline — queued work syncs on reconnect.
+        <p className="rail-note">Evidence before decision.<br />Approval before release.</p>
+      </aside>
+      <div className="workspace-content">
+      <main id="main-content" tabIndex={-1} className="workspace-main">{children}</main>
+      <footer className="yard-foot py-4 text-xs">
+        BAK INTEL · yard operations · {live ? 'connected' : 'training mode'} · Saved offline work is reviewed and retried on reconnect.
       </footer>
+      </div>
+      </div>
     </div>
   )
 }

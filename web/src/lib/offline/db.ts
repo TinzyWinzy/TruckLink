@@ -11,6 +11,7 @@ export interface PendingAction {
   actionType: string
   payload: Record<string, unknown>
   timestamp: number
+  sequence?: number // persistent FIFO tie-breaker when captures share a millisecond
   retryCount: number
   lastError?: string
   actorId?: string
@@ -50,8 +51,8 @@ export class LocalAppDatabase extends Dexie {
   inspections!: Table<GateInspection, number>
   syncQueue!: Table<SyncQueueItem, number>
 
-  constructor() {
-    super('OperationalLocalDB')
+  constructor(name = 'OperationalLocalDB') {
+    super(name)
     this.version(1).stores({
       pendingActions: 'id, actionType, timestamp',
       inspections: '++id, vehicleReg, status, timestamp, synced',
@@ -68,6 +69,17 @@ export class LocalAppDatabase extends Dexie {
           action.lastError = 'Legacy action has no owning session; supervisor review required'
         }
       })
+    })
+    this.version(3).stores({
+      pendingActions: 'id, actionType, timestamp, sequence, actorId, facilityId, state',
+      inspections: '++id, vehicleReg, status, timestamp, synced',
+      syncQueue: '++id, action, timestamp',
+    }).upgrade(async tx => {
+      // Preserve the prior replay order; historical capture order for ties is unknown.
+      const rows = await tx.table('pendingActions').orderBy('timestamp').toArray()
+      for (let i = 0; i < rows.length; i++) {
+        await tx.table('pendingActions').update(rows[i].id, { sequence: i + 1 })
+      }
     })
   }
 }
@@ -131,7 +143,11 @@ export async function enqueueOfflineAction(
     apiBase: owned ? apiBase : undefined, state: owned ? 'PENDING' : 'BLOCKED' }
   try {
     await migrateLegacyOnce()
-    await db.pendingActions.add(action)
+    await db.transaction('rw', db.pendingActions, async () => {
+      const last = await db.pendingActions.orderBy('sequence').last()
+      action.sequence = (last?.sequence ?? 0) + 1
+      await db.pendingActions.add(action)
+    })
   } catch {
     // Fallback: append to legacy key so work is never lost when IndexedDB is blocked.
     try {
@@ -150,7 +166,8 @@ export async function listPendingActions(): Promise<PendingAction[]> {
     await migrateLegacyOnce()
     const stored = await db.pendingActions.orderBy('timestamp').toArray()
     const ids = new Set(stored.map((a) => a.id))
-    return [...stored, ...legacyRead().filter((a) => !ids.has(a.id))].sort((a, b) => a.timestamp - b.timestamp)
+    return [...stored, ...legacyRead().filter((a) => !ids.has(a.id))].sort((a, b) =>
+      a.timestamp - b.timestamp || (a.sequence ?? 0) - (b.sequence ?? 0))
   } catch {
     return legacyRead()
   }

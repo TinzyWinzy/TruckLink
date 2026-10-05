@@ -18,6 +18,7 @@ const demoEnv = {
 
 export default defineConfig({
   testDir: './e2e',
+  outputDir: process.env.PW_PROD ? './test-results/production' : './test-results/practice',
   fullyParallel: true,
   workers: 2,
   timeout: 90000,
@@ -34,7 +35,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
       // prod-smoke targets the deployed site; e2e/live needs the Django
       // bootstrap harness (playwright.live.config.ts).
-      testIgnore: ['**/prod-smoke.spec.ts', '**/live/**', '**/regulatory/**'],
+      testIgnore: ['**/prod-smoke.spec.ts', '**/live/**', '**/regulatory/**', '**/stories/**'],
     },
     // Only with PW_PROD=1: the deployed site needs no local webServer.
     ...(process.env.PW_PROD

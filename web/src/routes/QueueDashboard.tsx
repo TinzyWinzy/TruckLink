@@ -88,7 +88,7 @@ export default function QueueDashboard() {
     return c
   }, [rows])
   const shown = filter === 'ALL' ? rows : rows.filter((r) => r.rawStatus === filter)
-  const canRelease = role === 'OPERATIONS_SUPERVISOR' || role === 'FACILITY_MANAGER' || role === 'ADMIN'
+  const canRelease = role === 'DISPATCH_SUPERVISOR' || role === 'OPERATIONS_SUPERVISOR' || role === 'FACILITY_MANAGER'
 
   async function register() {
     const parsed = queueEntrySchema.safeParse({
@@ -180,7 +180,7 @@ export default function QueueDashboard() {
     <div>
       <PageHeader
         title="Shift queue"
-        eyebrow="Harare yard · oldest first"
+        eyebrow="Yard operations · oldest first"
         sub={live ? 'Live yard board — oldest first. Register at the gate, release at the exit.' : 'Practice board — training entries only.'}
         mode={live ? 'live' : 'demo'}
       />

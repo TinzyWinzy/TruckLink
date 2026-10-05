@@ -25,8 +25,8 @@
   --bak-status-warn: #b45309;
   --bak-status-warn-bg: #fef3c7;
   --bak-focus: #1d4ed8;
-  --bak-radius: 14px;
-  --bak-radius-sm: 10px;
+  --bak-radius: 7px;
+  --bak-radius-sm: 6px;
   --bak-shadow-1: 0 1px 2px rgb(11 21 38 / 0.07);
   --bak-shadow-2: 0 6px 20px -8px rgb(11 21 38 / 0.22);
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -39,10 +39,7 @@ html {
   scroll-behavior: smooth;
 }
 body {
-  background:
-    radial-gradient(1200px 300px at 50% -120px, rgb(245 158 11 / 0.10), transparent 70%),
-    repeating-linear-gradient(0deg, transparent 0 27px, rgb(11 21 38 / 0.014) 27px 28px),
-    var(--bak-paper);
+  background: var(--bak-paper);
   color: var(--bak-ink);
   font-family: var(--font-sans);
   font-feature-settings: "tnum" 1, "cv05" 1;
@@ -242,4 +239,56 @@ footer.yard-foot {
     transition-duration: 0.01ms !important;
   }
   html { scroll-behavior: auto; }
+}
+/* NetOne hierarchy and VehicleImport workspace navigation, adapted for BAK. */
+.bak-masthead { background: var(--bak-navy); border-bottom: 2px solid var(--bak-amber-bright); }
+.masthead-inner { padding: 20px 28px; max-width: 1600px; margin-inline: auto; }
+.gantry-mark { background: var(--bak-amber-bright); box-shadow: none; border-radius: 6px; }
+.workbench-body { display: grid; grid-template-columns: 212px minmax(0, 1fr); max-width: 1600px; margin-inline: auto; min-height: calc(100vh - 100px); }
+.workspace-rail { background: #eeebe2; border-right: 1px solid #d6d5cd; padding: 28px 16px; }
+.rail-heading { padding: 0 12px 22px; }
+.rail-heading p { margin-top: 8px; font-size: 12px; color: var(--bak-ink-2); text-transform: capitalize; line-height: 1.6; }
+.workspace-navigation { display: flex; flex-direction: column; gap: 4px; }
+.workspace-navigation .nav-pill { color: var(--bak-ink-2); border-left: 3px solid transparent; border-radius: 0 5px 5px 0; }
+.workspace-navigation .nav-pill:hover { background: #e2dfd6; color: var(--bak-ink); }
+.workspace-navigation .nav-active { background: #fff; border-left-color: var(--bak-amber); box-shadow: none; }
+.navigation-divider { height: 1px; background: #d6d5cd; margin: 14px 12px; }
+.rail-note { border-top: 1px solid #d6d5cd; margin: 28px 12px 0; padding-top: 20px; font-size: 11px; line-height: 1.8; color: var(--bak-ink-2); }
+.workspace-content { min-width: 0; padding: 30px 32px 0; }
+.workspace-main { max-width: 1200px; margin-inline: auto; }
+.page-heading { padding-bottom: 22px; border-bottom: 1px solid #d6d5cd; }
+.page-title { font-size: clamp(26px, 2.6vw, 36px); font-weight: 650; letter-spacing: -.035em; }
+.page-sub { margin-top: 10px; }
+.metric-cell { border-block: 1px solid #d6d5cd; background: transparent; }
+.metric-cell > div:first-child { color: var(--bak-ink-2); font-weight: 600; }
+.metric-cell > div:nth-child(2) { font-weight: 650; }
+.card { box-shadow: none; }
+.card-raised { box-shadow: 0 2px 8px rgb(11 21 38 / 4%); }
+.btn-primary { background: var(--bak-navy); box-shadow: none; }
+.btn-accent { background: var(--bak-amber); box-shadow: none; }
+.yard-foot { max-width: 1200px; margin-inline: auto; line-height: 1.8; }
+.skip-link { position: fixed; top: -80px; left: 16px; z-index: 100; background: white; color: var(--bak-navy); padding: 12px 20px; }
+.skip-link:focus { top: 12px; }
+@media (max-width: 900px) {
+  .workbench-body { grid-template-columns: 1fr; }
+  .workspace-rail { padding: 8px 16px; border-right: 0; border-bottom: 1px solid #d6d5cd; }
+  .rail-heading, .rail-note { display: none; }
+  .workspace-navigation { flex-direction: row; overflow-x: auto; align-items: center; }
+  .workspace-navigation .nav-pill { flex-shrink: 0; border-left: 0; border-bottom: 3px solid transparent; border-radius: 0; }
+  .workspace-navigation .nav-active { border-bottom-color: var(--bak-amber); background: transparent; }
+  .navigation-divider { width: 1px; height: 24px; flex-shrink: 0; margin: 0 8px; }
+  .workspace-content { padding: 24px 20px 0; }
+  .masthead-inner { padding: 16px 20px; }
+}
+@media (max-width: 480px) {
+  .workspace-content { padding-inline: max(16px, env(safe-area-inset-left)); }
+  .masthead-inner { padding-inline: 16px; }
+  .masthead-inner > [role="status"] { flex-basis: 100%; order: 2; }
+  .masthead-inner > label { width: 100%; order: 3; }
+  .masthead-inner > label select { flex: 1; min-width: 0; min-height: 44px; }
+  .masthead-inner > button { margin-left: auto; }
+}
+@media (max-width: 900px) {
+  .workbench-body { grid-template-columns: minmax(0, 1fr); }
+  .workspace-rail { min-width: 0; }
 }

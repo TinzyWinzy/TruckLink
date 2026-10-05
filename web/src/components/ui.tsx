@@ -26,7 +26,7 @@ export function PageHeader({
   eyebrow?: string
 }) {
   return (
-    <div className="mb-5">
+    <div className="page-heading mb-6">
       {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="page-title">{title}</h1>
@@ -38,7 +38,7 @@ export function PageHeader({
         {actions && <div className="ml-auto flex flex-wrap gap-2">{actions}</div>}
       </div>
       <p className="page-sub mt-1.5">{sub}</p>
-      <div aria-hidden="true" className="mt-3 h-[3px] w-16 rounded-full bg-gradient-to-r from-amber-500 to-amber-300" />
+
     </div>
   )
 }
@@ -46,7 +46,7 @@ export function PageHeader({
 export function Stat({ label, value, tone }: { label: string; value: string; tone?: 'alert' | 'good' | 'plain' }) {
   const bar = tone === 'alert' ? 'bg-red-700' : tone === 'good' ? 'bg-emerald-700' : 'bg-slate-300'
   return (
-    <div className="card spine p-4 pl-5">
+    <div className="metric-cell p-4">
       <div className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-slate-500">{label}</div>
       <div
         className={`tnum mt-1 text-3xl font-extrabold tracking-tight ${
