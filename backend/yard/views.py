@@ -1,7 +1,7 @@
 """Yard endpoints (SAD v2 section 11): board digest, queue, docks, alerts,
 reports and the admin demo seed/reset.
 
-Ports of bak-logistics-app/src/lib/powersync/operations.ts:
+Ports of web/src/lib/powersync/operations.ts:
   registerVehiclePS / assignDockPS / releaseVehiclePS / acknowledgeAlertPS.
 Release gate (section 9): only COMPLETED or OVERRIDE_APPROVED may be released;
 the gate is engine.can_transition(status, "RELEASED") - one FSM, one truth.

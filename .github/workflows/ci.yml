@@ -30,14 +30,14 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: bak-logistics-app
+        working-directory: web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: bak-logistics-app/package-lock.json
+          cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npm run lint --if-present
       - run: npx tsc -b
@@ -62,13 +62,13 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: bak-logistics-app/package-lock.json
+          cache-dependency-path: web/package-lock.json
       - run: pip install -r requirements.txt
         working-directory: backend
       - run: npm ci
-        working-directory: bak-logistics-app
+        working-directory: web
       - run: npx playwright install --with-deps chromium
-        working-directory: bak-logistics-app
+        working-directory: web
       - name: Boot Django + seed tenant
         working-directory: backend
         run: |
@@ -87,5 +87,5 @@ jobs:
             -H "Authorization: Token $TOKEN" -H 'Content-Type: application/json' \
             -d '{"facility":"ci-yard"}'
       - name: Playwright live e2e
-        working-directory: bak-logistics-app
+        working-directory: web
         run: npx playwright test --config playwright.live.config.ts

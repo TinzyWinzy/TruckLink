@@ -1,6 +1,6 @@
 """B1e: compliance engine + endpoints (SAD v2 section 9).
 
-Engine cases ported from bak-logistics-app compliance.test.ts + siTables.test.ts;
+Engine cases ported from web compliance.test.ts + siTables.test.ts;
 API cases cover the quarantine transaction, override segregation-of-duties and
 audit-chain integration.
 """

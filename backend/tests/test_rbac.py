@@ -25,7 +25,7 @@ ROLES = [
 ]
 ALL = set(ROLES)
 
-# Golden matrix — hand-copied from bak-logistics-app/firestore.rules.
+# Golden matrix — hand-copied from web/firestore.rules.
 # Deliberately independent of core.rbac.ROLE_MATRIX so drift fails the test.
 GOLDEN = {
     ("queue", "read"): ALL,

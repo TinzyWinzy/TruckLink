@@ -1,6 +1,6 @@
 """Server-authoritative RBAC matrix (SAD v2 §5).
 
-Faithful port of bak-logistics-app/firestore.rules — the real enforcement
+Faithful port of web/firestore.rules — the real enforcement
 that existed client-side in BAK. The client gates.ts copy is UI affordance
 only; this module + tests keep them from drifting.
 

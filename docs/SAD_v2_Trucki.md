@@ -55,7 +55,7 @@ Architecture goal for R1: **one Django API, one Postgres database, one React SPA
                     └───────────────┘      └──────────────────┘
 ```
 
-No Firebase, no RabbitMQ, no PowerSync in R1. Side effects start as a transactional **outbox table + management command** (broker added only when volume demands — BAK's `server/src/events/` remains the reference design).
+No Firebase, no RabbitMQ, no PowerSync in R1. Side effects start as a transactional **outbox table + management command** (broker added only when volume demands — `docs/reference/events/` (ex-`server/src/events/`) remains the reference design).
 
 ## 4. Data model (merged, Postgres)
 
@@ -180,7 +180,7 @@ All write endpoints: token + role + tenant/facility scope. OpenAPI generated fro
 
 - **Retired:** Firebase projects for the product (`radbit-bak-*` stay frozen as BAK evidence), Cloud Functions, `server/` Node sync service, PowerSync path, RabbitMQ topology, Trucki Render free-tier app at R1 cutover.
 - **Data migration:** none required (no paying tenants, no production data). Demo seeds recreated via `/api/admin/seed`.
-- **Reference keeps:** `server/src/events/*` (notification design), `server/src/wms/*` (R3), `firestore.rules` (source of the RBAC matrix to port).
+- **Reference keeps:** `docs/reference/events/*` (notification design; ex-`server/src/events`), `docs/reference/wms/*` (R3; ex-`server/src/wms`), `web/firestore.rules` (source of the RBAC matrix to port). The superseded Node/Firebase source otherwise lives only in the frozen BAK archive repo.
 
 ## 16. Gap register (open at SAD v2.0)
 

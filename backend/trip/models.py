@@ -6,7 +6,7 @@ from django.db import models
 
 
 class UserRole(models.TextChoices):
-    """Six BAK roles (bak-logistics-app/src/store/session.ts). Server-authoritative."""
+    """Six BAK roles (web/src/store/session.ts). Server-authoritative."""
     DISPATCH_SUPERVISOR = 'DISPATCH_SUPERVISOR', 'Dispatch Supervisor'
     FACILITY_MANAGER = 'FACILITY_MANAGER', 'Facility Manager'
     OPERATIONS_SUPERVISOR = 'OPERATIONS_SUPERVISOR', 'Operations Supervisor'

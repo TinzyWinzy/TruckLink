@@ -1,6 +1,6 @@
 """Yard module tables (SAD v2 §4 "Yard module", ported from BAK).
 
-Contract source: bak-logistics-app/src/lib/powersync/operations.ts (row shapes)
+Contract source: web/src/lib/powersync/operations.ts (row shapes)
 + SAD §4/§6/§9 (status enums, audit chain, compliance fields).
 """
 from __future__ import annotations

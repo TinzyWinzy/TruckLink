@@ -8,7 +8,7 @@ Product specs: [`docs/PRD_v2_Trucki.md`](docs/PRD_v2_Trucki.md) ·
 ## Layout
 
 - `backend/` — Django 6 + DRF API (auth, tenancy, yard, compliance engine, audit chain)
-- `bak-logistics-app/` — React PWA frontend (rename to `web/` at R1 cutover)
+- `web/` — React PWA frontend
 - `docs/` — PRD/SAD; `docs/archive/` — superseded BAK-era documents
 - `render.yaml` — production blueprint (API + Postgres)
 - `.github/workflows/ci.yml` — tests: backend pytest · frontend lint/typecheck/vitest/build · Playwright e2e
@@ -22,7 +22,7 @@ set DJANGO_SECRET_KEY=dev-secret && set AUDIT_SALT=dev-salt
 .venv\Scripts\python manage.py migrate && .venv\Scripts\python manage.py runserver
 
 # PWA (practice mode without VITE_API_URL; live with it set)
-cd bak-logistics-app && npm ci && npm run dev
+cd web && npm ci && npm run dev
 ```
 
 Tests: `pytest -m "not live"` (backend) · `npm run test` + `npm run build` (frontend) ·
