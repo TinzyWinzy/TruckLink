@@ -1,20 +1,21 @@
 """Tenancy + credential provisioning endpoints (SAD v2 §5, §11)."""
 from __future__ import annotations
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from django.utils.text import slugify
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 
 from trip.models import Organisation, UserProfile, UserRole
 from trip.permissions import IsAdmin, get_user_organisation
 
-from .models import Facility, PinCredential
+from .models import Facility, PinCredential, PushSubscription
 
 User = get_user_model()
 
@@ -149,3 +150,51 @@ def provision_pin(request):
         },
         status=status.HTTP_201_CREATED,
     )
+
+
+# ---------------------------------------------------------------------------
+# Web Push (SAD §10) — VAPID-native, Firebase-free.
+# ---------------------------------------------------------------------------
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def push_public_key(request):
+    """GET /api/push/public-key/ - the VAPID applicationServerKey for the PWA."""
+    return Response({"public_key": getattr(settings, "VAPID_PUBLIC_KEY", "")})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def push_subscribe(request):
+    """POST /api/push/subscribe/ - store this device's Web Push subscription."""
+    endpoint = str(request.data.get("endpoint", "")).strip()
+    keys = request.data.get("keys") or {}
+    p256dh = str(keys.get("p256dh", "")).strip()
+    auth = str(keys.get("auth", "")).strip()
+    if not endpoint or not p256dh or not auth:
+        return Response(
+            {"ok": False, "error": "endpoint and keys.p256dh/keys.auth are required"},
+            status=400,
+        )
+    profile = getattr(request.user, "profile", None)
+    facility = profile.facilities.first() if profile else None
+    sub, _created = PushSubscription.objects.update_or_create(
+        endpoint=endpoint,
+        defaults={
+            "user": request.user,
+            "facility": facility,
+            "p256dh": p256dh,
+            "auth": auth,
+        },
+    )
+    return Response({"ok": True, "id": sub.id})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def push_unsubscribe(request):
+    """POST /api/push/unsubscribe/ - remove this device (own rows only)."""
+    endpoint = str(request.data.get("endpoint", "")).strip()
+    PushSubscription.objects.filter(endpoint=endpoint, user=request.user).delete()
+    return Response({"ok": True})

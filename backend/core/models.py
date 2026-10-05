@@ -163,3 +163,26 @@ class NotificationLog(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+
+class PushSubscription(models.Model):
+    """Web Push (VAPID) subscription — SAD §10 push leg, Firebase-free."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='push_subscriptions',
+    )
+    facility = models.ForeignKey(
+        Facility, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='push_subscriptions',
+    )
+    endpoint = models.TextField(unique=True)
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'push[{self.user_id}] {self.endpoint[:48]}'

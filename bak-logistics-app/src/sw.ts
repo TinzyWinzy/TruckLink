@@ -1,13 +1,10 @@
 /// <reference lib="webworker" />
 // Custom service worker (injectManifest): Workbox precache + /api runtime
-// cache + FCM background push. Replaces generateSW so push and offline
-// caching share one worker registration.
+// cache + Web Push (VAPID, SAD §10) — one worker for push and offline caching.
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
 import { registerRoute } from 'workbox-routing'
 import { NetworkFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
-import { initializeApp } from 'firebase/app'
-import { getMessaging, onBackgroundMessage } from 'firebase/messaging/sw'
 
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<{ url: string; revision: string | null }>
@@ -36,26 +33,32 @@ registerRoute(
   }),
 )
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string | undefined,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID as string | undefined,
-}
-
-if (firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId) {
-  const fbApp = initializeApp(firebaseConfig)
-  const messaging = getMessaging(fbApp)
-  onBackgroundMessage(messaging, (payload) => {
-    const data = (payload.data ?? {}) as Record<string, string>
-    void self.registration.showNotification(payload.notification?.title ?? 'Trucki', {
-      body: payload.notification?.body ?? '',
-      data: { url: data.url ?? '/alerts' },
-    })
-  })
-}
+// Background push (SAD §10): payload is {title, body, facility} from the
+// Django notify command's pywebpush leg.
+self.addEventListener('push', (event) => {
+  const e = event as unknown as {
+    data: { json(): unknown; text(): string } | null
+    waitUntil(p: Promise<unknown>): void
+  }
+  e.waitUntil(
+    (async () => {
+      let title = 'Trucki'
+      let body = ''
+      let url = '/alerts'
+      if (e.data) {
+        try {
+          const data = e.data.json() as Record<string, string>
+          title = data.title ?? title
+          body = data.body ?? body
+          url = data.url ?? url
+        } catch {
+          body = e.data.text()
+        }
+      }
+      await self.registration.showNotification(title, { body, data: { url } })
+    })(),
+  )
+})
 
 self.addEventListener('notificationclick', (event) => {
   const e = event as unknown as {

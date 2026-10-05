@@ -219,6 +219,14 @@ TWILIO_FROM_NUMBER = os.environ.get("TWILIO_FROM_NUMBER", "")
 TWILIO_WHATSAPP_NUMBER = os.environ.get("TWILIO_WHATSAPP_NUMBER", "")
 
 # ---------------------------------------------------------------------------
+# Web Push (SAD §10, VAPID-native) — legs stay LOGGED until both keys set.
+# Generate: python manage.py generate_vapid_keys  (or py_vapid CLI)
+# ---------------------------------------------------------------------------
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "security@trucki.app")
+
+# ---------------------------------------------------------------------------
 # Audit chain (SAD §6) — fail-closed when empty: appends refuse to run.
 # ---------------------------------------------------------------------------
 AUDIT_SALT = os.environ.get("AUDIT_SALT", "")

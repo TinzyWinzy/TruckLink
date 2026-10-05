@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from core.audit import append_audit
 from core.audit_views import resolve_facility
+from core.models import OutboxEvent
 from core.rbac import RoleAccess
 from trip.permissions import (
     belongs_to_organisation, in_facility, scope_organisation,
@@ -179,6 +180,18 @@ class ComplianceListView(APIView):
                         f"QUARANTINE: {reg} failed axle check "
                         f"(+{okg:g}kg, fine ${fee:g}). Rebalancing required."
                     ),
+                )
+                OutboxEvent.objects.create(
+                    organisation=entry.organisation,
+                    facility=entry.facility,
+                    event_type="QUARANTINE",
+                    payload={
+                        "check_id": check.id,
+                        "queue_entry_id": str(entry.id),
+                        "reg_number": reg,
+                        "overload_kg": okg,
+                        "overload_fee_usd": fee,
+                    },
                 )
             append_audit(
                 facility=entry.facility,

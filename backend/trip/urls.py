@@ -46,6 +46,10 @@ urlpatterns = [
     # Tenancy (core app)
     path("tenancy/signup/", core_views.tenancy_signup),
     path("admin/pins/", core_views.provision_pin),
+    # Web push (core app; SAD §10)
+    path("push/public-key/", core_views.push_public_key),
+    path("push/subscribe/", core_views.push_subscribe),
+    path("push/unsubscribe/", core_views.push_unsubscribe),
     # Audit chain (core app)
     path("audit/", core_audit_views.AuditListView.as_view()),
     path("audit/verify/", core_audit_views.AuditVerifyView.as_view()),

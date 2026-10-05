@@ -1,59 +1,74 @@
-// $0 push subscriptions (FCM). Tablet opts in once; the sync service then
-// notifies this device free before trying WhatsApp/SMS. Requires
-// VITE_FIREBASE_VAPID_KEY (Firebase console -> Project settings -> Cloud
-// Messaging -> Web Push certificates) and VITE_SYNC_API_URL.
+// Web Push (SAD §10) — VAPID-native, Firebase-free. The tablet opts in once;
+// the Django `notify` command then rings this device before WhatsApp/SMS.
+// Requires VITE_VAPID_PUBLIC_KEY (py_vapid / generate_vapid_keys output) and
+// a signed-in yard session (DRF Token auth via apiFetch).
 
-import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging'
-import { getAuth } from 'firebase/auth'
-import { app, facilityId } from './firebase'
+import { apiFetch, isLive } from './api'
 
-const API = (import.meta.env.VITE_SYNC_API_URL as string | undefined)?.replace(/\/$/, '') ?? ''
-const VAPID = (import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined) ?? ''
+const VAPID = (import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined) ?? ''
 
 export const isPushAvailable = (): boolean =>
   typeof window !== 'undefined' &&
   'Notification' in window &&
   'serviceWorker' in navigator &&
-  API.length > 0 &&
+  isLive() &&
   VAPID.length > 0
 
 export type PushState = 'unsupported' | 'denied' | 'off' | 'on' | 'error'
 
 export async function pushState(): Promise<PushState> {
-  if (!isPushAvailable() || !(await isSupported().catch(() => false))) return 'unsupported'
+  if (!isPushAvailable()) return 'unsupported'
   if (Notification.permission === 'denied') return 'denied'
-  const reg = await navigator.serviceWorker.ready.catch(() => null)
-  void reg
-  return Notification.permission === 'granted' ? 'on' : 'off'
+  if (Notification.permission !== 'granted') return 'off'
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.getSubscription()
+    return sub ? 'on' : 'off'
+  } catch {
+    return 'error'
+  }
 }
 
-/** Request permission, fetch the FCM token, register with the sync service. */
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(base64)
+  const output = new Uint8Array(new ArrayBuffer(raw.length))
+  for (let i = 0; i < raw.length; i += 1) output[i] = raw.charCodeAt(i)
+  return output
+}
+
+/** Request permission, subscribe via the service worker, register server-side. */
 export async function subscribePush(userId: string, role: string): Promise<string> {
-  if (!app) throw new Error('Firebase not configured.')
+  if (!isPushAvailable()) throw new Error('Push not configured (VITE_VAPID_PUBLIC_KEY missing).')
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') throw new Error('Notification permission not granted.')
-  const messaging = getMessaging(app)
-  const token = await getToken(messaging, { vapidKey: VAPID })
-  // Identity: the server verifies the Firebase ID token; the shared API key is gone (H1).
-  const auth = getAuth(app)
-  const user = auth.currentUser
-  if (!user) throw new Error('Sign in before subscribing to push.')
-  const idToken = await user.getIdToken()
-  const res = await fetch(`${API}/api/push/subscribe`, {
+  const reg = await navigator.serviceWorker.ready
+  let sub = await reg.pushManager.getSubscription()
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID),
+    })
+  }
+  const keys = sub.toJSON().keys ?? {}
+  await apiFetch('/push/subscribe/', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-    body: JSON.stringify({ userId, facilityId, role, fcmToken: token }),
+    body: { endpoint: sub.endpoint, keys, user_id: userId, role },
   })
-  if (!res.ok) throw new Error(`Subscribe failed: ${res.status}`)
-  // Foreground messages while the app is open.
-  onMessage(messaging, (payload) => {
-    const title = payload.notification?.title ?? 'Trucki'
-    const body = payload.notification?.body ?? ''
-    if (navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({ type: 'SHOW_NOTIFICATION', title, body })
-    } else {
-      new Notification(title, { body })
-    }
-  })
-  return token
+  return sub.endpoint
+}
+
+/** Remove this device from the server and the browser. */
+export async function unsubscribePush(): Promise<void> {
+  if (!isPushAvailable()) return
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.getSubscription()
+    if (!sub) return
+    await apiFetch('/push/unsubscribe/', { method: 'POST', body: { endpoint: sub.endpoint } })
+    await sub.unsubscribe()
+  } catch {
+    // Best-effort: a dead endpoint is pruned server-side on 404/410 anyway.
+  }
 }

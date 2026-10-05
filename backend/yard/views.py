@@ -21,6 +21,7 @@ from rest_framework.views import APIView
 from compliance import engine
 from core.audit import append_audit
 from core.audit_views import find_facility, resolve_facility
+from core.models import OutboxEvent
 from core.rbac import RoleAccess
 from trip.permissions import belongs_to_organisation, in_facility
 from yard.models import (
@@ -217,6 +218,16 @@ class QueueReleaseView(APIView):
                 action="RELEASE_VEHICLE",
                 payload={"queueEntryId": str(entry.id)},
                 actor=request.user,
+            )
+            OutboxEvent.objects.create(
+                organisation=entry.organisation,
+                facility=entry.facility,
+                event_type="RELEASED",
+                payload={
+                    "queue_entry_id": str(entry.id),
+                    "reg_number": entry.reg_number,
+                    "dwell_seconds": dwell,
+                },
             )
         return Response({"ok": True, "queue_entry": QueueEntrySerializer(entry).data})
 
