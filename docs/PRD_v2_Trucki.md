@@ -4,7 +4,7 @@
 **Prepared by:** Tinotenda Brandon Duma | Founder & Lead Developer, RadBit Studios
 **Version:** 2.0 | **Date:** October 2026
 **Status:** Active build specification for Release 1.
-**Supersedes:** `PRD_v1_BAK_Logistics_Operational_Intelligence_Layer.txt`, `bak-pwa-prd.md` (both retained as evidence), `spotterAI/docs/*` (stale US-HOS assessment material — discarded).
+**Supersedes:** `docs/archive/PRD_v1_BAK_Logistics_Operational_Intelligence_Layer.txt`, `docs/archive/bak-pwa-prd.md` (both retained as evidence), `spotterAI/docs/*` (stale US-HOS assessment material — discarded).
 
 **Provenance labels used throughout:** `[PORT-FROM-BAK]` = requirement proven in the BAK build · `[PORT-FROM-TRUCKI]` = requirement proven in the Trucki build · `[NEW]` = not yet built · `[DROPPED]` = explicitly out of product.
 

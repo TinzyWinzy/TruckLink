@@ -4,7 +4,7 @@
 **Prepared by:** Tinotenda Brandon Duma | RadBit Studios
 **Version:** 2.0 | **Date:** October 2026
 **Status:** Build specification for Release 1. Companions `docs/PRD_v2_Trucki.md`.
-**Supersedes:** `Technical_Spec_v1_BAK_Logistics_Operational_Intelligence_Layer.txt`, `bak-pwa-sad.md` (retained as evidence of the BAK as-built system), `spotterAI/docs/architecture.md` (stale).
+**Supersedes:** `docs/archive/Technical_Spec_v1_BAK_Logistics_Operational_Intelligence_Layer.txt`, `docs/archive/bak-pwa-sad.md` (retained as evidence of the BAK as-built system), `spotterAI/docs/architecture.md` (stale).
 
 ---
 
