@@ -3,29 +3,34 @@ import { useLive } from '../lib/liveGate'
 import type { LiveRow } from '../lib/live'
 import { EmptyState, PageHeader, StatusPill } from '../components/ui'
 import { DEMO_AUDIT } from '../lib/demoData'
+import { useSession } from '../store/session'
 
 const SEED: LiveRow[] = DEMO_AUDIT as unknown as LiveRow[]
 
 export default function AuditLog() {
-  const [logs, setLogs] = useState<LiveRow[]>(SEED)
   const live = useLive()
+  const userId = useSession((s) => s.userId)
+  const [logs, setLogs] = useState<LiveRow[]>(() => live ? [] : SEED)
+  const [feedError, setFeedError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!live) return
+    let cancelled = false
     let unsub: (() => void) | undefined
     import('../lib/live').then((m) => {
-      unsub = m.subscribe('auditLogs', setLogs) ?? undefined
+      if (!cancelled) unsub = m.subscribe('auditLogs', setLogs, 100, setFeedError) ?? undefined
     })
-    return () => unsub?.()
-  }, [live])
+    return () => { cancelled = true; unsub?.() }
+  }, [live, userId])
 
   return (
     <div>
       <PageHeader
         title="Audit trail"
-        sub="Tamper-proof record — every release, override and assignment lands here."
+        sub="Server audit records for releases, overrides and assignments. Chain verification has documented integrity limits."
         mode={live ? 'live' : 'demo'}
       />
+      {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
       {logs.length === 0 ? (
         <EmptyState title="No entries yet" sub="Gate releases, overrides and assignments land here." />
       ) : (

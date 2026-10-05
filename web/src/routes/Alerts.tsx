@@ -5,20 +5,20 @@ import { isPushAvailable, pushState, subscribePush, type PushState } from '../li
 import { useSession } from '../store/session'
 import { canAckAlert } from '../lib/gates'
 import { EmptyState, PageHeader, StatusPill } from '../components/ui'
-import { approveOverridePS, acknowledgeAlertPS } from '../lib/powersync/operations'
 import { DEMO_ALERTS } from '../lib/demoData'
 
 const SEED: LiveRow[] = DEMO_ALERTS as unknown as LiveRow[]
 
 export default function Alerts() {
   const { userId, role, displayName } = useSession()
-  const [alerts, setAlerts] = useState<LiveRow[]>(SEED)
+  const live = useLive()
+  const [alerts, setAlerts] = useState<LiveRow[]>(() => live ? [] : SEED)
+  const [feedError, setFeedError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [overrideTarget, setOverrideTarget] = useState<string | null>(null)
   const [overrideReason, setOverrideReason] = useState('')
-  const live = useLive()
   const active = alerts.filter((a) => String(a.status) === 'ACTIVE' || !a.acknowledged)
-  const canApproveOverride = role === 'OPERATIONS_SUPERVISOR' || role === 'FACILITY_MANAGER' || role === 'ADMIN'
+  const canApproveOverride = role === 'OPERATIONS_SUPERVISOR' || role === 'ADMIN'
   const canAck = canAckAlert(role)
   const [push, setPush] = useState<PushState>(() => (isPushAvailable() ? 'off' : 'unsupported'))
   const [pushBusy, setPushBusy] = useState(false)
@@ -54,12 +54,13 @@ export default function Alerts() {
 
   useEffect(() => {
     if (!live) return
+    let cancelled = false
     let unsub: (() => void) | undefined
     import('../lib/live').then((m) => {
-      unsub = m.subscribe('alerts', setAlerts) ?? undefined
+      if (!cancelled) unsub = m.subscribe('alerts', setAlerts, 100, setFeedError) ?? undefined
     })
-    return () => unsub?.()
-  }, [live])
+    return () => { cancelled = true; unsub?.() }
+  }, [live, userId])
 
   async function ack(id: string) {
     if (!canAck) {
@@ -67,7 +68,7 @@ export default function Alerts() {
       return
     }
     if (!live) {
-      setAlerts((a) => a.map((x) => (x.id === id ? { ...x, status: 'ACKNOWLEDGED' } : x)))
+      setAlerts((a) => a.map((x) => (x.id === id ? { ...x, status: 'ACKNOWLEDGED', acknowledged: true } : x)))
       return
     }
     try {
@@ -90,16 +91,8 @@ export default function Alerts() {
         await m.approveOverrideLive(entryId, true, userId ?? displayName, overrideReason.trim())
         await m.acknowledgeAlertLive(alertId, displayName)
       } else {
-        await approveOverridePS({
-          facilityId: 'demo-facility',
-          checkId: alertId,
-          authorizerId: userId || 'demo-supervisor',
-          reason: overrideReason.trim()
-        }).catch(() => {
-          // In demo fallback, mark local state
-        })
-        setAlerts((a) => a.map((x) => (x.id === alertId ? { ...x, status: 'OVERRIDE_APPROVED' } : x)))
-        await acknowledgeAlertPS('demo-facility', alertId, userId || 'demo-supervisor').catch(() => {})
+        setMessage('Practice override is not recorded. Use a DEMO facility with two provisioned supervisors to exercise approval.')
+        return
       }
       setOverrideTarget(null)
       setOverrideReason('')
@@ -116,6 +109,7 @@ export default function Alerts() {
         sub="Critical quarantine alerts first. Acknowledge when you own the problem — escalation runs at 10 and 30 minutes."
         mode={live ? 'live' : 'demo'}
       />
+      {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
       {message && (
         <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-800">
           {message}

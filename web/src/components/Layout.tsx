@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { pendingActionCount, pendingActionCountSyncInitial, isOnline } from '../lib/offline/db'
+import { listPendingActions, isOnline } from '../lib/offline/db'
 import { useSession, isPracticeSession, type Role, canAccess } from '../store/session'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -30,11 +30,13 @@ export default function Layout({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const { role, userId, displayName, online, setOnline, signOut, signInDemo } = useSession()
   const practice = isPracticeSession(userId)
-  const [pending, setPending] = useState(pendingActionCountSyncInitial)
+  const [pending, setPending] = useState(0)
+  const [blocked, setBlocked] = useState(0)
   const [critical, setCritical] = useState(0)
   const live = useLive()
 
   useEffect(() => {
+    let cancelled = false
     const sync = async () => {
       const onlineNow = isOnline()
       if (onlineNow) {
@@ -44,9 +46,13 @@ export default function Layout({ children }: { children: ReactNode }) {
           // Replay failures stay queued with retry counts; header shows the backlog.
         }
       }
+      if (cancelled) return
       setOnline(onlineNow)
       try {
-        setPending(await pendingActionCount())
+        const actions = (await listPendingActions()).filter((a) => a.actorId === userId || !a.actorId)
+        if (cancelled) return
+        setPending(actions.filter((a) => a.state !== 'BLOCKED').length)
+        setBlocked(actions.filter((a) => a.state === 'BLOCKED').length)
       } catch {
         // IndexedDB blocked — keep last badge value.
       }
@@ -56,22 +62,25 @@ export default function Layout({ children }: { children: ReactNode }) {
     window.addEventListener('offline', sync)
     const id = window.setInterval(sync, 5000)
     return () => {
+      cancelled = true
       window.removeEventListener('online', sync)
       window.removeEventListener('offline', sync)
       window.clearInterval(id)
     }
-  }, [setOnline, pathname])
+  }, [setOnline, pathname, userId])
 
   useEffect(() => {
     if (!live || !role) return
     let unsub: (() => void) | undefined
+    let cancelled = false
     import('../lib/live').then((m) => {
+      if (cancelled) return
       unsub = m.subscribe('alerts', (rows) =>
         setCritical(rows.filter((r) => String(r.status) === 'ACTIVE' && String(r.severity) === 'CRITICAL').length),
       ) ?? undefined
     })
-    return () => unsub?.()
-  }, [live, role])
+    return () => { cancelled = true; unsub?.() }
+  }, [live, role, userId])
 
   const linkCls = (to: string) => {
     const active = pathname === to
@@ -102,6 +111,9 @@ export default function Layout({ children }: { children: ReactNode }) {
             <span className={live ? 'pill pill-live' : 'pill pill-demo'}>{live ? '● LIVE' : '■ PRACTICE'}</span>
             {pending > 0 && (
               <span role="status" className="pill pill-queued">⏳ {pending} queued</span>
+            )}
+            {blocked > 0 && (
+              <span role="status" className="pill pill-warn" title="Saved locally; supervisor reconciliation required before retry">{blocked} need review</span>
             )}
             {critical > 0 && (
               <Link to="/alerts" className="pill pill-fail" role="alert">✖ {critical} critical</Link>

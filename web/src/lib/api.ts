@@ -7,6 +7,7 @@
  */
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? ''
+export const apiBase = BASE
 
 export const facilityId =
   (import.meta.env.VITE_FACILITY_ID as string | undefined) ?? 'demo-facility'

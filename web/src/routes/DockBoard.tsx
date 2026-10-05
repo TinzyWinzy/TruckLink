@@ -4,13 +4,14 @@ import type { LiveRow } from '../lib/live'
 import { isOnline } from '../lib/offline/db'
 import { EmptyState, PageHeader, StatusPill, spineForStatus } from '../components/ui'
 import { DEMO_DOCKS } from '../lib/demoData'
+import { useSession } from '../store/session'
 
 interface Dock {
   id: string
   label: string
   rawStatus: string
   occupant: string
-  util: number
+  util: number | null
 }
 
 const SEED: Dock[] = DEMO_DOCKS
@@ -24,30 +25,35 @@ function mapLive(r: LiveRow): Dock {
     label: String(r.name ?? r.id),
     rawStatus: s,
     occupant: r.currentAssignment ? String(r.currentAssignment) : '',
-    util: s === 'OCCUPIED' ? 82 : s === 'AVAILABLE' ? 40 : 0,
+    util: null,
   }
 }
 
 export default function DockBoard() {
-  const [docks, setDocks] = useState<Dock[]>(SEED)
+  const live = useLive()
+  const userId = useSession((s) => s.userId)
+  const [docks, setDocks] = useState<Dock[]>(() => live ? [] : SEED)
+  const [feedError, setFeedError] = useState<string | null>(null)
   const [queuedIds, setQueuedIds] = useState<string[]>([])
   const [message, setMessage] = useState<string | null>(null)
-  const live = useLive()
   const free = docks.filter((d) => d.rawStatus === 'AVAILABLE').length
 
   useEffect(() => {
     if (!live) return
+    let cancelled = false
     let u1: (() => void) | undefined
     let u2: (() => void) | undefined
     import('../lib/live').then((m) => {
-      u1 = m.subscribe('docks', (found) => setDocks(found.map(mapLive))) ?? undefined
+      if (cancelled) return
+      u1 = m.subscribe('docks', (found) => setDocks(found.map(mapLive)), 100, setFeedError) ?? undefined
       u2 = m.subscribe('queue', (found) => setQueuedIds(found.filter((r) => r.status === 'QUEUED').map((r) => r.id))) ?? undefined
     })
     return () => {
+      cancelled = true
       u1?.()
       u2?.()
     }
-  }, [live])
+  }, [live, userId])
 
   async function tap(dock: Dock) {
     setMessage(null)
@@ -80,6 +86,7 @@ export default function DockBoard() {
         sub={live ? `${free} of ${docks.length} docks free · ${queuedIds.length} waiting. Tap a free dock to take the oldest truck.` : 'Practice layout — training docks only.'}
         mode={live ? 'live' : 'demo'}
       />
+      {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
       {message && <p role="status" className="mb-3 rounded-lg bg-slate-900 p-3 text-sm font-bold text-white">{message}</p>}
       {docks.length === 0 ? (
         <EmptyState title="No docks configured" sub="Ask your supervisor to set up the yard." />
@@ -101,9 +108,9 @@ export default function DockBoard() {
                   <StatusPill status={d.rawStatus} symbol={SYMBOL[d.rawStatus]} />
                 </div>
                 <p className="mt-1 min-h-5 text-sm font-semibold text-slate-600">{d.occupant || (free_ ? 'Tap to assign oldest truck' : '—')}</p>
-                <div className="mt-2 h-2.5 rounded bg-slate-200" role="img" aria-label={`${d.label} utilization ${d.util} percent`}>
+                {d.util != null ? <div className="mt-2 h-2.5 rounded bg-slate-200" role="img" aria-label={`${d.label} demo utilization ${d.util} percent`}>
                   <div className="h-2.5 rounded bg-slate-900" style={{ width: `${d.util}%` }} />
-                </div>
+                </div> : <p className="mt-2 text-xs text-slate-500">Utilization history unavailable</p>}
               </button>
             )
           })}

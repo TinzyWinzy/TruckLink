@@ -15,6 +15,8 @@ from core.audit import verify_chain
 from core.models import Facility
 from trip.models import UserProfile, UserRole
 from yard.models import Alert, AuditLog, Dock, QueueEntry
+from yard.models import ComplianceCheck
+from compliance.policy import MANDATORY_CHECKLIST_IDS
 
 User = get_user_model()
 
@@ -248,7 +250,7 @@ class TestQueuePatch:
 @pytest.mark.django_db
 class TestQueueRelease:
     def test_completed_releases(
-        self, api_client, default_org, default_facility, dock,
+        self, api_client, default_org, default_facility, dock, auth_user,
     ):
         entry = QueueEntry.objects.create(
             organisation=default_org, facility=default_facility,
@@ -257,6 +259,9 @@ class TestQueueRelease:
         dock.status = "OCCUPIED"
         dock.current_entry = entry
         dock.save(update_fields=["status", "current_entry", "updated_at"])
+        ComplianceCheck.objects.create(organisation=default_org, facility=default_facility,
+            queue_entry=entry, inspector=auth_user, reg_number=entry.reg_number,
+            status="PASSED", checklist_results=dict.fromkeys(MANDATORY_CHECKLIST_IDS, True))
 
         resp = api_client.post(f"/api/queue/{entry.id}/release/")
         assert resp.status_code == 200
@@ -270,12 +275,12 @@ class TestQueueRelease:
         assert AuditLog.objects.filter(action="RELEASE_VEHICLE").count() == 1
         assert verify_chain(default_facility)["ok"] is True
 
-    def test_override_approved_releases(self, api_client, default_org, default_facility):
+    def test_override_status_without_approval_is_blocked(self, api_client, default_org, default_facility):
         entry = QueueEntry.objects.create(
             organisation=default_org, facility=default_facility,
             reg_number="ABC 2", status="OVERRIDE_APPROVED",
         )
-        assert api_client.post(f"/api/queue/{entry.id}/release/").status_code == 200
+        assert api_client.post(f"/api/queue/{entry.id}/release/").status_code == 409
 
     @pytest.mark.parametrize("status", ["QUEUED", "QUARANTINED", "AT_DOCK"])
     def test_gate_blocks(self, api_client, default_org, default_facility, status):

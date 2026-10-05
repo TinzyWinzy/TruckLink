@@ -525,7 +525,7 @@ def vehicles_list(request):
         qs = scope_organisation(qs, request.user)
         return Response({"ok": True, "vehicles": VehicleSerializer(qs, many=True).data})
 
-    org = get_user_organisation(request.user) or Organisation.objects.filter(is_deleted=False).first()
+    org = get_user_organisation(request.user)
     if not org:
         return Response({"ok": False, "error": "No organisation found"}, status=status.HTTP_400_BAD_REQUEST)
     s = VehicleCreateSerializer(data=request.data)
@@ -609,7 +609,7 @@ def drivers_list(request):
         qs = Driver.objects.select_related("organisation").filter(is_deleted=False)
         qs = scope_organisation(qs, request.user)
         return Response({"ok": True, "drivers": DriverSerializer(qs, many=True).data})
-    org = get_user_organisation(request.user) or Organisation.objects.filter(is_deleted=False).first()
+    org = get_user_organisation(request.user)
     if not org:
         return Response({"ok": False, "error": "No organisation found"}, status=status.HTTP_400_BAD_REQUEST)
     s = DriverCreateSerializer(data=request.data)

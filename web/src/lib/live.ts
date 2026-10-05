@@ -10,8 +10,9 @@
  * Server is authoritative for compliance + overrides (SAD §9); the client
  * only renders. Firebase survives solely for web push (push.ts / sw.ts).
  */
-import { apiFetch, clearToken, facilityId, isLive, setToken } from './api'
+import { apiFetch, apiBase, ApiError, clearToken, facilityId, getToken, isLive, setToken } from './api'
 import { isRealLive } from './liveGate'
+import { useSession } from '../store/session'
 import {
   listPendingActions,
   recordActionFailure,
@@ -231,20 +232,30 @@ export function subscribe(
   name: Feed,
   cb: (rows: LiveRow[]) => void,
   max = 100,
+  onError?: (message: string | null) => void,
 ): (() => void) | null {
   if (!isRealLive()) return null
   let stopped = false
   let warned = false
+  let inFlight = false
+  const identity = useSession.getState().userId
   const tick = async () => {
-    if (stopped) return
+    if (stopped || inFlight || identity !== useSession.getState().userId || !isRealLive()) return
+    inFlight = true
     try {
       const rows = await fetchFeed(name, max)
-      if (!stopped) cb(rows)
+      if (!stopped && identity === useSession.getState().userId) {
+        cb(rows)
+        onError?.(null)
+      }
     } catch (err) {
+      if (!stopped && identity === useSession.getState().userId) onError?.('Server data unavailable — displayed records may be stale. Retry when connected.')
       if (!warned) {
         warned = true
         console.warn(`[live] ${name} poll failed: ${(err as Error).message}`)
       }
+    } finally {
+      inFlight = false
     }
   }
   void tick()
@@ -295,6 +306,7 @@ export async function submitComplianceLive(input: {
   totalWeight: number
   gvmRating: number
   supervisorId: string
+  checklistResults?: Record<string, boolean>
   key: string
 }): Promise<'PASS' | 'FAIL'> {
   // Server resolves S.I. limits from tenant config and returns the final
@@ -311,6 +323,7 @@ export async function submitComplianceLive(input: {
         route_type: input.routeType ?? 'DEFAULT',
         vehicle_type: input.vehicleType,
         client_key: input.key,
+        checklist_results: input.checklistResults ?? {},
       },
     },
   )
@@ -553,6 +566,7 @@ async function replayOne(action: PendingAction): Promise<void> {
         totalWeight: number
         gvmRating: number
         supervisorId: string
+        checklistResults?: Record<string, boolean>
       }
       await submitComplianceLive({ ...p, key: action.id })
       break
@@ -563,17 +577,31 @@ async function replayOne(action: PendingAction): Promise<void> {
 }
 
 /** Replay queued offline actions in order. Returns { done, failed }. */
-export async function flushPendingActions(): Promise<{ done: number; failed: number }> {
+let activeReplay: Promise<{ done: number; failed: number }> | null = null
+
+export function flushPendingActions(): Promise<{ done: number; failed: number }> {
+  if (activeReplay) return activeReplay
+  activeReplay = replayPendingActions().finally(() => { activeReplay = null })
+  return activeReplay
+}
+
+async function replayPendingActions(): Promise<{ done: number; failed: number }> {
   if (!isRealLive() || typeof navigator !== 'undefined' && !navigator.onLine) return { done: 0, failed: 0 }
   let done = 0
   let failed = 0
+  const actorId = useSession.getState().userId
+  const token = getToken()
   for (const action of await listPendingActions()) {
+    if (useSession.getState().userId !== actorId || getToken() !== token || !isRealLive()) break
+    if (action.actorId !== actorId || action.facilityId !== facilityId || action.apiBase !== apiBase
+        || action.state === 'BLOCKED' || (action.nextAttemptAt ?? 0) > Date.now()) continue
     try {
       await replayOne(action)
       await removePendingAction(action.id)
       done += 1
     } catch (err) {
-      await recordActionFailure(action.id, (err as Error).message)
+      await recordActionFailure(action.id, (err as Error).message,
+        err instanceof ApiError && err.status >= 400 && err.status < 500)
       failed += 1
     }
   }

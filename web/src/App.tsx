@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { Suspense, lazy, useEffect, type ReactNode } from 'react'
+import { Fragment, Suspense, lazy, useEffect, useState, createContext, useContext, type ReactNode } from 'react'
 import Layout from './components/Layout'
 import { useSession } from './store/session'
 import { canVisit, landingPathForRole, type RouteKey } from './lib/gates'
@@ -14,10 +14,13 @@ const AuditLog = lazy(() => import('./routes/AuditLog'))
 const Admin = lazy(() => import('./routes/Admin'))
 const Hub = lazy(() => import('./routes/Hub'))
 const Guide = lazy(() => import('./routes/Guide'))
+const AuthReady = createContext(false)
 
 /** Role gate per ROUTE_GATES. Mismatch renders a dead-end, never a redirect loop. */
 function RoleGuard({ route, children }: { route: RouteKey; children: ReactNode }) {
-  const { role, signOut } = useSession()
+  const { role, signOut, userId } = useSession()
+  const authReady = useContext(AuthReady)
+  if (!role && !authReady) return <Fallback />
   if (!role) return <Navigate to="/" replace />
   if (!canVisit(route, role)) {
     return (
@@ -30,7 +33,8 @@ function RoleGuard({ route, children }: { route: RouteKey; children: ReactNode }
           <button
             type="button"
             className="btn-primary touch-target mt-4 w-full px-4"
-            onClick={() => {
+            onClick={async () => {
+              await (await import('./lib/live')).signOutLive()
               signOut()
             }}
           >
@@ -40,7 +44,8 @@ function RoleGuard({ route, children }: { route: RouteKey; children: ReactNode }
       </Layout>
     )
   }
-  return <>{children}</>
+  // Identity changes remount private screens before they can display old rows.
+  return <Fragment key={userId}>{children}</Fragment>
 }
 
 function Fallback() {
@@ -50,7 +55,7 @@ function Fallback() {
 /** Restore real yard sessions across refresh. The API token persists in
  * localStorage; this revalidates it against /auth/me/ at boot. Practice
  * sessions restore separately from sessionStorage (session.ts). */
-function AuthRestore() {
+function AuthRestore({ onReady }: { onReady: (ready: boolean) => void }) {
   const { signInReal } = useSession()
   const navigate = useNavigate()
   useEffect(() => {
@@ -65,19 +70,23 @@ function AuthRestore() {
         if (window.location.pathname === '/') navigate(landingPathForRole(s.role))
       } catch {
         // Offline boot or dead token — staffer signs in again.
+      } finally {
+        if (!cancelled) onReady(true)
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [navigate, signInReal])
+  }, [navigate, signInReal, onReady])
   return null
 }
 
 export default function App() {
+  const [authReady, setAuthReady] = useState(false)
   return (
     <BrowserRouter>
-      <AuthRestore />
+      <AuthReady.Provider value={authReady}>
+      <AuthRestore onReady={setAuthReady} />
       <Suspense fallback={<Fallback />}>
       <Routes>
         <Route path="/" element={<Login />} />
@@ -92,7 +101,8 @@ export default function App() {
         <Route path="/guide" element={<RoleGuard route="guide"><Layout><Guide /></Layout></RoleGuard>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      </Suspense>
+        </Suspense>
+      </AuthReady.Provider>
     </BrowserRouter>
   )
 }

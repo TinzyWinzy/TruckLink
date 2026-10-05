@@ -3,8 +3,8 @@ reports and the admin demo seed/reset.
 
 Ports of web/src/lib/powersync/operations.ts:
   registerVehiclePS / assignDockPS / releaseVehiclePS / acknowledgeAlertPS.
-Release gate (section 9): only COMPLETED or OVERRIDE_APPROVED may be released;
-the gate is engine.can_transition(status, "RELEASED") - one FSM, one truth.
+Release gate: the transactional service validates the latest inspection,
+checklist, tenant/site and independent override approvals before gate exit.
 """
 from __future__ import annotations
 
@@ -33,6 +33,7 @@ from .serializers import (
     AlertSerializer, DockAssignSerializer, DockCreateSerializer, DockSerializer,
     QueueCreateSerializer, QueueEntrySerializer, QueueUpdateSerializer,
 )
+from .services import ReleaseBlocked, release_entry
 
 
 def _get_entry_or_404(request, pk):
@@ -148,17 +149,27 @@ class QueueDetailView(APIView):
     permission_classes = [IsAuthenticated, RoleAccess]
     rbac_resource = "queue"
 
+    @transaction.atomic
     def patch(self, request, pk):
         entry, err = _get_entry_or_404(request, pk)
         if err is not None:
             return err
+        entry = QueueEntry.objects.select_for_update().get(pk=entry.pk)
         serializer = QueueUpdateSerializer(entry, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
         new_status = validated.get("status")
         old_status = entry.status
 
+        if any(field != "status" and getattr(entry, field) != value
+               for field, value in validated.items()) and (ComplianceCheck.objects.filter(queue_entry=entry).exists() or entry.inspection_attempts.exists()):
+            return Response({"ok": False, "error":
+                "Inspected vehicle details require a supervised correction and new inspection"}, status=409)
+
         if new_status is not None and new_status != old_status:
+            if new_status not in ("ASSIGNED", "AT_DOCK"):
+                return Response({"ok": False, "error":
+                    "invalid status transition: gate decisions require their dedicated command"}, status=409)
             if not engine.can_transition(old_status, new_status):
                 return Response(
                     {"ok": False, "error":
@@ -169,11 +180,12 @@ class QueueDetailView(APIView):
             for field, value in validated.items():
                 setattr(entry, field, value)
             entry.save(update_fields=[*validated.keys(), "updated_at"])
-            if new_status is not None and new_status != old_status:
+            if validated:
                 append_audit(
                     facility=entry.facility,
                     action="UPDATE_QUEUE_STATUS",
-                    payload={"id": str(entry.id), "from": old_status, "to": new_status},
+                    payload={"id": str(entry.id), "from": old_status, "to": entry.status,
+                             "changes": validated},
                     actor=request.user,
                 )
         return Response({"ok": True, "queue_entry": QueueEntrySerializer(entry).data})
@@ -190,45 +202,10 @@ class QueueReleaseView(APIView):
         entry, err = _get_entry_or_404(request, pk)
         if err is not None:
             return err
-        if not engine.can_transition(entry.status, "RELEASED"):
-            return Response(
-                {"ok": False, "error":
-                 f"Cannot release entry in status {entry.status} "
-                 "(must be COMPLETED or OVERRIDE_APPROVED)"},
-                status=409,
-            )
-        now = timezone.now()
-        dwell = max(0, int((now - entry.entry_timestamp).total_seconds()))
-        with transaction.atomic():
-            entry.status = "RELEASED"
-            entry.exit_timestamp = now
-            entry.dwell_duration_seconds = dwell
-            entry.save(
-                update_fields=[
-                    "status", "exit_timestamp", "dwell_duration_seconds", "updated_at",
-                ],
-            )
-            if entry.assigned_dock_id:
-                dock = entry.assigned_dock
-                dock.status = "AVAILABLE"
-                dock.current_entry = None
-                dock.save(update_fields=["status", "current_entry", "updated_at"])
-            append_audit(
-                facility=entry.facility,
-                action="RELEASE_VEHICLE",
-                payload={"queueEntryId": str(entry.id)},
-                actor=request.user,
-            )
-            OutboxEvent.objects.create(
-                organisation=entry.organisation,
-                facility=entry.facility,
-                event_type="RELEASED",
-                payload={
-                    "queue_entry_id": str(entry.id),
-                    "reg_number": entry.reg_number,
-                    "dwell_seconds": dwell,
-                },
-            )
+        try:
+            entry = release_entry(entry.pk, request.user)
+        except ReleaseBlocked as exc:
+            return Response({"ok": False, "error": str(exc)}, status=409)
         return Response({"ok": True, "queue_entry": QueueEntrySerializer(entry).data})
 
 
@@ -273,6 +250,7 @@ class DockAssignView(APIView):
     rbac_resource = "docks"
     rbac_action = "update"
 
+    @transaction.atomic
     def post(self, request, pk):
         dock = Dock.objects.filter(pk=pk).select_related("facility").first()
         if (
@@ -294,6 +272,10 @@ class DockAssignView(APIView):
                 {"ok": False, "error": "entry and dock are at different facilities"},
                 status=400,
             )
+        entry = QueueEntry.objects.select_for_update().get(pk=entry.pk)
+        dock = Dock.objects.select_for_update().get(pk=dock.pk)
+        if entry.assigned_dock_id and entry.assigned_dock_id != dock.pk:
+            return Response({"ok": False, "error": "entry already assigned to another dock"}, status=409)
         if dock.status != "AVAILABLE":
             return Response(
                 {"ok": False, "error": "Selected dock is not available"}, status=409,
@@ -498,6 +480,11 @@ class AdminSeedView(APIView):
         facility, err = _facility_from_body(request)
         if err is not None:
             return err
+        if facility.yard_config.get("mode") != "DEMO":
+            return Response({"ok": False, "error": "Demo seeding is restricted to DEMO facilities"}, status=409)
+        if (QueueEntry.objects.filter(facility=facility, regulatory_contexts__isnull=False).exists()
+                or QueueEntry.objects.filter(facility=facility, inspection_attempts__isnull=False).exists()):
+            return Response({"ok": False, "error": "Versioned regulatory history cannot be reseeded"}, status=409)
         created = {"docks": 0, "equipment": 0, "queue": 0, "alerts": 0, "config": 0}
         updated = dict(created)
 
@@ -615,16 +602,15 @@ class AdminResetView(APIView):
         facility, err = _facility_from_body(request)
         if err is not None:
             return err
+        if facility.yard_config.get("mode") != "DEMO":
+            return Response({"ok": False, "error": "Demo reset is restricted to DEMO facilities"}, status=409)
+        if (QueueEntry.objects.filter(facility=facility, regulatory_contexts__isnull=False).exists()
+                or QueueEntry.objects.filter(facility=facility, inspection_attempts__isnull=False).exists()):
+            return Response({"ok": False, "error": "Versioned regulatory history cannot be reset"}, status=409)
         deleted = {}
         with transaction.atomic():
-            for model in (Alert, ComplianceCheck, QueueEntry, Dock, Equipment,
-                          ComplianceConfig):
-                if model is ComplianceConfig:
-                    count, _ = model.objects.filter(
-                        organisation=facility.organisation,
-                    ).delete()
-                else:
-                    count, _ = model.objects.filter(facility=facility).delete()
+            for model in (Alert, ComplianceCheck, QueueEntry, Dock, Equipment):
+                count, _ = model.objects.filter(facility=facility).delete()
                 deleted[model.__name__] = count
             append_audit(
                 facility=facility,

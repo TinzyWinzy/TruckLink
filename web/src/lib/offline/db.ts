@@ -3,6 +3,8 @@
 // migrated once on first open so tablets keep queued work across the upgrade.
 
 import Dexie, { type Table } from 'dexie'
+import { useSession, isPracticeSession } from '../../store/session'
+import { apiBase, facilityId } from '../api'
 
 export interface PendingAction {
   id: string // client-generated idempotency key
@@ -11,6 +13,11 @@ export interface PendingAction {
   timestamp: number
   retryCount: number
   lastError?: string
+  actorId?: string
+  facilityId?: string
+  apiBase?: string
+  state?: 'PENDING' | 'BLOCKED'
+  nextAttemptAt?: number
 }
 
 export interface GateInspection {
@@ -50,6 +57,18 @@ export class LocalAppDatabase extends Dexie {
       inspections: '++id, vehicleReg, status, timestamp, synced',
       syncQueue: '++id, action, timestamp',
     })
+    this.version(2).stores({
+      pendingActions: 'id, actionType, timestamp, actorId, facilityId, state',
+      inspections: '++id, vehicleReg, status, timestamp, synced',
+      syncQueue: '++id, action, timestamp',
+    }).upgrade(async (tx) => {
+      await tx.table('pendingActions').toCollection().modify((action: PendingAction) => {
+        if (!action.actorId) {
+          action.state = 'BLOCKED'
+          action.lastError = 'Legacy action has no owning session; supervisor review required'
+        }
+      })
+    })
   }
 }
 
@@ -75,19 +94,22 @@ export function __resetOfflineMigration(): void {
 
 async function migrateLegacyOnce(): Promise<void> {
   if (migrationDone) return
-  migrationDone = true
   try {
     const legacy = legacyRead()
     if (legacy.length === 0) return
     const existing = await db.pendingActions.toCollection().primaryKeys()
     const seen = new Set(existing)
-    const fresh = legacy.filter((a) => a?.id && !seen.has(a.id))
+    const fresh = legacy.filter((a) => a?.id && !seen.has(a.id)).map((a) => (
+      a.actorId ? a : { ...a, state: 'BLOCKED' as const,
+        lastError: 'Legacy action has no owning session; supervisor review required' }
+    ))
     if (fresh.length > 0) await db.pendingActions.bulkAdd(fresh)
     try {
       localStorage.removeItem(LEGACY_KEY)
     } catch {
       // Non-blocking — IndexedDB is now the source of truth.
     }
+    migrationDone = true
   } catch {
     // IndexedDB unavailable (private mode); callers fall back per-op.
   }
@@ -102,7 +124,11 @@ export async function enqueueOfflineAction(
   actionType: string,
   payload: Record<string, unknown>,
 ): Promise<PendingAction> {
-  const action: PendingAction = { id: newId(), actionType, payload, timestamp: Date.now(), retryCount: 0 }
+  const actorId = useSession.getState().userId
+  const owned = actorId != null && !isPracticeSession(actorId) && apiBase.length > 0
+  const action: PendingAction = { id: newId(), actionType, payload, timestamp: Date.now(), retryCount: 0,
+    actorId: owned ? actorId : undefined, facilityId: owned ? facilityId : undefined,
+    apiBase: owned ? apiBase : undefined, state: owned ? 'PENDING' : 'BLOCKED' }
   try {
     await migrateLegacyOnce()
     await db.pendingActions.add(action)
@@ -113,7 +139,7 @@ export async function enqueueOfflineAction(
       all.push(action)
       localStorage.setItem(LEGACY_KEY, JSON.stringify(all))
     } catch {
-      // Storage fully unavailable — return the action so the caller can warn.
+      throw new Error('Inspection was not saved: local storage unavailable. Keep a manual record and retry.')
     }
   }
   return action
@@ -122,7 +148,9 @@ export async function enqueueOfflineAction(
 export async function listPendingActions(): Promise<PendingAction[]> {
   try {
     await migrateLegacyOnce()
-    return await db.pendingActions.orderBy('timestamp').toArray()
+    const stored = await db.pendingActions.orderBy('timestamp').toArray()
+    const ids = new Set(stored.map((a) => a.id))
+    return [...stored, ...legacyRead().filter((a) => !ids.has(a.id))].sort((a, b) => a.timestamp - b.timestamp)
   } catch {
     return legacyRead()
   }
@@ -142,17 +170,15 @@ export async function removePendingAction(id: string): Promise<void> {
   }
 }
 
-export async function recordActionFailure(id: string, error: string): Promise<PendingAction | null> {
+export async function recordActionFailure(id: string, error: string, permanent = false): Promise<PendingAction | null> {
   try {
     await migrateLegacyOnce()
     const found = await db.pendingActions.get(id)
     if (!found) return null
     found.retryCount += 1
     found.lastError = error
-    if (found.retryCount >= MAX_RETRIES) {
-      await db.pendingActions.delete(id)
-      return null
-    }
+    found.state = permanent || found.retryCount >= MAX_RETRIES ? 'BLOCKED' : 'PENDING'
+    found.nextAttemptAt = Date.now() + Math.min(300000, 5000 * 2 ** (found.retryCount - 1))
     await db.pendingActions.put(found)
     return found
   } catch {
@@ -161,27 +187,19 @@ export async function recordActionFailure(id: string, error: string): Promise<Pe
     if (!found) return null
     found.retryCount += 1
     found.lastError = error
-    const kept = found.retryCount >= MAX_RETRIES ? all.filter((a) => a.id !== id) : all
+    found.state = permanent || found.retryCount >= MAX_RETRIES ? 'BLOCKED' : 'PENDING'
+    found.nextAttemptAt = Date.now() + Math.min(300000, 5000 * 2 ** (found.retryCount - 1))
     try {
-      localStorage.setItem(LEGACY_KEY, JSON.stringify(kept))
+      localStorage.setItem(LEGACY_KEY, JSON.stringify(all))
     } catch {
       // Ignore.
     }
-    return found.retryCount >= MAX_RETRIES ? null : found
+    return found
   }
 }
 
 export async function pendingActionCount(): Promise<number> {
-  try {
-    await migrateLegacyOnce()
-    const [count, legacy] = await Promise.all([
-      db.pendingActions.count(),
-      (async () => legacyRead().length)(),
-    ])
-    return count + legacy
-  } catch {
-    return legacyRead().length
-  }
+  return (await listPendingActions()).length
 }
 
 /** Synchronous legacy shim — deprecated, kept for header badge initial paint only. */

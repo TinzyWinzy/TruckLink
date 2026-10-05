@@ -89,7 +89,7 @@ def default_facility(default_org):
     from core.models import Facility
     fac, _ = Facility.objects.get_or_create(
         organisation=default_org, slug="main-yard",
-        defaults={"name": "Main Yard"},
+        defaults={"name": "Main Yard", "yard_config": {"mode": "DEMO"}},
     )
     return fac
 

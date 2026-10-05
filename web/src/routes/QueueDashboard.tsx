@@ -60,8 +60,10 @@ function shortId(id: string): string {
 }
 
 export default function QueueDashboard() {
-  const { role, displayName } = useSession()
-  const [rows, setRows] = useState<Row[]>(SEED)
+  const { role, displayName, userId } = useSession()
+  const live = useLive()
+  const [rows, setRows] = useState<Row[]>(() => live ? [] : SEED)
+  const [feedError, setFeedError] = useState<string | null>(null)
   const [plate, setPlate] = useState('')
   const [driver, setDriver] = useState('')
   const [cargo, setCargo] = useState('Container')
@@ -69,16 +71,16 @@ export default function QueueDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [filter, setFilter] = useState('ALL')
-  const live = useLive()
 
   useEffect(() => {
     if (!live) return
+    let cancelled = false
     let unsub: (() => void) | undefined
     import('../lib/live').then((m) => {
-      unsub = m.subscribe('queue', (found) => setRows(found.map(mapLive))) ?? undefined
+      if (!cancelled) unsub = m.subscribe('queue', (found) => setRows(found.map(mapLive)), 100, setFeedError) ?? undefined
     })
-    return () => unsub?.()
-  }, [live])
+    return () => { cancelled = true; unsub?.() }
+  }, [live, userId])
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { ALL: rows.length }
@@ -182,6 +184,7 @@ export default function QueueDashboard() {
         sub={live ? 'Live yard board — oldest first. Register at the gate, release at the exit.' : 'Practice board — training entries only.'}
         mode={live ? 'live' : 'demo'}
       />
+      {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
       {/* Primary job first: register the truck in front of you (Fitts + Hick) */}
       <section className="card p-4 sm:p-5" aria-label="Register vehicle">
         <h2 className="text-base font-extrabold">Register arrival</h2>

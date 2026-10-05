@@ -1,10 +1,6 @@
 /// <reference lib="webworker" />
-// Custom service worker (injectManifest): Workbox precache + /api runtime
-// cache + Web Push (VAPID, SAD §10) — one worker for push and offline caching.
+// Custom service worker: public shell precache and Web Push.
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
-import { registerRoute } from 'workbox-routing'
-import { NetworkFirst } from 'workbox-strategies'
-import { ExpirationPlugin } from 'workbox-expiration'
 
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<{ url: string; revision: string | null }>
@@ -20,18 +16,15 @@ self.addEventListener('install', () => {
   void self.skipWaiting()
 })
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim())
+  event.waitUntil((async () => {
+    // Retire the old URL-only cache; it could mix authenticated responses.
+    await caches.delete('api-runtime-cache')
+    await self.clients.claim()
+  })())
 })
 
-// SAD §4.1: NetworkFirst for API reads (5s timeout, 24h / 100-entry cap).
-registerRoute(
-  /\/api\/.*$/i,
-  new NetworkFirst({
-    cacheName: 'api-runtime-cache',
-    networkTimeoutSeconds: 5,
-    plugins: [new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 })],
-  }),
-)
+// Private API reads are network-only until an actor/site-scoped snapshot store
+// is implemented. The precached shell and durable offline write outbox remain.
 
 // Background push (SAD §10): payload is {title, body, facility} from the
 // Django notify command's pywebpush leg.

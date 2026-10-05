@@ -13,6 +13,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from compliance import engine
+from compliance.policy import MANDATORY_CHECKLIST_IDS
 from core.audit import verify_chain
 from trip.models import Organisation, UserProfile, UserRole
 from core.models import Facility
@@ -85,12 +86,13 @@ def payload(queue_entry):
         "axle_weights": [6000, 8000, 8000],
         "total_weight": 22000,
         "gvm_rating": 24000,
-        "checklist_results": {"license-check": True},
+        "checklist_results": dict.fromkeys(MANDATORY_CHECKLIST_IDS, True),
     }
 
 
 def _overload_payload(queue_entry):
     return {
+        "checklist_results": dict.fromkeys(MANDATORY_CHECKLIST_IDS, True),
         "queue_entry": queue_entry.id,
         "axle_weights": [9500, 8000, 8000],
         "total_weight": 25500,
@@ -358,7 +360,7 @@ class TestComplianceApi:
             "gvm_rating": 24000,
         }, format="json")
         assert resp.status_code == 400
-        assert "same length" in resp.json()["error"]
+        assert "server-owned" in str(resp.json())
 
     def test_released_entry_409(self, dispatch_client, queue_entry):
         queue_entry.status = "RELEASED"

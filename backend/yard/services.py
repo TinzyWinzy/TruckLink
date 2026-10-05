@@ -1,0 +1,71 @@
+"""Authoritative yard commands shared by API entry points."""
+from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+
+from compliance.policy import missing_checks
+from core.audit import append_audit
+from core.models import OutboxEvent
+from yard.models import ComplianceCheck, Dock, QueueEntry
+
+
+class ReleaseBlocked(ValueError):
+    pass
+
+
+@transaction.atomic
+def release_entry(entry_id, actor):
+    # All gate mutations lock the queue row first, then checks/docks.
+    entry = QueueEntry.objects.select_for_update().get(pk=entry_id)
+    from core.models import Facility
+    Facility.objects.select_for_update().get(pk=entry.facility_id)
+    attempt = approval = None
+    if entry.facility.yard_config.get("mode") != "DEMO" or entry.inspection_attempts.exists():
+        from regulatory.services import release_authority
+        try:
+            attempt, approval = release_authority(entry, actor)
+        except (ValidationError, PermissionError) as exc:
+            raise ReleaseBlocked('; '.join(exc.messages) if isinstance(exc, ValidationError) else str(exc)) from exc
+        authority = {"attempt_id": attempt.pk, "approval_id": approval.pk if approval else None}
+    else:
+        check = validate_demo_release(entry)
+        authority = {"check_id": str(check.id), "verification_status": "LEGACY_DEMO_UNVERIFIED"}
+    now = timezone.now()
+    entry.status = "RELEASED"
+    entry.exit_timestamp = now
+    entry.dwell_duration_seconds = max(0, int((now - entry.entry_timestamp).total_seconds()))
+    entry.save(update_fields=["status", "exit_timestamp", "dwell_duration_seconds", "updated_at"])
+    if attempt:
+        from regulatory.models import ReleaseRecord
+        ReleaseRecord.objects.create(organisation=entry.organisation, creator=actor, queue_entry=entry, attempt=attempt, approval=approval)
+    if entry.assigned_dock_id:
+        dock = Dock.objects.select_for_update().get(pk=entry.assigned_dock_id)
+        if dock.current_entry_id == entry.pk:
+            dock.status = "AVAILABLE"
+            dock.current_entry = None
+            dock.save(update_fields=["status", "current_entry", "updated_at"])
+    append_audit(facility=entry.facility, action="RELEASE_VEHICLE", actor=actor,
+                 payload={"queueEntryId": str(entry.id), **authority})
+    OutboxEvent.objects.create(organisation=entry.organisation, facility=entry.facility,
+                              event_type="RELEASED", payload={"queue_entry_id": str(entry.id),
+                              **authority, "reg_number": entry.reg_number,
+                              "dwell_seconds": entry.dwell_duration_seconds})
+    return entry
+
+
+def validate_demo_release(entry):
+    if entry.status not in ("COMPLETED", "OVERRIDE_APPROVED"):
+        raise ReleaseBlocked(f"Cannot release entry in status {entry.status}")
+    check = ComplianceCheck.objects.filter(queue_entry=entry).order_by("-timestamp", "-pk").first()
+    expected = "PASSED" if entry.status == "COMPLETED" else "OVERRIDE_APPROVED"
+    if (check is None or check.status != expected or check.inspector_id is None
+            or check.organisation_id != entry.organisation_id
+            or check.facility_id != entry.facility_id
+            or missing_checks(check.checklist_results)):
+        raise ReleaseBlocked("Cannot release without a current authorized inspection and mandatory checks")
+    if expected == "OVERRIDE_APPROVED":
+        if (not check.override_reason.strip() or not check.override_requester_id
+                or not check.override_authorizer_id
+                or check.override_authorizer_id in (check.override_requester_id, check.inspector_id)):
+            raise ReleaseBlocked("Cannot release without independent override approval")
+    return check

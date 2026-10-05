@@ -8,6 +8,8 @@ import { connectWeighbridge, isWebSerialSupported, type SerialConnection } from 
 import type { ChecklistItem } from '../lib/live'
 import { SI_ROUTES, SI_ROUTE_LABELS } from '../lib/validation/siTables'
 import { PageHeader, Section, StatusPill } from '../components/ui'
+import VersionedInspection from '../components/VersionedInspection'
+import { getRegulatoryContext, type RegulatoryContext } from '../lib/regulatory'
 
 const VEHICLES = ['DEFAULT', 'FLATBED', 'TANKER', 'REFRIGERATED', 'CONTAINER', 'DRY_VAN'] as const
 
@@ -22,6 +24,8 @@ const DEMO_CHECKLIST: ChecklistItem[] = [
 export default function ComplianceCheck() {
   const { userId, role, displayName } = useSession()
   const [entryId, setEntryId] = useState('')
+  const [regulatory, setRegulatory] = useState<{ entryId: string; data: RegulatoryContext } | null>(null)
+  const [contextError, setContextError] = useState('')
   const [vehicleType, setVehicleType] = useState<string>('DEFAULT')
   const [routeType, setRouteType] = useState<string>('BEITBRIDGE')
   const [limits, setLimits] = useState<number[]>([8000, 9000, 9000])
@@ -42,6 +46,15 @@ export default function ComplianceCheck() {
   const connRef = useRef<SerialConnection | null>(null)
   const live = useLive()
   const [searchParams] = useSearchParams()
+
+  useEffect(() => {
+    if (!live || !entryId.trim()) return
+    let cancelled = false
+    getRegulatoryContext(entryId.trim()).then(data => {
+      if (!cancelled) { setRegulatory({ entryId: entryId.trim(), data }); setContextError('') }
+    }).catch(e => { if (!cancelled) setContextError((e as Error).message) })
+    return () => { cancelled = true }
+  }, [live, entryId])
 
   // Queue board "Check →" shortcut (?entry=) fills the ID — no more typing
   // IDs from memory. Runs once per link; manual edits afterwards are kept.
@@ -105,6 +118,7 @@ export default function ComplianceCheck() {
         totalWeight: Number(total),
         gvmRating: Number(gvm),
         supervisorId: userId ?? 'unknown',
+        checklistResults: { ...checked },
       }
       if (!isOnline()) {
         await enqueueOfflineAction('compliance.submit', { ...payload })
@@ -115,7 +129,7 @@ export default function ComplianceCheck() {
       const status = await (await import('../lib/live')).submitComplianceLive({ ...payload, key })
       const ok = status === 'PASS'
       setPassed(ok)
-      setResult(ok ? '✔ PASS — gate release enabled. Next: release the truck from the Queue board.' : '✖ FAIL — vehicle QUARANTINED. Use the quarantine panel below or fix the load.')
+      setResult(ok ? '✔ PASS — demo inspection only, using unverified pilot limits. Release from the Queue board requires the current inspection.' : '✖ FAIL — vehicle QUARANTINED. Use the quarantine panel below or fix the load.')
     } catch (e) {
       setResult(`✖ ${(e as Error).message}`)
     } finally {
@@ -178,7 +192,11 @@ export default function ComplianceCheck() {
     }
   }
 
-  const canApprove = role === 'OPERATIONS_SUPERVISOR' || role === 'ADMIN' || role === 'FACILITY_MANAGER'
+  const canApprove = role === 'OPERATIONS_SUPERVISOR' || role === 'ADMIN'
+
+  if (live && regulatory?.entryId === entryId.trim() && regulatory.data.mode === 'VERSIONED') {
+    return <VersionedInspection key={`${entryId}:${regulatory.data.context?.id ?? 'missing'}`} entryId={entryId} data={regulatory.data} changeEntry={setEntryId} />
+  }
 
   return (
     <div className="max-w-2xl">
@@ -187,7 +205,12 @@ export default function ComplianceCheck() {
         sub="Four short steps at the side of the vehicle. A failed check quarantines the truck — it cannot be released."
         mode={live ? 'live' : 'demo'}
       />
+      <p role="note" className="mb-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+        Pilot limits are LEGACY_DEMO_UNVERIFIED. This inspection does not establish legal compliance.
+        Operational sites require verified regulatory configuration before evaluation or release.
+      </p>
       <div className="space-y-3">
+        {contextError && <p role="alert">Context unavailable: {contextError}. Operational evaluation requires recorded context.</p>}
         <Section step="1" title="Vehicle" sub="Which truck are you standing next to?">
           <label className="block text-sm font-bold">
               Queue entry ID

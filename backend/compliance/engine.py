@@ -10,6 +10,8 @@ BAK SiRemoteConfig interface).
 """
 from __future__ import annotations
 
+import math
+
 SI_ROUTES = ("BEITBRIDGE", "CHIRUNDU", "FORBES", "HARARE_LOCAL", "DEFAULT")
 
 _PILOT_3AXLE = {
@@ -87,6 +89,8 @@ def resolve_si_limits(route, vehicle, remote=None) -> list[float]:
 
 def validate_load(measured_weights, limits, total_weight, gvm_rating) -> dict:
     """Axle + GVM check. Returns per-axle findings and overall PASS|FAIL."""
+    if not all(math.isfinite(value) for value in [*measured_weights, *limits, total_weight, gvm_rating]):
+        raise ComplianceInputError("All mass values must be finite")
     if not measured_weights:
         raise ComplianceInputError("At least one axle weight is required")
     if not limits:

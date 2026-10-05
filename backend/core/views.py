@@ -36,8 +36,11 @@ def tenancy_signup(request):
     username = str(request.data.get("username", "")).strip()
     password = str(request.data.get("password", ""))
     email = str(request.data.get("email", "")).strip()
+    facility_mode = str(request.data.get("facility_mode", "OPERATIONS"))
 
     errors = {}
+    if facility_mode not in ("DEMO", "OPERATIONS"):
+        errors["facility_mode"] = "must be DEMO or OPERATIONS"
     if not org_name:
         errors["organisation_name"] = "required"
     if not username:
@@ -61,6 +64,7 @@ def tenancy_signup(request):
         fac_slug = slugify(facility_name)[:100] or "yard"
         facility = Facility.objects.create(
             organisation=org, name=facility_name, slug=fac_slug,
+            yard_config={"mode": facility_mode},
         )
         user = User.objects.create_user(
             username=username, password=password, email=email,

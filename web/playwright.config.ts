@@ -34,14 +34,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
       // prod-smoke targets the deployed site; e2e/live needs the Django
       // bootstrap harness (playwright.live.config.ts).
-      testIgnore: ['**/prod-smoke.spec.ts', '**/live/**'],
+      testIgnore: ['**/prod-smoke.spec.ts', '**/live/**', '**/regulatory/**'],
     },
     // Only with PW_PROD=1: the deployed site needs no local webServer.
     ...(process.env.PW_PROD
       ? [
           {
             name: 'production',
-            use: { ...devices['Desktop Chrome'], baseURL: 'https://trucki-two.vercel.app' },
+            use: { ...devices['Desktop Chrome'], baseURL: process.env.PW_PROD_URL || 'https://trucki-two.vercel.app' },
             testMatch: ['**/prod-smoke.spec.ts'],
           },
         ]

@@ -29,11 +29,11 @@ class RegisterSerializer(serializers.Serializer):
             username=validated["username"],
             password=validated["password"],
         )
-        org, _ = Organisation.objects.get_or_create(
-            slug="default",
-            defaults={"name": user.username},
-        )
-        UserProfile.objects.get_or_create(user=user, defaults={"organisation": org})
+        # Self-service registration may create its own workspace, never join
+        # an existing tenant or acquire a yard supervisor identity implicitly.
+        org = Organisation.objects.create(slug=f"self-service-{uuid.uuid4().hex}", name=user.username)
+        from .models import UserRole
+        UserProfile.objects.create(user=user, organisation=org, role=UserRole.EXECUTIVE)
         Driver.objects.create(user=user, name=validated["name"], organisation=org)
         token, _ = Token.objects.get_or_create(user=user)
         return {"user": user, "token": token}

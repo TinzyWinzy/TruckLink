@@ -1,0 +1,38 @@
+name: Production interface checks
+on:
+  deployment_status:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  interface:
+    if: github.event_name == 'workflow_dispatch' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    env:
+      PW_PROD: '1'
+      PW_PROD_URL: https://trucki-two.vercel.app
+      PW_PROD_API_URL: https://spotteraiassessment-khaj.onrender.com
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- --project=production --retries=0
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: production-interface-traces
+          path: web/test-results/
+          retention-days: 14

@@ -8,6 +8,9 @@ Server result is final; both override actors are recorded on the audit chain.
 """
 from __future__ import annotations
 
+import hashlib
+import json
+
 from django.db import transaction
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -26,6 +29,7 @@ from yard.models import (
 
 from . import engine
 from .serializers import ComplianceCreateSerializer, OverrideSerializer
+from .policy import missing_checks
 
 
 def _tenant_remote(organisation) -> dict:
@@ -62,6 +66,7 @@ def _serialize_check(check: ComplianceCheck) -> dict:
         "override_authorizer": check.override_authorizer.username
         if check.override_authorizer else None,
         "timestamp": check.timestamp.isoformat(),
+        "verification_status": "LEGACY_DEMO_UNVERIFIED",
     }
 
 
@@ -75,6 +80,19 @@ def _get_check_or_404(request, pk):
         or not in_facility(request.user, check.facility)
     ):
         return None, Response({"ok": False, "error": "not found"}, status=404)
+    return check, None
+
+
+def _lock_current_check(check):
+    """Call inside an atomic command; lock ordering matches release/submission."""
+    entry = QueueEntry.objects.select_for_update().get(pk=check.queue_entry_id)
+    if entry.facility.yard_config.get('mode') != 'DEMO' or entry.inspection_attempts.exists():
+        return None, Response({'ok': False, 'error': 'Versioned attempts require separate regulatory approvals'}, status=409)
+    check = ComplianceCheck.objects.select_for_update().get(pk=check.pk)
+    latest = entry.compliance_checks.order_by("-timestamp", "-pk").first()
+    if latest.pk != check.pk or entry.status == "RELEASED":
+        return None, Response({"ok": False, "error": "Only the current inspection can be overridden"}, status=409)
+    check.queue_entry = entry
     return check, None
 
 
@@ -92,7 +110,15 @@ class ComplianceListView(APIView):
         entries = [_serialize_check(c) for c in checks]
         return Response({"ok": True, "count": len(entries), "checks": entries})
 
+    @transaction.atomic
     def post(self, request):
+        entry_ref = request.data.get('queue_entry')
+        candidate = QueueEntry.objects.filter(pk=entry_ref).first() if str(entry_ref).isdigit() else None
+        if candidate and (candidate.facility.yard_config.get('mode') != 'DEMO' or candidate.regulatory_contexts.exists()):
+            if not belongs_to_organisation(candidate, request.user) or not in_facility(request.user, candidate.facility):
+                return Response({'ok': False, 'error': 'not found'}, status=404)
+            return Response({'ok': False, 'code': 'CONFIGURATION_REQUIRED',
+                'error': 'Use /api/regulatory/evaluate/ with recorded context; caller ratings and pilot arithmetic are not operational inputs'}, status=409)
         serializer = ComplianceCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
@@ -103,12 +129,28 @@ class ComplianceListView(APIView):
             or not in_facility(user, entry.facility)
         ):
             return Response({"ok": False, "error": "not found"}, status=404)
+        entry = QueueEntry.objects.select_for_update().get(pk=entry.pk)
+        if entry.facility.yard_config.get("mode") != "DEMO":
+            return Response({"ok": False, "code": "CONFIGURATION_REQUIRED",
+                "error": "Verified regulatory rules and vehicle rating evidence are required for an operational site"}, status=409)
+        vehicle_type = engine.normalize_vehicle(validated.get("vehicle_type") or entry.vehicle_type)
+        route_type = engine.normalize_route(validated.get("route_type"))
+        submission = {"queue_entry": entry.pk, "vehicle_type": vehicle_type,
+                      "route_type": route_type, "axle_weights": validated["axle_weights"],
+                      "total_weight": validated["total_weight"], "gvm_rating": validated["gvm_rating"],
+                      "checklist_results": validated.get("checklist_results", {})}
+        digest = hashlib.sha256(json.dumps(submission, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         client_key = validated.get("client_key") or ""
         if client_key:
+            # Serializes equal keys even when they target different queue rows.
+            from core.models import Facility
+            Facility.objects.select_for_update().get(pk=entry.facility_id)
             existing = ComplianceCheck.objects.filter(
-                organisation=entry.organisation, client_key=client_key,
+                facility=entry.facility, organisation=entry.organisation, client_key=client_key,
             ).first()
             if existing is not None:
+                if existing.submission_digest != digest or existing.inspector_id != user.pk:
+                    return Response({"ok": False, "error": "Idempotency key belongs to a different inspection"}, status=409)
                 return Response(
                     {"ok": True, "check": _serialize_check(existing), "replayed": True},
                 )
@@ -117,12 +159,17 @@ class ComplianceListView(APIView):
                 {"ok": False, "error": "cannot check a released entry"}, status=409,
             )
 
+        missing = missing_checks(validated.get("checklist_results", {}))
+        if missing:
+            return Response({"ok": False, "error": "Complete mandatory checks first",
+                             "missing_checks": missing}, status=400)
+
         vehicle_type = engine.normalize_vehicle(
             validated.get("vehicle_type") or entry.vehicle_type,
         )
         route_type = engine.normalize_route(validated.get("route_type"))
         try:
-            limits = validated.get("limits") or engine.resolve_si_limits(
+            limits = engine.resolve_si_limits(
                 route_type, vehicle_type, _tenant_remote(entry.organisation),
             )
             result = engine.validate_load(
@@ -161,6 +208,7 @@ class ComplianceListView(APIView):
                     "gvm_status": result["gvm_status"],
                 },
                 client_key=client_key,
+                submission_digest=digest,
                 status=CheckStatus.PASSED if passed else CheckStatus.QUARANTINED,
                 inspector=user,
             )
@@ -236,8 +284,12 @@ class ComplianceOverrideRequestView(APIView):
     rbac_resource = "compliance"
     rbac_action = "update"
 
+    @transaction.atomic
     def post(self, request, pk):
         check, err = _get_check_or_404(request, pk)
+        if err is not None:
+            return err
+        check, err = _lock_current_check(check)
         if err is not None:
             return err
         if check.status != CheckStatus.QUARANTINED:
@@ -252,7 +304,8 @@ class ComplianceOverrideRequestView(APIView):
         with transaction.atomic():
             check.status = CheckStatus.PENDING_OVERRIDE
             check.override_requester = request.user
-            check.save(update_fields=["status", "override_requester", "updated_at"])
+            check.override_reason = reason
+            check.save(update_fields=["status", "override_requester", "override_reason", "updated_at"])
             entry = check.queue_entry
             if entry.status == "QUARANTINED":
                 entry.status = "PENDING_OVERRIDE"
@@ -271,8 +324,12 @@ class ComplianceOverrideApproveView(APIView):
     rbac_resource = "compliance"
     rbac_action = "update"
 
+    @transaction.atomic
     def post(self, request, pk):
         check, err = _get_check_or_404(request, pk)
+        if err is not None:
+            return err
+        check, err = _lock_current_check(check)
         if err is not None:
             return err
         if check.status != CheckStatus.PENDING_OVERRIDE:

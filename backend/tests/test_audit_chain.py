@@ -13,6 +13,7 @@ from core.audit import (
     AuditSaltMissing, append_audit, hash_audit_entry, require_salt, verify_chain,
 )
 from core.models import AuditMeta
+from compliance.policy import MANDATORY_CHECKLIST_IDS
 from yard.models import AuditLog
 
 User = get_user_model()
@@ -219,6 +220,7 @@ class TestAuditLivePath:
                 "axle_weights": [6000, 8000, 8000],
                 "total_weight": 22000,
                 "gvm_rating": 24000,
+                "checklist_results": dict.fromkeys(MANDATORY_CHECKLIST_IDS, True),
             },
             format="json",
         )

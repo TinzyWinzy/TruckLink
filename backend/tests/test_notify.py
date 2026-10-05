@@ -9,6 +9,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from core.audit import verify_chain
+from compliance.policy import MANDATORY_CHECKLIST_IDS
 from core.models import NotificationLog, OutboxEvent, PushSubscription
 from trip.models import UserProfile, UserRole
 from yard.models import Alert, AuditLog, ComplianceCheck, QueueEntry
@@ -77,6 +78,7 @@ def _post_check(client, entry, weights=(9500, 8000, 8000), total=25500, gvm=2400
             "axle_weights": list(weights),
             "total_weight": total,
             "gvm_rating": gvm,
+            "checklist_results": dict.fromkeys(MANDATORY_CHECKLIST_IDS, True),
         },
         format="json",
     )

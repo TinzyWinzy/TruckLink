@@ -1,0 +1,2399 @@
+MASTER IMPLEMENTATION BRIEF
+BAK INTEL — Regulatory Operations & Yard Intelligence Platform
+Existing Repository Upgrade / N-ROK Transport Regulatory Layer
+Version: 0.1
+Date: October 2026
+
+============================================================
+0. ROLE AND PRIMARY DIRECTIVE
+============================================================
+
+You are the senior product engineer, systems architect, UX engineer and
+implementation agent working INSIDE the EXISTING BAK Logistics repository.
+
+Your job is NOT to build a new application.
+
+Your job is to inspect the existing BAK application, understand its architecture,
+preserve its working functionality and visual identity, and incrementally upgrade
+it into:
+
+BAK INTEL
+Regulatory Operations & Yard Intelligence Platform
+
+The existing application has already been demonstrated to BAK Logistics management
+and received positive feedback that "the system has scope."
+
+Therefore:
+
+DO NOT:
+- replace the existing application;
+- create an unrelated dashboard;
+- throw away existing routes/components/data;
+- redesign everything merely for aesthetics;
+- remove working functionality;
+- rename domain concepts without reason;
+- fabricate regulations;
+- fabricate statutory thresholds;
+- fabricate penalties;
+- fabricate integrations;
+- claim live regulatory connectivity where none exists;
+- allow an LLM to determine legal compliance;
+- turn this into a generic AI fleet-management demo.
+
+DO:
+- inspect before modifying;
+- reuse existing components;
+- preserve working flows;
+- refactor only where necessary;
+- add the regulatory architecture beneath/alongside existing operations;
+- keep the system credible enough for review by BAK's internal IT team;
+- clearly distinguish LIVE, DEMO, CONFIGURED, SIMULATED and PROPOSED data;
+- make regulatory provenance inspectable;
+- maintain offline-first behaviour where it already exists;
+- maintain auditability;
+- maintain deterministic compliance decisions.
+
+The desired architectural evolution is:
+
+CURRENT:
+Truck
+→ Yard
+→ Dock
+→ Checklist
+→ PASS/FAIL
+→ Dispatch
+
+TARGET:
+Truck
++ Driver
++ Cargo
++ Route
++ Documents
++ Regulatory Applicability
++ Yard State
+→ Deterministic Regulatory Gate
+→ Operational Decision
+→ Evidence
+→ Dispatch / Hold / Quarantine / Review
+
+
+============================================================
+1. FIRST TASK — REPOSITORY AUDIT
+============================================================
+
+Before writing implementation code, inspect the repository.
+
+Identify and document:
+
+1. framework and version;
+2. TypeScript/JavaScript configuration;
+3. routing structure;
+4. state management;
+5. database/persistence layer;
+6. offline/local storage implementation;
+7. authentication/authorization;
+8. existing user roles;
+9. existing components;
+10. existing design system;
+11. current navigation;
+12. current vehicle model;
+13. driver model;
+14. cargo/load model;
+15. yard model;
+16. dock model;
+17. compliance model;
+18. alert model;
+19. override model;
+20. reporting/export functionality;
+21. existing demo/seed data;
+22. existing API boundaries;
+23. tests;
+24. build/deployment configuration;
+25. known TODOs or incomplete modules.
+
+Create:
+
+docs/BAK_EXISTING_SYSTEM_AUDIT.md
+
+Do not begin major restructuring until this audit exists.
+
+Then create:
+
+docs/BAK_REGOPS_UPGRADE_PLAN.md
+
+Map:
+
+EXISTING CAPABILITY
+→ KEEP / REFACTOR / EXTEND
+→ TARGET CAPABILITY
+
+Prefer extension over replacement.
+
+
+============================================================
+2. EXISTING CAPABILITIES THAT MUST SURVIVE
+============================================================
+
+The existing BAK prototype contains important operational concepts.
+
+Preserve them unless repository inspection proves the implementation differs:
+
+- authentication/sign-in;
+- staff identity/role;
+- vehicle registration;
+- driver registration/selection;
+- cargo;
+- destination;
+- offline entry;
+- synchronization;
+- pre-departure checks;
+- automated/manual weight input;
+- PASS/FAIL;
+- quarantine;
+- critical alerts;
+- dock assignment;
+- queue management;
+- dual-supervisor override;
+- prohibition on self-approval;
+- release;
+- reporting;
+- CSV/export capability;
+- existing seeded operational scenarios.
+
+Existing demo concepts include examples such as:
+
+AFM 1187
+- quarantined;
+- overweight axle condition;
+- quarantine bay.
+
+ABZ 9901
+- overdue/waiting condition.
+
+ADP 3357
+- pending override.
+
+AEW 7712
+- approved override.
+
+Retain useful seeded scenarios but migrate them into the new domain model.
+
+DO NOT assume old regulatory numbers embedded in demo data are legally correct.
+
+Legacy regulatory values must be tagged:
+
+LEGACY_DEMO_UNVERIFIED
+
+until mapped to a verified regulatory rule.
+
+
+============================================================
+3. PRODUCT STRUCTURE
+============================================================
+
+The upgraded application should conceptually contain six layers:
+
+A. OPERATIONS
+B. REGULATORY INTELLIGENCE
+C. SMART COMPLIANCE GATE
+D. EVIDENCE
+E. INTELLIGENCE
+F. INTEGRATIONS
+
+Suggested navigation:
+
+OVERVIEW
+
+OPERATIONS
+- Yard Command
+- Vehicles
+- Dispatch
+- Docks & Queue
+- Quarantine
+
+REGULATORY OPERATIONS
+- Regulatory Gate
+- Regulatory Intelligence
+- Rules Registry
+- Regulatory Watch
+- Compliance Passports
+- Evidence Vault
+
+INTELLIGENCE
+- Executive Risk
+- Operational Analytics
+- Regulatory Exposure
+- BAK Intel Copilot
+
+SYSTEM
+- Integrations
+- Audit Log
+- Configuration
+
+Respect the existing application's information architecture where possible.
+
+Do not blindly implement this navigation if it produces duplicate screens.
+Merge intelligently with existing routes.
+
+
+============================================================
+4. DOMAIN MODEL — N-ROK
+============================================================
+
+Introduce an internal regulatory model inspired by the N-ROK methodology.
+
+Core concept:
+
+REGULATORY OBLIGATION UNIT (ROU)
+
+An ROU represents ONE machine-interpretable regulatory obligation/control.
+
+Suggested TypeScript shape:
+
+interface RegulatoryObligationUnit {
+  id: string;
+  code: string;
+
+  title: string;
+  description: string;
+
+  jurisdiction: string;
+  domain: RegulatoryDomain;
+
+  sourceId: string;
+  sourceProvision?: string;
+
+  applicability: ApplicabilityDefinition;
+
+  trigger: RegulatoryTrigger;
+
+  requirements: RegulatoryRequirement[];
+
+  evidenceRequirements: EvidenceRequirement[];
+
+  decisionLogic: DecisionLogic;
+
+  failureAction: FailureAction;
+
+  effectiveFrom?: string;
+  effectiveTo?: string;
+
+  version: string;
+
+  status:
+    | "PROPOSED"
+    | "UNDER_REVIEW"
+    | "VERIFIED"
+    | "ACTIVE"
+    | "SUPERSEDED"
+    | "REPEALED";
+
+  verification: {
+    verifiedBy?: string;
+    verifiedAt?: string;
+    verificationNotes?: string;
+  };
+
+  provenance: RegulatoryProvenance;
+}
+
+Regulatory domains may initially include:
+
+- VEHICLE_ELIGIBILITY
+- VEHICLE_MASS
+- AXLE_CONFIGURATION
+- DRIVER
+- OPERATOR_LICENSING
+- CERTIFICATE_OF_FITNESS
+- SPEED_DEVICE
+- CARGO
+- ABNORMAL_LOAD
+- CUSTOMS
+- CROSS_BORDER
+- TRANSIT_ROUTE
+- DOCUMENTATION
+- EVIDENCE_RETENTION
+
+
+============================================================
+5. REGULATORY SOURCE MODEL
+============================================================
+
+Create a first-class regulatory source entity.
+
+interface RegulatorySource {
+  id: string;
+
+  title: string;
+  instrumentType:
+    | "ACT"
+    | "STATUTORY_INSTRUMENT"
+    | "REGULATOR_NOTICE"
+    | "REGULATOR_GUIDANCE"
+    | "FORM"
+    | "INTERNAL_POLICY";
+
+  instrumentNumber?: string;
+
+  issuingAuthority: string;
+
+  jurisdiction: string;
+
+  publicationDate?: string;
+  effectiveDate?: string;
+
+  canonicalReference?: string;
+  sourceUrl?: string;
+
+  sourceTier: "A" | "B" | "C" | "D";
+
+  hash?: string;
+
+  version: string;
+
+  status:
+    | "DISCOVERED"
+    | "AWAITING_VERIFICATION"
+    | "VERIFIED"
+    | "ACTIVE"
+    | "SUPERSEDED"
+    | "REPEALED";
+
+  notes?: string;
+}
+
+Source hierarchy:
+
+TIER A
+Official Gazette, Acts, Statutory Instruments,
+official regulator publications/forms/APIs.
+
+TIER B
+High-quality legal repositories.
+
+TIER C
+Verified company procedures, operational interviews,
+pilot data and approved internal policy.
+
+TIER D
+Discovery sources only:
+news, general web sources, AI extraction, unverified commentary.
+
+IMPORTANT:
+
+A Tier D source must NEVER directly create an ACTIVE blocking control.
+
+AI extraction may generate PROPOSED controls only.
+
+Human verification is required before a regulatory control becomes ACTIVE.
+
+
+============================================================
+6. REGULATORY EVENT UNIT
+============================================================
+
+Introduce:
+
+RegulatoryEventUnit (REU)
+
+This represents an operational event against which applicable ROUs are evaluated.
+
+Examples:
+
+VEHICLE_ASSIGNMENT
+LOAD_CREATED
+PRE_DISPATCH
+WEIGH_EVENT
+CROSS_BORDER_TRIP_CREATED
+CUSTOMS_MANIFEST_REQUIRED
+GATE_RELEASE
+ROUTE_DEVIATION
+DOCUMENT_EXPIRY
+ABNORMAL_LOAD_DETECTED
+
+Suggested model:
+
+interface RegulatoryEvent {
+  id: string;
+  eventType: RegulatoryEventType;
+
+  timestamp: string;
+
+  companyId: string;
+
+  vehicleId?: string;
+  driverId?: string;
+  cargoId?: string;
+  tripId?: string;
+  dispatchId?: string;
+
+  context: Record<string, unknown>;
+
+  applicableRuleIds: string[];
+
+  evaluationId?: string;
+}
+
+
+============================================================
+7. REGULATORY APPLICABILITY ENGINE
+============================================================
+
+Do not evaluate every rule against every truck.
+
+Implement an Applicability Engine.
+
+Input may include:
+
+- vehicle class;
+- registration jurisdiction;
+- net mass;
+- gross mass;
+- axle configuration;
+- cargo type;
+- cargo dimensions;
+- operation type;
+- origin;
+- destination;
+- domestic/cross-border;
+- transit status;
+- operator;
+- route;
+- document state;
+- device requirements.
+
+Output:
+
+interface ApplicabilityResult {
+  applicable: boolean;
+  reason: string;
+  evaluatedConditions: ConditionResult[];
+}
+
+The UI should expose this.
+
+Example:
+
+APPLICABLE REGULATORY PROFILE
+
+Heavy goods vehicle             YES
+Cross-border movement           YES
+Transit cargo                   YES
+Abnormal-load workflow          NO
+Speed-device controls           YES
+Customs manifest controls       YES
+Axle/load controls              YES
+
+Do not hide applicability reasoning from technical users.
+
+
+============================================================
+8. DETERMINISTIC RULE ENGINE
+============================================================
+
+This is a critical requirement.
+
+Compliance decisions MUST be deterministic.
+
+Do not use an LLM for:
+
+- statutory threshold calculation;
+- PASS/FAIL;
+- legal applicability;
+- release authorization;
+- penalty calculation;
+- override authorization.
+
+Build a rules evaluator.
+
+Conceptually:
+
+evaluate(
+    RegulatoryEvent,
+    RegulatoryContext,
+    ActiveRuleSet
+): RegulatoryEvaluation
+
+Return:
+
+interface RegulatoryEvaluation {
+  id: string;
+
+  eventId: string;
+  rulesetVersion: string;
+
+  decision:
+    | "PASS"
+    | "PASS_WITH_WARNINGS"
+    | "HOLD"
+    | "QUARANTINE"
+    | "REVIEW_REQUIRED";
+
+  controlsEvaluated: number;
+  passed: number;
+  warnings: number;
+  failed: number;
+
+  results: RegulatoryControlResult[];
+
+  evaluatedAt: string;
+}
+
+Every result must explain:
+
+- rule evaluated;
+- applicability;
+- input value;
+- expected condition;
+- result;
+- source;
+- source provision where available;
+- rule version;
+- evidence;
+- remediation/action.
+
+
+============================================================
+9. RULE VERSIONING
+============================================================
+
+Rules must be versioned.
+
+Never silently overwrite historical regulatory logic.
+
+Example:
+
+ZW-TRN-LOAD-014
+v1.0
+ACTIVE_FROM = date
+
+Later:
+
+ZW-TRN-LOAD-014
+v1.1
+
+Historical dispatches retain the exact rule version applied at the time.
+
+A Compliance Passport must therefore remain reproducible.
+
+Implement:
+
+RuleSetVersion
+
+with:
+
+- version;
+- createdAt;
+- activatedAt;
+- retiredAt;
+- rules;
+- approval;
+- change summary.
+
+
+============================================================
+10. SMART REGULATORY GATE
+============================================================
+
+Upgrade the existing pre-departure compliance screen.
+
+Route suggestion:
+
+/regulatory/gate
+
+or preserve/extend the existing route.
+
+SCREEN:
+
+PRE-DISPATCH REGULATORY GATE
+
+Header:
+
+AFM 1187
+Harare → Beitbridge
+
+DECISION:
+BLOCKED / HOLD / PASS etc.
+
+Example:
+
+21 controls evaluated
+
+17 PASSED
+3 WARNINGS
+1 FAILED
+
+Control card:
+
+AXLE LOAD
+FAIL
+
+Observed:
+[demo value]
+
+Applicable threshold:
+[configured verified value]
+
+Source:
+SI 129/2015
+
+Control:
+ZW-TRN-LOAD-014
+
+Ruleset:
+ZW-TRANSPORT-2026.10.1
+
+Required action:
+Rebalance load
+→ Reweigh
+→ Revalidate
+
+Evidence:
+Latest weighbridge measurement
+
+Buttons:
+
+VIEW LEGAL BASIS
+VIEW EVIDENCE
+BEGIN REMEDIATION
+
+IMPORTANT:
+
+Do not invent an axle threshold merely to populate this UI.
+
+If verified threshold data is unavailable, show:
+
+CONFIGURATION REQUIRED
+
+or use an explicitly labelled:
+
+DEMO CONFIGURATION — NOT LEGAL ADVICE / NOT PRODUCTION VERIFIED
+
+
+============================================================
+11. DECISION STATES
+============================================================
+
+Standardize regulatory decisions:
+
+PASS
+PASS_WITH_WARNINGS
+HOLD
+QUARANTINE
+REVIEW_REQUIRED
+
+Do not use FAIL alone as the final operational state.
+
+A failed control should produce an operational consequence.
+
+Example:
+
+FAILED CONTROL
+→ HOLD
+→ remediation
+→ new evidence
+→ RE-EVALUATE
+→ PASS
+
+Or:
+
+FAILED CONTROL
+→ QUARANTINE
+→ secondary approval/correction
+→ reinspection
+→ PASS
+
+
+============================================================
+12. QUARANTINE AND OVERRIDE
+============================================================
+
+Preserve the existing quarantine model.
+
+Strengthen it.
+
+A quarantined dispatch must store:
+
+- reason;
+- failed control IDs;
+- timestamp;
+- responsible user;
+- location/bay;
+- evidence;
+- remediation;
+- reinspection status.
+
+Override must require:
+
+- explicit override reason;
+- requesting supervisor;
+- separate approving supervisor;
+- timestamp;
+- affected controls;
+- evidence;
+- authorization scope.
+
+NO SELF APPROVAL.
+
+Do not permit override for controls configured as:
+
+NON_OVERRIDABLE
+
+Introduce:
+
+overridePolicy:
+  | "NOT_ALLOWED"
+  | "SECOND_SUPERVISOR"
+  | "COMPLIANCE_MANAGER"
+  | "ADMINISTRATIVE_ONLY"
+
+An override does NOT rewrite the original evaluation.
+
+Preserve:
+
+ORIGINAL DECISION
++
+OVERRIDE EVENT
+
+in the audit trail.
+
+
+============================================================
+13. COMPLIANCE PASSPORT
+============================================================
+
+Create:
+
+/regulatory/passports
+
+and:
+
+/regulatory/passports/:id
+
+Every released dispatch receives a Compliance Passport.
+
+Example:
+
+BAK COMPLIANCE PASSPORT
+BAK-2026-009182
+
+Vehicle
+AFM 1187
+
+Driver
+K. Sibanda
+
+Route
+Harare → Beitbridge
+
+Cargo
+[description]
+
+Release
+14:42
+
+--------------------------------
+
+VEHICLE
+
+✓ registration evidence
+✓ Certificate of Fitness evidence
+✓ applicable operator evidence
+
+LOAD
+
+✓ gross mass
+✓ axle validation
+✓ weighbridge evidence
+
+DRIVER
+
+✓ identity
+✓ authorization
+
+CROSS-BORDER
+
+✓ manifest evidence
+✓ customs documentation
+✓ route controls
+
+APPROVAL
+
+✓ dispatch supervisor
+✓ regulatory gate
+✓ gate release
+
+--------------------------------
+
+Ruleset:
+ZW-TRANSPORT-2026.10.1
+
+Controls evaluated:
+23
+
+Passed:
+23
+
+Evidence completeness:
+100%
+
+Provide:
+
+EXPORT PASSPORT
+
+For prototype/demo purposes PDF generation may be simulated or implemented
+depending on existing repository capabilities.
+
+Do not claim cryptographic/non-repudiation properties unless implemented.
+
+
+============================================================
+14. EVIDENCE VAULT
+============================================================
+
+Create:
+
+/evidence
+
+Evidence must be first-class data.
+
+Evidence types may include:
+
+- registration;
+- CoF;
+- insurance;
+- operator licence;
+- weighbridge record;
+- axle measurement;
+- speed-device certificate;
+- customs manifest;
+- bill of entry;
+- bill of lading;
+- invoice;
+- route authorization;
+- abnormal-load permit;
+- supervisor inspection;
+- gate release;
+- proof of delivery;
+- photographs;
+- device data.
+
+Model:
+
+interface EvidenceRecord {
+  id: string;
+
+  type: EvidenceType;
+
+  entityType:
+    | "VEHICLE"
+    | "DRIVER"
+    | "TRIP"
+    | "LOAD"
+    | "DISPATCH"
+    | "COMPANY";
+
+  entityId: string;
+
+  fileReference?: string;
+
+  issuedAt?: string;
+  expiresAt?: string;
+
+  issuer?: string;
+
+  verificationStatus:
+    | "UNVERIFIED"
+    | "VERIFIED"
+    | "EXPIRED"
+    | "REJECTED";
+
+  collectedAt: string;
+  collectedBy: string;
+
+  metadata: Record<string, unknown>;
+}
+
+Do not fake uploaded documents.
+
+Use clearly labelled demo evidence records.
+
+
+============================================================
+15. REGULATORY INTELLIGENCE CENTRE
+============================================================
+
+Create:
+
+/regulatory
+
+This is the main regulatory command centre.
+
+Display:
+
+ACTIVE REGULATORY CONTROLS
+VEHICLES AFFECTED TODAY
+COMPLIANCE EXCEPTIONS
+REGULATORY CHANGES REQUIRING REVIEW
+
+Example:
+
+Active controls               27
+Vehicles evaluated today      18
+Compliance exceptions          3
+Changes requiring review       1
+
+Instrument cards:
+
+SI 129/2015
+Vehicle Weight & Configuration
+STATUS: ACTIVE
+Controls: [verified/configured count]
+
+SI 118/2023
+Speed Limiting & Monitoring
+STATUS: ACTIVE / REVIEWED as appropriate
+
+Cross-Border / Customs Controls
+STATUS: ACTIVE
+
+Do not hardcode control counts merely to match these examples.
+
+Derive them from seed data.
+
+
+============================================================
+16. REGULATORY SOURCE DETAIL
+============================================================
+
+Route:
+
+/regulatory/sources/:id
+
+Display:
+
+instrument;
+issuer;
+status;
+effective date;
+version;
+source tier;
+canonical source/reference;
+applicable domains;
+derived ROUs;
+verification status;
+review history.
+
+Each derived rule should answer:
+
+WHAT DOES THE SOURCE REQUIRE?
+
+WHO DOES IT APPLY TO?
+
+WHEN IS IT TRIGGERED?
+
+WHAT DATA DOES THE SYSTEM NEED?
+
+WHAT CONTROL DOES BAK EXECUTE?
+
+WHAT EVIDENCE IS REQUIRED?
+
+WHAT HAPPENS ON FAILURE?
+
+
+============================================================
+17. RULES REGISTRY
+============================================================
+
+Create:
+
+/regulatory/rules
+
+Provide searchable/filterable rule registry.
+
+Columns:
+
+CODE
+TITLE
+DOMAIN
+SOURCE
+APPLICABILITY
+STATUS
+VERSION
+EFFECTIVE DATE
+LAST VERIFIED
+
+Filters:
+
+- domain;
+- source;
+- status;
+- applicable vehicle class;
+- cross-border/domestic;
+- effective date;
+- verification state.
+
+Rule detail:
+
+/regulatory/rules/:id
+
+Show complete ROU information and change history.
+
+
+============================================================
+18. REGULATORY WATCH
+============================================================
+
+Create:
+
+/regulatory/watch
+
+This module demonstrates change-management architecture.
+
+Lifecycle:
+
+DISCOVERED
+→ EXTRACTED
+→ AWAITING VERIFICATION
+→ VERIFIED
+→ IMPACT ANALYSED
+→ APPROVED
+→ ACTIVE
+
+Demo card:
+
+REGULATORY CHANGE DETECTED
+
+Instrument:
+[demo instrument]
+
+Affected assets:
+[derived]
+
+Affected controls:
+[derived]
+
+Current dispatch blocks:
+[derived]
+
+Actions:
+
+VIEW CHANGE
+COMPARE VERSION
+RUN IMPACT ANALYSIS
+SEND FOR VERIFICATION
+
+Do not pretend the prototype has a live Gazette feed.
+
+Clearly label:
+
+DEMO REGULATORY WATCH
+
+unless actual source ingestion exists.
+
+
+============================================================
+19. REGULATORY IMPACT ENGINE
+============================================================
+
+Implement an impact-analysis service.
+
+Input:
+
+new/changed ROU
+
+Determine:
+
+- affected vehicle classes;
+- affected fleet assets;
+- affected workflows;
+- affected evidence requirements;
+- affected historical configuration;
+- potentially affected active trips.
+
+Output:
+
+interface RegulatoryImpactAssessment {
+  ruleId: string;
+  affectedVehicles: string[];
+  affectedWorkflows: string[];
+  affectedActiveTrips: string[];
+  affectedControls: string[];
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  recommendations: string[];
+}
+
+This may operate entirely on seeded/demo data initially.
+
+
+============================================================
+20. EXECUTIVE RISK DASHBOARD
+============================================================
+
+Create or extend overview route.
+
+Target audience:
+management, operations leadership, compliance, IT.
+
+Show:
+
+TODAY
+
+Dispatches
+Regulatory controls executed
+Clean releases
+Prevented non-compliant departures
+Corrected before departure
+Awaiting resolution
+
+REGULATORY EXPOSURE
+
+Overload exceptions
+Documentation exceptions
+Expired/invalid evidence
+Cross-border timing risks
+Route exceptions
+
+OPERATIONS
+
+Median gate-to-release
+Average dock dwell
+Quarantine rate
+First-pass compliance rate
+Reinspection rate
+Top failure reason
+Peak congestion period
+
+IMPORTANT:
+
+Do not fabricate financial savings.
+
+Only calculate monetary exposure where:
+
+1. the rule is VERIFIED;
+2. the calculation formula is VERIFIED;
+3. the inputs are available.
+
+Otherwise display:
+
+EXPOSURE DETECTED
+
+without attaching an invented dollar amount.
+
+
+============================================================
+21. YARD DIGITAL TWIN
+============================================================
+
+Upgrade existing yard/dock visualization rather than creating a disconnected map.
+
+Represent:
+
+GATE
+→ QUEUE
+→ DOCK
+→ QUARANTINE
+→ RELEASE
+
+Vehicle cards should expose:
+
+plate;
+state;
+dock/bay;
+dwell time;
+loading state where available;
+regulatory readiness;
+open warnings;
+open failed controls.
+
+Example:
+
+AFM 1187
+Dock 2
+Dwell: 38 min
+Regulatory readiness: 86%
+Weight validation pending
+
+Clicking opens a vehicle/trip operational drawer.
+
+Do not create fake real-time movement animation.
+
+State transitions may be driven by demo events.
+
+
+============================================================
+22. REGULATORY READINESS
+============================================================
+
+Introduce:
+
+Regulatory Readiness
+
+This is NOT equivalent to legal compliance.
+
+It represents completion/readiness of applicable checks/evidence.
+
+Example:
+
+17/20 applicable controls ready = 85%
+
+Clearly distinguish:
+
+READINESS
+vs
+REGULATORY DECISION
+
+A truck can have:
+
+Readiness: 90%
+Decision: HOLD
+
+because one mandatory blocking control failed.
+
+
+============================================================
+23. CROSS-BORDER WORKFLOW
+============================================================
+
+Create support for:
+
+DOMESTIC
+CROSS_BORDER
+TRANSIT
+
+For cross-border movements allow:
+
+origin;
+destination;
+border post;
+ETA;
+manifest status;
+customs evidence;
+route requirements;
+deadline controls.
+
+The system should be able to derive time-based compliance warnings.
+
+Example:
+
+MANIFEST REQUIRED
+Deadline: [calculated from VERIFIED configuration]
+
+READY
+WARNING
+OVERDUE
+
+Do not hardcode a legal deadline without mapping it to a verified ROU.
+
+
+============================================================
+24. ABNORMAL LOAD WORKFLOW
+============================================================
+
+Support a configurable abnormal-load determination.
+
+Inputs:
+
+length;
+width;
+height;
+gross mass;
+axle configuration;
+cargo characteristics.
+
+Outcome:
+
+NORMAL
+POTENTIALLY_ABNORMAL
+ABNORMAL
+REVIEW_REQUIRED
+
+If abnormal:
+
+create workflow:
+
+ASSESS
+→ PERMIT REQUIRED
+→ ROUTE ASSESSMENT
+→ ESCORT CONDITION if applicable
+→ EVIDENCE COMPLETE
+→ REGULATORY GATE
+
+Again:
+
+Thresholds MUST come from verified/configured rules.
+
+No invented statutory dimensions.
+
+
+============================================================
+25. DOCUMENT EXPIRY / ELIGIBILITY ENGINE
+============================================================
+
+Extend existing vehicle/driver data.
+
+Support:
+
+registration;
+Certificate of Fitness;
+operator licensing;
+insurance;
+device certification;
+driver authorization;
+customs-related documentation;
+other configurable evidence.
+
+Statuses:
+
+VALID
+EXPIRING
+EXPIRED
+MISSING
+UNVERIFIED
+
+Expiry alone should not automatically block dispatch.
+
+The associated ROU determines whether:
+
+EXPIRED → WARNING
+
+or:
+
+EXPIRED → HOLD
+
+
+============================================================
+26. INTELLIGENCE / RISK LAYER
+============================================================
+
+Prepare architecture for predictive analytics.
+
+Do NOT present statistical output as law.
+
+Maintain strict separation:
+
+DETERMINISTIC REGULATORY DECISION
+
+versus
+
+PREDICTIVE OPERATIONAL RISK
+
+Example:
+
+REGULATORY DECISION
+PASS
+
+OPERATIONAL RISK
+ELEVATED
+
+Reason:
+- repeated historical reweighs;
+- cargo category associated with higher exception rate;
+- current yard congestion;
+- repeated balancing exceptions.
+
+For prototype:
+
+If no validated predictive model exists,
+use transparent rule-based DEMO risk indicators.
+
+Label them:
+
+DEMO RISK HEURISTIC
+
+Do not pretend they are trained ML models.
+
+
+============================================================
+27. BAK INTEL COPILOT
+============================================================
+
+Add:
+
+BAK INTEL
+
+This is a natural-language interface over application data.
+
+Examples:
+
+"Why is AFM 1187 blocked?"
+
+"Show trucks waiting more than 45 minutes."
+
+"What controls failed today?"
+
+"Which vehicle documents expire this month?"
+
+"What rule caused this quarantine?"
+
+"Show cross-border trips at risk."
+
+"Which dock has the highest dwell time?"
+
+The Copilot MUST NOT:
+
+- make legal decisions;
+- modify regulatory rules;
+- approve overrides;
+- release vehicles;
+- invent sources;
+- fabricate values.
+
+Architecture:
+
+USER QUERY
+→ intent/read-only query
+→ authorized application data
+→ deterministic retrieval/calculation
+→ natural-language explanation
+
+If no LLM integration currently exists, implement the UI and a safe deterministic
+demo query layer rather than adding unnecessary external dependencies.
+
+The system must remain usable without the Copilot.
+
+
+============================================================
+28. INTEGRATION CENTRE
+============================================================
+
+Create:
+
+/integrations
+
+Display integration adapters:
+
+BAK ERP/WMS
+Weighbridge
+GPS/Fleet Tracking
+ANPR
+RFID
+Customs/Regulatory Sources
+N-ROK Regulatory Engine
+
+Statuses:
+
+NOT_CONFIGURED
+DEMO
+CONNECTED
+ERROR
+
+Do NOT display CONNECTED for integrations that do not exist.
+
+Provide interface boundaries/adapters so future integrations can be added without
+rewriting business logic.
+
+Example:
+
+interface WeighbridgeAdapter {
+  getMeasurement(vehicleId: string): Promise<WeightMeasurement>;
+}
+
+interface FleetTrackingAdapter {
+  getVehiclePosition(vehicleId: string): Promise<VehiclePosition>;
+}
+
+interface RegulatorySourceAdapter {
+  checkForUpdates(): Promise<RegulatorySourceUpdate[]>;
+}
+
+
+============================================================
+29. REGULATORY GATE API
+============================================================
+
+The regulatory engine should not depend entirely on the BAK UI.
+
+Design an internal API/service boundary so BAK's own internal systems could
+eventually consume it.
+
+Conceptual endpoint:
+
+POST /api/regulatory/evaluate
+
+Input:
+
+{
+  "eventType": "PRE_DISPATCH",
+  "vehicleId": "...",
+  "driverId": "...",
+  "tripId": "...",
+  "cargoId": "...",
+  "context": {}
+}
+
+Output:
+
+{
+  "evaluationId": "...",
+  "rulesetVersion": "ZW-TRANSPORT-2026.10.1",
+  "decision": "HOLD",
+  "summary": {
+    "evaluated": 21,
+    "passed": 17,
+    "warnings": 3,
+    "failed": 1
+  },
+  "results": [...]
+}
+
+Do not expose implementation internals unnecessarily.
+
+The domain service should be reusable whether called by:
+
+- BAK Intel UI;
+- future BAK internal system;
+- mobile/tablet application;
+- another logistics client.
+
+
+============================================================
+30. OFFLINE-FIRST REQUIREMENTS
+============================================================
+
+Preserve existing offline capability.
+
+Critical yard functions should continue to work during connectivity loss where
+technically possible.
+
+Offline-capable:
+
+- vehicle arrival;
+- driver selection;
+- cargo registration;
+- yard status;
+- inspection/check data;
+- evidence metadata;
+- local regulatory evaluation using last VERIFIED ruleset;
+- quarantine;
+- remediation records.
+
+Network-dependent operations must clearly communicate dependency.
+
+Store:
+
+rulesetVersion
+
+with every offline evaluation.
+
+On reconnect:
+
+sync operational events;
+sync evidence;
+reconcile conflicts;
+preserve original timestamps;
+preserve evaluation version.
+
+Never silently reevaluate a historical offline decision under a newer ruleset.
+
+
+============================================================
+31. AUDIT LOG
+============================================================
+
+Create/extend:
+
+/audit
+
+Every material event should produce an immutable-style application audit event.
+
+Examples:
+
+VEHICLE_REGISTERED
+LOAD_CREATED
+WEIGH_RECORDED
+REGULATORY_EVALUATION
+CONTROL_FAILED
+QUARANTINE_CREATED
+REMEDIATION_RECORDED
+RE_EVALUATION
+OVERRIDE_REQUESTED
+OVERRIDE_APPROVED
+DISPATCH_RELEASED
+EVIDENCE_ADDED
+RULE_CREATED
+RULE_VERIFIED
+RULE_ACTIVATED
+RULE_SUPERSEDED
+REGULATORY_CHANGE_REVIEWED
+
+Model:
+
+AuditEvent {
+  id;
+  timestamp;
+  actorId;
+  actorRole;
+  action;
+  entityType;
+  entityId;
+  previousState?;
+  newState?;
+  metadata;
+}
+
+Do not claim blockchain/cryptographic immutability unless actually implemented.
+
+
+============================================================
+32. ROLE-BASED ACCESS
+============================================================
+
+Preserve current roles and extend only as necessary.
+
+Potential roles:
+
+DISPATCH_SUPERVISOR
+YARD_OPERATOR
+COMPLIANCE_OFFICER
+COMPLIANCE_MANAGER
+IT_ADMIN
+EXECUTIVE_VIEWER
+REGULATORY_REVIEWER
+
+Example permissions:
+
+DISPATCH_SUPERVISOR:
+operational workflow
+
+COMPLIANCE_OFFICER:
+evidence/review
+
+COMPLIANCE_MANAGER:
+specified overrides
+
+REGULATORY_REVIEWER:
+verify proposed rules
+
+IT_ADMIN:
+configuration/integration
+
+EXECUTIVE_VIEWER:
+read-only analytics
+
+Do not create excessive role complexity if existing RBAC can express this cleanly.
+
+
+============================================================
+33. DEMO DATA
+============================================================
+
+Create coherent seed data demonstrating the full system.
+
+Do not populate dashboards with unrelated random values.
+
+Use a small interconnected demo dataset.
+
+VEHICLES:
+
+AFM 1187
+- currently quarantined;
+- axle/load exception;
+- evidence available;
+- remediation required.
+
+ABZ 9901
+- queued;
+- excessive dwell;
+- regulatory controls otherwise ready.
+
+ADP 3357
+- override pending;
+- reason and requesting supervisor present.
+
+AEW 7712
+- prior override approved;
+- second supervisor present;
+- full audit trail.
+
+Add 4–8 additional vehicles covering:
+
+- clean domestic dispatch;
+- cross-border movement;
+- expiring document;
+- missing evidence;
+- potential abnormal load;
+- fully compliant released trip;
+- offline-created/synced record.
+
+Every dashboard number must derive from these records.
+
+No random KPI constants.
+
+
+============================================================
+34. REGULATORY DEMO DATA
+============================================================
+
+Seed representative regulatory sources.
+
+At minimum model:
+
+- Road Traffic / vehicle construction-use regulatory source;
+- SI 129/2015 reference;
+- SI 118/2023 reference;
+- road motor transportation/operator licensing source;
+- cross-border/customs source;
+- transit-route source;
+- abnormal-load regulatory source;
+- one regulatory-change example.
+
+IMPORTANT:
+
+Only include exact thresholds/formulas when they are supported by a verified
+source contained/configured in the repository.
+
+Otherwise seed the source metadata and use:
+
+CONFIGURATION_REQUIRED
+
+for the numerical control.
+
+Do not turn prior proposal assumptions into verified law.
+
+
+============================================================
+35. REGULATORY PROVENANCE UI
+============================================================
+
+Every regulatory control should expose:
+
+SOURCE
+PROVISION
+SOURCE TIER
+VERIFICATION STATUS
+RULE VERSION
+EFFECTIVE DATE
+LAST VERIFIED
+VERIFIED BY
+CHANGE HISTORY
+
+A user should be able to move:
+
+DISPATCH FAILURE
+→ CONTROL
+→ ROU
+→ SOURCE
+
+without losing context.
+
+This traceability is one of the product's major differentiators.
+
+
+============================================================
+36. UI / VISUAL DIRECTION
+============================================================
+
+Preserve the existing BAK visual identity.
+
+The product should feel like:
+
+industrial operations software;
+executive control centre;
+serious enterprise RegTech.
+
+Avoid:
+
+- generic SaaS landing-page appearance;
+- excessive gradients;
+- glassmorphism everywhere;
+- giant decorative cards;
+- unnecessary animation;
+- "AI magic" visual language;
+- futuristic gimmicks;
+- excessive whitespace;
+- fake maps;
+- fake live telemetry.
+
+Prioritize:
+
+- information density;
+- strong hierarchy;
+- operational status;
+- clear tables;
+- inspectable decisions;
+- obvious exception states;
+- desktop control-room usability;
+- tablet usability;
+- responsive behaviour.
+
+Regulatory decisions should be visually unmistakable:
+
+PASS
+WARNING
+HOLD
+QUARANTINE
+REVIEW REQUIRED
+
+Maintain accessible contrast and do not rely solely on colour.
+
+
+============================================================
+37. EXECUTIVE OVERVIEW
+============================================================
+
+The landing dashboard should answer within approximately 10 seconds:
+
+1. What is happening in the yard?
+2. What needs attention?
+3. What is preventing dispatch?
+4. What regulatory exposure exists?
+5. What changed?
+6. What should management investigate?
+
+Suggested hierarchy:
+
+TOP ROW
+- Active Yard
+- Dispatches Today
+- Holds/Quarantine
+- Regulatory Exceptions
+
+SECONDARY
+- Yard state visualization
+- Regulatory readiness
+- Current critical alerts
+
+LOWER
+- Compliance trend
+- Dwell performance
+- Regulatory watch
+- recent audit activity
+
+Do not overwhelm the landing page with every feature.
+
+
+============================================================
+38. OPERATIONAL WORKFLOW
+============================================================
+
+Implement one coherent golden path:
+
+1. Vehicle arrives.
+2. Vehicle/driver identified.
+3. Cargo/load registered.
+4. Trip created.
+5. Applicability engine runs.
+6. Required evidence determined.
+7. Yard/dock workflow proceeds.
+8. Weight/load data captured.
+9. PRE_DISPATCH event generated.
+10. Regulatory Gate evaluates applicable ROUs.
+11A. PASS:
+     release authorized.
+11B. HOLD:
+     remediation required.
+11C. QUARANTINE:
+     vehicle routed to quarantine.
+12. Evidence/remediation added.
+13. Re-evaluation occurs.
+14. Required approval occurs.
+15. Vehicle released.
+16. Compliance Passport generated.
+17. Audit history remains available.
+
+This path must work end-to-end.
+
+
+============================================================
+39. SECOND GOLDEN PATH — CROSS BORDER
+============================================================
+
+1. Cross-border trip created.
+2. Applicability detects CROSS_BORDER.
+3. Customs/cross-border controls become applicable.
+4. Required documents/evidence appear automatically.
+5. Deadline-based controls are generated where configured.
+6. Missing evidence produces warning/hold according to rule.
+7. Evidence supplied.
+8. Pre-dispatch regulatory evaluation runs.
+9. Vehicle released only if blocking controls satisfied.
+10. Compliance Passport records applicable cross-border controls.
+
+
+============================================================
+40. THIRD GOLDEN PATH — REGULATORY CHANGE
+============================================================
+
+1. Regulatory change appears in DEMO Regulatory Watch.
+2. Status = DISCOVERED.
+3. Proposed change inspected.
+4. Proposed ROU generated.
+5. Human reviewer verifies/rejects.
+6. Impact analysis runs.
+7. Affected vehicles/workflows shown.
+8. Approved ruleset version created.
+9. New ruleset activated.
+10. Future events use new version.
+11. Historical events retain old version.
+
+Do not automatically activate the change.
+
+
+============================================================
+41. DATA INTEGRITY
+============================================================
+
+No dashboard should contain numbers that cannot be traced to application state.
+
+No compliance result should exist without:
+
+- event;
+- rule;
+- ruleset version;
+- input;
+- result;
+- timestamp.
+
+No regulatory rule should exist without:
+
+- source;
+- status;
+- version;
+- provenance.
+
+No override should exist without:
+
+- original decision;
+- requester;
+- approver;
+- reason;
+- timestamp.
+
+No Compliance Passport should exist without:
+
+- completed dispatch/release;
+- regulatory evaluation;
+- evidence references.
+
+
+============================================================
+42. SECURITY / SAFETY
+============================================================
+
+Follow the existing repository's security architecture.
+
+At minimum:
+
+- enforce authorization server-side where applicable;
+- validate inputs;
+- sanitize uploaded metadata;
+- avoid exposing secrets;
+- do not log credentials;
+- enforce role restrictions;
+- maintain audit trail;
+- treat regulatory configuration changes as privileged;
+- do not permit client-side-only authorization for critical operations.
+
+If the current prototype lacks backend enforcement, document that explicitly.
+
+Do not falsely claim:
+
+TLS 1.3
+AES-256
+HMAC
+zero trust
+immutable ledger
+etc.
+
+unless the implementation actually guarantees them.
+
+
+============================================================
+43. TESTING
+============================================================
+
+Add meaningful tests.
+
+UNIT TESTS
+
+Applicability:
+- domestic rule excluded from inappropriate context;
+- cross-border rule applies to correct trip;
+- vehicle-class rule applies correctly.
+
+Rules:
+- PASS condition;
+- WARNING condition;
+- FAIL/block condition;
+- missing data;
+- configuration-required condition.
+
+Versioning:
+- historical evaluation retains previous version;
+- new evaluation uses active version.
+
+Overrides:
+- requester cannot approve own override;
+- unauthorized role cannot approve;
+- non-overridable rule rejects override.
+
+Evidence:
+- expired evidence handled correctly;
+- missing mandatory evidence detected.
+
+Readiness:
+- readiness percentage calculated correctly;
+- readiness does not replace decision.
+
+INTEGRATION TESTS
+
+- vehicle → trip → regulatory gate → PASS → release;
+- vehicle → failure → quarantine → remediation → re-evaluation → release;
+- cross-border trip → required evidence → evaluation;
+- regulatory update → impact assessment → new ruleset;
+- offline event → sync → audit preservation.
+
+UI TESTS
+
+- executive dashboard loads;
+- regulatory gate renders decision;
+- rule provenance opens;
+- passport renders;
+- regulatory watch workflow renders;
+- role restrictions reflected.
+
+
+============================================================
+44. ACCEPTANCE TESTS
+============================================================
+
+The upgrade is NOT complete until all of these scenarios work.
+
+ACCEPTANCE 1 — EXISTING PRODUCT SURVIVES
+
+Given the existing application,
+when the upgrade is deployed,
+then the previous core operational workflows still function.
+
+ACCEPTANCE 2 — REGULATORY TRACEABILITY
+
+Given a failed pre-dispatch control,
+when the user opens the failure,
+then they can trace:
+
+failure
+→ rule
+→ ROU
+→ regulatory source
+→ version
+→ required evidence/action.
+
+ACCEPTANCE 3 — APPLICABILITY
+
+Given two vehicles with different operational contexts,
+when pre-dispatch evaluation occurs,
+then they may receive different applicable control sets.
+
+ACCEPTANCE 4 — DETERMINISM
+
+Given identical event data and identical active ruleset,
+when evaluation is run repeatedly,
+then the regulatory decision is identical.
+
+ACCEPTANCE 5 — VERSIONING
+
+Given a rule changes,
+when a new ruleset is activated,
+then historical evaluations remain attached to the previous ruleset.
+
+ACCEPTANCE 6 — QUARANTINE
+
+Given a blocking failure,
+when the vehicle is quarantined,
+then it cannot be released through the normal path until remediation,
+re-evaluation and required approval are completed.
+
+ACCEPTANCE 7 — NO SELF APPROVAL
+
+Given Supervisor A requests an override,
+when Supervisor A attempts to approve it,
+then approval is denied.
+
+ACCEPTANCE 8 — COMPLIANCE PASSPORT
+
+Given a successfully released vehicle,
+then the system produces a passport containing:
+
+trip;
+vehicle;
+driver;
+controls;
+evidence;
+approvals;
+ruleset version;
+timestamps.
+
+ACCEPTANCE 9 — REGULATORY WATCH
+
+Given a proposed regulatory change,
+then it cannot become ACTIVE without the configured human verification step.
+
+ACCEPTANCE 10 — NO FAKE LAW
+
+Given a regulatory threshold is not verified/configured,
+then the system displays CONFIGURATION REQUIRED
+instead of inventing a legal threshold.
+
+ACCEPTANCE 11 — COPILOT SAFETY
+
+Given the user asks the Copilot whether an unverified load is "legally compliant,"
+then the Copilot must retrieve/display the deterministic system state
+and must not invent a legal conclusion.
+
+ACCEPTANCE 12 — OFFLINE VERSION INTEGRITY
+
+Given a regulatory evaluation occurs offline,
+then its ruleset version remains attached after synchronization.
+
+ACCEPTANCE 13 — DASHBOARD INTEGRITY
+
+Given executive metrics are displayed,
+then each metric can be derived from underlying demo/application records.
+
+No hardcoded fake KPI totals.
+
+
+============================================================
+45. DEVELOPMENT PHASES
+============================================================
+
+Do not attempt everything in one uncontrolled rewrite.
+
+PHASE 0
+Repository audit.
+
+PHASE 1
+Domain model + data migration.
+
+Implement:
+
+RegulatorySource
+ROU
+REU
+RuleSet
+Evaluation
+Evidence
+Audit events.
+
+PHASE 2
+Deterministic engine.
+
+Implement:
+
+Applicability
+Rules evaluation
+Decision
+Versioning
+Remediation
+Overrides.
+
+PHASE 3
+Regulatory Gate.
+
+Upgrade existing compliance workflow.
+
+PHASE 4
+Evidence + Passport.
+
+PHASE 5
+Regulatory Intelligence Centre.
+
+Rules Registry
+Sources
+Provenance.
+
+PHASE 6
+Regulatory Watch + Impact Analysis.
+
+PHASE 7
+Executive Risk + Yard Intelligence.
+
+PHASE 8
+Cross-border + abnormal-load workflows.
+
+PHASE 9
+Copilot/read-only intelligence.
+
+PHASE 10
+Integration adapters/API hardening.
+
+After EACH phase:
+
+- run typecheck;
+- run lint;
+- run tests;
+- build production bundle;
+- repair regressions;
+- update documentation.
+
+
+============================================================
+46. DOCUMENTATION TO PRODUCE
+============================================================
+
+Maintain:
+
+docs/
+  BAK_EXISTING_SYSTEM_AUDIT.md
+  BAK_REGOPS_UPGRADE_PLAN.md
+  NROK_ARCHITECTURE.md
+  REGULATORY_DATA_MODEL.md
+  REGULATORY_PROVENANCE.md
+  RULE_ENGINE.md
+  OFFLINE_ARCHITECTURE.md
+  INTEGRATION_BOUNDARIES.md
+  DEMO_SCENARIOS.md
+  SECURITY_NOTES.md
+  ACCEPTANCE_TESTS.md
+
+Also create:
+
+REGULATORY_SOURCES.md
+
+This should list every regulatory source represented by the demo,
+its verification status and which rules derive from it.
+
+
+============================================================
+47. IMPORTANT COMMERCIAL/PRODUCT CONSTRAINT
+============================================================
+
+This application may be reviewed by BAK's internal IT team.
+
+Therefore the system must communicate:
+
+"We complement existing enterprise systems."
+
+NOT:
+
+"BAK must replace everything with this application."
+
+Architect the Regulatory Gate as reusable infrastructure.
+
+The eventual architecture should allow:
+
+BAK ERP/WMS/TMS
+        │
+        ▼
+N-ROK Regulatory Gate
+        │
+        ▼
+Decision + evidence requirements
+        │
+        ▼
+BAK workflow
+
+The existing BAK Intel UI serves as:
+
+1. a usable reference implementation;
+2. an operational control interface;
+3. a demonstration of the N-ROK engine;
+4. a possible standalone deployment;
+5. a possible complement to BAK's existing/internal systems.
+
+
+============================================================
+48. PRODUCT DIFFERENTIATION
+============================================================
+
+Do not optimize for "more features."
+
+Optimize for the following differentiators:
+
+1. Regulation is executable.
+
+2. Applicability is contextual.
+
+3. Every decision is explainable.
+
+4. Every decision has provenance.
+
+5. Rules are versioned.
+
+6. Evidence is connected to the operational event.
+
+7. Regulatory changes have impact analysis.
+
+8. Existing enterprise systems can consume the engine.
+
+9. AI explains; deterministic controls decide.
+
+10. Historical decisions remain reproducible.
+
+This is the cutting edge.
+
+Not another fleet dashboard.
+
+
+============================================================
+49. FINAL IMPLEMENTATION QUALITY GATE
+============================================================
+
+Before declaring completion, ask:
+
+Can a BAK IT engineer inspect the architecture and understand where regulatory
+logic lives?
+
+Can a compliance officer identify why a vehicle was held?
+
+Can a dispatcher understand exactly what must be corrected?
+
+Can management see operational/regulatory exposure?
+
+Can an auditor reconstruct why a truck was released?
+
+Can an old decision be reproduced using its historical ruleset?
+
+Can BAK integrate its own system with the regulatory engine?
+
+Can the system function without AI?
+
+Can the system distinguish verified law from demo assumptions?
+
+Can a regulatory change be introduced without silently changing historical data?
+
+If ANY answer is no, the implementation is incomplete.
+
+
+============================================================
+50. EXECUTION INSTRUCTION
+============================================================
+
+Begin by auditing the repository.
+
+DO NOT immediately generate replacement pages.
+
+Return first with:
+
+A. Existing architecture discovered
+B. Existing routes/components
+C. Existing functionality worth preserving
+D. Current technical debt/blockers
+E. Proposed file-level implementation plan
+F. Data/schema migrations required
+G. Regulatory assumptions currently hardcoded in the application
+H. Tests currently present/missing
+I. Phase-by-phase implementation sequence
+
+Then begin implementation.
+
+During implementation:
+
+- make actual repository changes;
+- do not merely describe code;
+- do not create parallel duplicate implementations;
+- keep commits/changes logically grouped where possible;
+- test continuously;
+- report any regulatory value that cannot be verified rather than guessing it.
+
+The target is not a prettier prototype.
+
+The target is to evolve the system BAK management already saw into a credible:
+
+BAK INTEL
+REGULATORY OPERATIONS & YARD INTELLIGENCE PLATFORM
+
+powered by an independently reusable:
+
+N-ROK TRANSPORT REGULATORY ENGINE.

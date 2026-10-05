@@ -32,13 +32,13 @@ describe('offline action queue (Dexie/IndexedDB)', () => {
     expect(await pendingActionCount()).toBe(0)
   })
 
-  it('drops actions after 5 failed retries (Spec §8 backoff cap)', async () => {
+  it('retains actions for review after 5 failed retries', async () => {
     const a = await enqueueOfflineAction('queue.create', { licensePlate: 'AEH 4521' })
     for (let i = 0; i < 4; i++) {
       expect(await recordActionFailure(a.id, 'network down')).not.toBeNull()
     }
-    expect(await recordActionFailure(a.id, 'network down')).toBeNull()
-    expect(await pendingActionCount()).toBe(0)
+    expect(await recordActionFailure(a.id, 'network down')).toMatchObject({ state: 'BLOCKED', retryCount: 5 })
+    expect(await pendingActionCount()).toBe(1)
   })
 
   it('survives 100+ actions and stays reload-safe (ordered)', async () => {

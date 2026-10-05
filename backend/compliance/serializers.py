@@ -23,6 +23,11 @@ class ComplianceCreateSerializer(serializers.Serializer):
         child=serializers.FloatField(), required=False, min_length=1,
     )
 
+    def validate(self, attrs):
+        if "limits" in attrs:
+            raise serializers.ValidationError({"limits": "Limits are server-owned; caller limits are not accepted"})
+        return attrs
+
 
 class OverrideSerializer(serializers.Serializer):
     reason = serializers.CharField(required=True, allow_blank=False)

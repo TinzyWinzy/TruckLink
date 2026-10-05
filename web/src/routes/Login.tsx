@@ -143,7 +143,7 @@ export default function Login() {
   }
 
   return (
-    <div className="-mx-4 -my-6 flex min-h-screen items-center justify-center bg-[#0b1526] px-4 py-10">
+    <div className="flex min-h-screen items-center justify-center bg-[#0b1526] px-4 py-10">
       <div className="w-full max-w-md">
         <div className="rounded-2xl bg-white p-6 shadow-2xl" aria-label="Gate sign-in">
           <div className="flex items-center gap-3">

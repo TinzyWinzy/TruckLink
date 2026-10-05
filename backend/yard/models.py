@@ -221,6 +221,7 @@ class ComplianceCheck(models.Model):
     # Client-supplied idempotency key (PWA offline outbox replay) — same check
     # never writes twice. Empty for direct/API calls.
     client_key = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    submission_digest = models.CharField(max_length=64, blank=True, default='')
     status = models.CharField(
         max_length=24, choices=CheckStatus.choices, default=CheckStatus.PASSED,
     )
@@ -242,6 +243,11 @@ class ComplianceCheck(models.Model):
 
     class Meta:
         ordering = ['-timestamp']
+        constraints = [
+            models.UniqueConstraint(fields=['facility', 'client_key'],
+                                    condition=~Q(client_key=''),
+                                    name='unique_check_key_per_facility'),
+        ]
         indexes = [
             models.Index(fields=['facility', 'status'], name='idx_check_facility_status'),
         ]

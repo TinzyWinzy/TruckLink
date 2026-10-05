@@ -23,7 +23,7 @@ async function importOutbox(apiUrl: string) {
   const { useSession } = await import('../store/session')
   useSession.getState().signInReal('user-live', 'DISPATCH_SUPERVISOR', 'Live')
   api.setToken('test-token-1')
-  return { db, api, live }
+  return { db, api, live, useSession }
 }
 
 describe('offline outbox integration (enqueue → replay → idempotent server)', () => {
@@ -38,6 +38,37 @@ describe('offline outbox integration (enqueue → replay → idempotent server)'
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.unstubAllEnvs()
+  })
+
+  it('keeps another actor’s actions without replaying them', async () => {
+    const { db, live, useSession } = await importOutbox('http://api.test')
+    const action = await db.enqueueOfflineAction('queue.create', { licensePlate: 'OWNER 1' })
+    expect(action).toMatchObject({ actorId: 'user-live', apiBase: 'http://api.test', state: 'PENDING' })
+    useSession.getState().signInReal('another-user', 'DISPATCH_SUPERVISOR', 'Other')
+    expect(await live.flushPendingActions()).toEqual({ done: 0, failed: 0 })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(await db.pendingActionCount()).toBe(1)
+  })
+
+  it('preserves rejected commands for review without repeatedly sending them', async () => {
+    const { db, live } = await importOutbox('http://api.test')
+    fetchMock.mockResolvedValueOnce(jsonResponse(409, { error: 'CONFIGURATION_REQUIRED' }))
+    await db.enqueueOfflineAction('queue.create', { licensePlate: 'REVIEW 1' })
+    expect(await live.flushPendingActions()).toEqual({ done: 0, failed: 1 })
+    expect((await db.listPendingActions())[0]).toMatchObject({ state: 'BLOCKED', retryCount: 1 })
+    expect(await live.flushPendingActions()).toEqual({ done: 0, failed: 0 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not replay actions for another facility or API', async () => {
+    const { db, live } = await importOutbox('http://api.test')
+    const action = await db.enqueueOfflineAction('queue.create', { licensePlate: 'SITE 1' })
+    await db.db.pendingActions.update(action.id, { facilityId: 'other-facility' })
+    expect(await live.flushPendingActions()).toEqual({ done: 0, failed: 0 })
+    await db.db.pendingActions.update(action.id, { facilityId: action.facilityId, apiBase: 'http://other.test' })
+    expect(await live.flushPendingActions()).toEqual({ done: 0, failed: 0 })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(await db.pendingActionCount()).toBe(1)
   })
 
   it('replays queue + compliance actions in order with idempotency keys', async () => {

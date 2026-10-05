@@ -1,5 +1,6 @@
 """Auth endpoints: register, login, pin login, logout, me."""
 from django.contrib.auth import authenticate
+from django.db import transaction
 from django.contrib.auth.hashers import check_password
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -14,6 +15,7 @@ from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@transaction.atomic
 def register(request):
     serializer = RegisterSerializer(data=request.data)
     if not serializer.is_valid():

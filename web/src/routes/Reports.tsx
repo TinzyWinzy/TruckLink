@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { facilityId } from '../lib/api'
 import { useLive } from '../lib/liveGate'
+import { useSession } from '../store/session'
 import { computeTurnaroundStats, queueToCsv, type LiveRow } from '../lib/live'
 import {
   fetchHeatmap,
@@ -27,27 +28,32 @@ const SEED: LiveRow[] = [
 const fmt = (n: number | null) => (n == null ? '—' : `${Math.round(n)}m`)
 
 export default function Reports() {
-  const [rows, setRows] = useState<LiveRow[]>(SEED)
+  const live = useLive()
+  const userId = useSession((s) => s.userId)
+  const [rows, setRows] = useState<LiveRow[]>(() => live ? [] : SEED)
+  const [feedError, setFeedError] = useState<string | null>(null)
   const [docks, setDocks] = useState<LiveRow[]>([])
   const [heatmap, setHeatmap] = useState<HeatmapBucket[] | null>(null)
   const [surge, setSurge] = useState<SurgeStatus | null>(null)
   const [roi, setRoi] = useState<RoiSummary | null>(null)
-  const live = useLive()
-  const analytics = isAnalyticsLive()
+  const analytics = live && isAnalyticsLive()
 
   useEffect(() => {
     if (!live) return
+    let cancelled = false
     let u1: (() => void) | undefined
     let u2: (() => void) | undefined
     import('../lib/live').then((m) => {
-      u1 = m.subscribe('queue', setRows, 500) ?? undefined
+      if (cancelled) return
+      u1 = m.subscribe('queue', setRows, 500, setFeedError) ?? undefined
       u2 = m.subscribe('docks', setDocks, 100) ?? undefined
     })
     return () => {
+      cancelled = true
       u1?.()
       u2?.()
     }
-  }, [live])
+  }, [live, userId])
 
   useEffect(() => {
     if (!analytics) return
@@ -65,7 +71,7 @@ export default function Reports() {
     return () => {
       cancelled = true
     }
-  }, [analytics])
+  }, [analytics, userId])
 
   const stats = useMemo(() => computeTurnaroundStats(rows), [rows])
   const dockUtil = useMemo(() => {
@@ -96,6 +102,7 @@ export default function Reports() {
           </button>
         }
       />
+      {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
       {/* Exceptions first: overdue and dock pressure lead (Pareto) */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Overdue > 60m" value={String(stats.overdueCount)} tone={stats.overdueCount > 0 ? 'alert' : 'good'} />

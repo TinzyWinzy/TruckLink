@@ -42,7 +42,7 @@ def _client_for(username, role, org, facility):
 def org_b(db):
     org = Organisation.objects.create(name="Other Fleet", slug="other-fleet")
     fac = Facility.objects.create(
-        organisation=org, name="Other Yard", slug="other-yard",
+        organisation=org, name="Other Yard", slug="other-yard", yard_config={"mode": "DEMO"},
     )
     return org, fac
 
