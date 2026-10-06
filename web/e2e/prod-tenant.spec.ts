@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 
 test.use({ trace:'off' })
-test('BAK is configured as a tenant and platform settings are readable without mutation', async ({ page }) => {
+test('BAK is configured as a tenant and platform settings are readable without mutation', async ({ page, request }) => {
   test.skip(!process.env.BAK_ADMIN_PIN, 'Explicit admin credentials required')
   await page.goto('/')
   await page.getByLabel('Staff ID', { exact:true }).fill(process.env.BAK_ADMIN_STAFF_ID || 'TRK-BAK-ADMIN')
@@ -9,6 +9,26 @@ test('BAK is configured as a tenant and platform settings are readable without m
   await page.getByRole('button', { name:'Sign in to shift',exact:true }).click()
   await expect(page).toHaveURL(/\/reports$/)
   await expect(page.getByRole('banner')).toContainText('BAK Logistics')
+  const api = process.env.PW_PROD_API_URL!
+  const token = await page.evaluate(() => localStorage.getItem('trucki-auth-token'))
+  const headers = { Authorization: `Token ${token}` }
+  const identityResponse = await request.get(`${api}/api/auth/me/`, { headers })
+  expect(identityResponse.ok()).toBe(true)
+  const identity = (await identityResponse.json()).user
+  expect(identity.id).toBe(2)
+  expect(identity.organisation_id).toBe(1)
+  expect(identity.facilities[0].id).toBe(1)
+  expect(identity.tenant_configuration.version).toBe(1)
+  expect(identity.tenant_configuration.content.branding.display_name).toBe('BAK Logistics')
+  const configResponse = await request.get(`${api}/api/tenant/configuration/`, { headers })
+  expect(configResponse.ok()).toBe(true)
+  expect((await configResponse.json()).configuration.digest).toBe(identity.tenant_configuration.digest)
+  const catalogue = await request.get(`${api}/api/regulatory/platform-catalogue/`, { headers })
+  expect(catalogue.ok()).toBe(true)
+  expect((await catalogue.json()).bundles).toEqual([])
+  const selections = await request.get(`${api}/api/regulatory/tenant-selections/`, { headers })
+  expect(selections.ok()).toBe(true)
+  expect((await selections.json()).selections).toEqual([])
   await page.getByRole('link', { name:'Admin',exact:true }).click()
   await expect(page.getByLabel('Tenant display name')).toHaveValue('BAK Logistics')
   await expect(page.getByLabel('Maximum inspection age in seconds')).toHaveValue('3600')
