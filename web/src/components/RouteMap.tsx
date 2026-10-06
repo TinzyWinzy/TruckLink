@@ -8,6 +8,7 @@ export default function RouteMap({ trips, selectedId, onSelect }: { trips: Route
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const layer = useRef<L.LayerGroup | null>(null)
+  const routeBounds = useRef<L.LatLngBounds | null>(null)
   const [tileError, setTileError] = useState(false)
   const [expanded, setExpanded] = useState(false)
   useEffect(() => {
@@ -24,7 +25,10 @@ export default function RouteMap({ trips, selectedId, onSelect }: { trips: Route
     layer.current = L.layerGroup().addTo(instance)
     L.control.scale({ imperial: false }).addTo(instance)
     map.current = instance
-    const resize = new ResizeObserver(() => instance.invalidateSize())
+    const resize = new ResizeObserver(() => {
+      instance.invalidateSize()
+      if (routeBounds.current?.isValid()) instance.fitBounds(routeBounds.current, { padding: [40,40], maxZoom: 11, animate: false })
+    })
     resize.observe(container.current)
     return () => { resize.disconnect(); instance.remove(); map.current = null; layer.current = null }
   }, [])
@@ -54,6 +58,7 @@ export default function RouteMap({ trips, selectedId, onSelect }: { trips: Route
         marker.on('click', () => onSelect(trip.id)); bounds.extend([pos.lat,pos.lon])
       }
     }
+    routeBounds.current = bounds.isValid() ? bounds : null
     if (bounds.isValid()) map.current.fitBounds(bounds, { padding: [40,40], maxZoom: 11, animate: false })
     else map.current.setView([-19,29],5)
   }, [trips, selectedId, onSelect])

@@ -18,6 +18,11 @@ test('synthetic routes show ordered stops and stale position evidence on desktop
   for (const [name, width] of [['desktop', 1440], ['mobile', 390]] as const) {
     await page.setViewportSize({ width, height: 1000 })
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await expect.poll(() => page.locator('.route-stop-icon').evaluateAll(markers => markers.every(marker => {
+      const map = marker.closest('.route-map-surface')!.getBoundingClientRect()
+      const stop = marker.getBoundingClientRect()
+      return stop.top >= map.top && stop.bottom <= map.bottom && stop.left >= map.left && stop.right <= map.right
+    }))).toBe(true)
     await page.screenshot({ path: `../docs/design/trucki-routes-${name}.png`, fullPage: true })
   }
   await page.getByRole('button', { name: /SYN-9002/ }).click()
