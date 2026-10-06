@@ -292,3 +292,46 @@ footer.yard-foot {
   .workbench-body { grid-template-columns: minmax(0, 1fr); }
   .workspace-rail { min-width: 0; }
 }
+
+/* Reports: a compact evidence and review layout, informed by the NetOne portfolio. */
+.report-context { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 24px; padding: 14px 0; border-block: 1px solid var(--bak-border-strong); font-size: 12px; color: var(--bak-ink-2); }
+.report-context strong { color: var(--bak-ink); font-weight: 600; }
+.report-metric-strip { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border-bottom: 1px solid var(--bak-border-strong); }
+.report-metric-strip .metric-cell { background: transparent; border: 0; border-right: 1px solid var(--bak-border); border-radius: 0; padding: 8px 22px 24px; }
+.report-metric-strip .metric-cell:first-child { padding-left: 0; }
+.report-metric-strip .metric-cell:last-child { border-right: 0; }
+.report-review-grid { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap: 24px; }
+.report-panel { background: var(--bak-surface); border: 1px solid var(--bak-border); border-radius: 7px; padding: 24px; min-width: 0; }
+.report-section-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 20px; margin-bottom: 20px; }
+.report-section-heading h2 { font-size: 16px; font-weight: 650; letter-spacing: -.25px; }
+.report-section-heading > span { font-size: 11px; color: var(--bak-ink-3); }
+.report-state-list li { display: grid; grid-template-columns: minmax(110px,1.3fr) minmax(40px,1fr) 24px; align-items: center; gap: 16px; padding: 11px 0; font-size: 11px; color: var(--bak-ink-2); }
+.report-state-list strong { text-align: right; color: var(--bak-ink); font-size: 14px; }
+.report-state-track { height: 7px; background: #f0efec; border-radius: 2px; overflow: hidden; }
+.report-state-track i { display: block; height: 100%; background: var(--bak-amber); }
+.report-review-panel { min-width: 0; background: #fff1e3; padding: 28px; border-radius: 7px; border-top: 3px solid var(--bak-amber); }
+.report-review-panel h2 { margin: 12px 0; font-size: clamp(21px,2vw,27px); font-weight: 650; letter-spacing: -.7px; line-height: 1.25; }
+.report-review-panel > p:not(.eyebrow) { font-size: 13px; line-height: 1.75; color: var(--bak-ink-2); }
+.report-actions { display: flex; align-items: flex-start; flex-direction: column; gap: 12px; margin-top: 20px; }
+.report-text-link { color: var(--bak-amber); text-decoration: underline; text-underline-offset: 4px; font-size: 12px; display: inline-flex; align-items: center; }
+.report-note { margin-top: 20px; font-size: 11px !important; line-height: 1.7; color: var(--bak-ink-3); }
+.report-empty { padding: 12px 0 22px; color: var(--bak-ink-2); font-size: 13px; line-height: 1.7; }
+.report-empty h3 { font-weight: 600; color: var(--bak-ink); margin-bottom: 8px; }
+.report-source-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24px; }
+.report-source-grid strong, .report-source-grid span { display: block; font-size: 12px; line-height: 1.7; }
+.report-source-grid strong { font-weight: 600; margin-bottom: 7px; }
+.report-source-grid span { color: var(--bak-ink-2); }
+.report-feed-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
+@media(max-width: 1000px) { .report-review-grid { grid-template-columns: minmax(0,1fr); } }
+@media(max-width: 640px) {
+ .report-context { flex-direction: column; gap: 6px; }
+ .report-metric-strip { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ .report-metric-strip .metric-cell { padding: 16px 12px; }
+ .report-metric-strip .metric-cell:first-child { padding-left: 12px; }
+ .report-metric-strip .metric-cell:nth-child(2) { border-right: 0; }
+ .report-metric-strip .metric-cell:nth-child(-n+2) { border-bottom: 1px solid var(--bak-border); }
+ .report-panel, .report-review-panel { padding: 20px; }
+ .report-source-grid, .report-feed-grid { grid-template-columns: minmax(0,1fr); }
+ .report-source-grid > div + div { padding-top: 16px; border-top: 1px solid var(--bak-border); }
+ .report-state-list li { gap: 10px; }
+}

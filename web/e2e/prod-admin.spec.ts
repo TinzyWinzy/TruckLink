@@ -8,6 +8,9 @@ test('live ADMIN PIN can switch working roles and return without changing identi
   await page.getByLabel('PIN', { exact: true }).fill(process.env.BAK_ADMIN_PIN!)
   await page.getByRole('button', { name: 'Sign in to shift', exact: true }).click()
   await expect(page).toHaveURL(/\/reports$/)
+  await expect(page.getByText(/Last successful read/)).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Review priority' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Data availability' })).toContainText('movements loaded')
   const api = process.env.PW_PROD_API_URL!
   const token = await page.evaluate(() => localStorage.getItem('trucki-auth-token'))
   const headers = { Authorization: `Token ${token}` }

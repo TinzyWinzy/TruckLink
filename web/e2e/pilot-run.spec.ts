@@ -35,11 +35,11 @@ test('DISPATCH validates a load — PASS then deliberate FAIL', async ({ page })
     await page.getByRole('checkbox', { name: item }).check()
   }
   await page.getByRole('button', { name: /Validate load/ }).click()
-  await expect(page.getByText(/practice check/)).toBeVisible()
+  await expect(page.getByText(/practice check/i)).toBeVisible()
 
   await page.getByLabel(/Axle 2/).fill('12000')
   await page.getByRole('button', { name: /Validate load/ }).click()
-  await expect(page.getByRole('status').filter({ hasText: /FAIL.*quarantine/ })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: /FAIL.*quarantine/i })).toBeVisible()
 })
 
 test('OPS assigns a dock and acknowledges a critical alert', async ({ page }) => {

@@ -43,7 +43,7 @@ export function PageHeader({
   )
 }
 
-export function Stat({ label, value, tone }: { label: string; value: string; tone?: 'alert' | 'good' | 'plain' }) {
+export function Stat({ label, value, tone, hint }: { label: string; value: string; tone?: 'alert' | 'good' | 'plain'; hint?: string }) {
   const bar = tone === 'alert' ? 'bg-red-700' : tone === 'good' ? 'bg-emerald-700' : 'bg-slate-300'
   return (
     <div className="metric-cell p-4">
@@ -55,6 +55,7 @@ export function Stat({ label, value, tone }: { label: string; value: string; ton
       >
         {value}
       </div>
+      {hint && <p className="mt-2 text-xs leading-relaxed text-slate-600">{hint}</p>}
       <div aria-hidden="true" className="mt-2 h-1 w-10 rounded-full bg-slate-200">
         <div className={`h-1 w-full rounded-full ${bar}`} />
       </div>
