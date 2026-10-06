@@ -120,11 +120,14 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
+        'core.throttling.OperationalUserThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '10/hour',
+        'anon': '60/minute',
         'user': '120/hour',
+        'operational_user': '600/minute',
+        'credential_attempt': '20/hour',
+        'credential_ip': '120/hour',
         'trip': '30/hour',
         'public_booking': '20/hour',
     },

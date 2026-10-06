@@ -4,17 +4,19 @@ from django.db import transaction
 from django.contrib.auth.hashers import check_password
 from rest_framework import status
 from rest_framework.authtoken.models import Token
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.models import PinCredential, AdminRoleSelection
+from core.throttling import CredentialAttemptThrottle, CredentialIPThrottle
 
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([CredentialAttemptThrottle, CredentialIPThrottle])
 @transaction.atomic
 def register(request):
     serializer = RegisterSerializer(data=request.data)
@@ -36,6 +38,7 @@ def register(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([CredentialAttemptThrottle, CredentialIPThrottle])
 def login_view(request):
     serializer = LoginSerializer(data=request.data)
     if not serializer.is_valid():
@@ -80,6 +83,7 @@ def _normalize_staff_id(raw: str) -> str:
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+@throttle_classes([CredentialAttemptThrottle, CredentialIPThrottle])
 def pin_login(request):
     """POST /api/auth/pin/ — exchange TRK-<staff-id> + PIN for a token (SAD §5).
 
