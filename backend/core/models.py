@@ -21,7 +21,7 @@ class Facility(models.Model):
     )
     name = models.CharField(max_length=200)
     slug = models.SlugField(max_length=100)
-    timezone = models.CharField(max_length=64, default='Africa/Harare')
+    timezone = models.CharField(max_length=64, default='UTC')
     yard_config = models.JSONField(default=dict, blank=True)
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -44,7 +44,7 @@ class Facility(models.Model):
 
 
 class PinCredential(models.Model):
-    """Staff PIN credential (BAK PIN design, server-owned): TRK-<staff-id> + PIN hash."""
+    """Tenant-owned server PIN credential: TRK-<staff-id> and a PIN hash."""
 
     staff_id = models.CharField(max_length=32, unique=True)
     pin_hash = models.CharField(max_length=256)

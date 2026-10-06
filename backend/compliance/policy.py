@@ -5,6 +5,11 @@ MANDATORY_CHECKLIST_IDS = (
 )
 
 
-def missing_checks(checklist):
+def missing_checks(checklist, organisation=None):
     """Only explicit boolean attestations count; strings and numbers do not."""
-    return [key for key in MANDATORY_CHECKLIST_IDS if checklist.get(key) is not True]
+    if organisation:
+        from tenancy.configuration import workflow
+        required = workflow(organisation)['mandatory_checks']
+    else:
+        required = MANDATORY_CHECKLIST_IDS
+    return [key for key in required if checklist.get(key) is not True]

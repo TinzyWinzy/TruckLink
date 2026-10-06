@@ -134,6 +134,9 @@ def switch_role(request):
     role = str(request.data.get('role', ''))
     if role not in UserRole.values:
         return Response({'ok': False, 'error': 'Unknown role.'}, status=400)
+    from tenancy.configuration import role_enabled
+    if not role_enabled(profile.organisation,role):
+        return Response({'ok':False,'error':'This role is disabled for the tenant.'},status=403)
     token = Token.objects.select_for_update().get(pk=request.auth.pk)
     from trip.permissions import get_user_role
     previous = get_user_role(request.user)

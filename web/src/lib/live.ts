@@ -13,6 +13,7 @@
 import { apiFetch, apiBase, ApiError, clearToken, facilityId, selectFacility, getToken, isLive, setToken } from './api'
 import { isRealLive } from './liveGate'
 import { useSession } from '../store/session'
+import type { TenantConfiguration } from './tenant'
 import {
   listPendingActions,
   recordActionFailure,
@@ -55,6 +56,7 @@ function sessionFrom(user: {
   base_role?: string
   organisation?: { id: number; name: string; slug: string } | null
   facilities?: { id: number; name: string; slug: string }[]
+  tenant_configuration?: TenantConfiguration | null
 }): SessionUser {
   if (!hasRole(user.role)) {
     clearToken()
@@ -67,7 +69,7 @@ function sessionFrom(user: {
   try { previous = localStorage.getItem(`trucki-yard-${user.id}`) ?? previous } catch { /* storage unavailable */ }
   const selected = facilities.find(f => String(f.id) === previous) ?? facilities[0]
   selectFacility(selected ? String(selected.id) : '')
-  useSession.getState().setWorkspace({ organisation: user.organisation ?? null, facilities, selectedFacility: facilityId })
+  useSession.getState().setWorkspace({ organisation: user.organisation ?? null, facilities, selectedFacility: facilityId, configuration: user.tenant_configuration ?? null })
   return {
     baseRole: hasRole(user.base_role) ? user.base_role : user.role,
     uid: String(user.id ?? ''),
@@ -384,7 +386,9 @@ export async function getComplianceConfig(
 ): Promise<ComplianceConfig> {
   const fallback: ComplianceConfig = {
     limits: resolveSiLimits(route, vehicleType, undefined),
-    checklist: FALLBACK_CHECKLIST,
+    checklist: useSession.getState().workspace?.configuration?.content.workflow.mandatory_checks.map(itemId => ({
+      itemId, label: FALLBACK_CHECKLIST.find(item => item.itemId === itemId)?.label ?? itemId.replace(/-/g,' '), mandatory: true,
+    })) ?? FALLBACK_CHECKLIST,
   }
   if (!isRealLive()) return fallback
   try {

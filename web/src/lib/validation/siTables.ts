@@ -1,8 +1,8 @@
 // S.I. 129/2015 + S.I. 159/2022 corridor-scoped axle limit tables (Phase 3).
 //
-// Values below are PILOT DEFAULTS — BAK to confirm against the VID schedule
+// Values below are PILOT DEFAULTS — unverified training examples; independent review is required
 // per corridor before prod. Limits are data, not law: the authoritative source
-// is Firestore `complianceConfig/default` (siTablesByRoute), editable without
+// is tenant-owned backend compliance configuration, editable without
 // a redeploy. This module is the offline fallback + pure resolver (unit-tested).
 //
 // Resolution order for (route, vehicleType):
@@ -41,7 +41,7 @@ export const SI_ROUTE_LABELS: Record<SiRoute, string> = {
   DEFAULT: 'Default (unassigned route)',
 }
 
-/** Pilot 3-axle defaults per corridor. Identical values until BAK/VID confirms
+/** Pilot 3-axle defaults per corridor. Identical unverified values until independently reviewed
  *  corridor-specific schedules — the structure is what Phase 3 delivers. */
 const PILOT_3AXLE: Record<SiVehicle, [number, number, number]> = {
   DEFAULT: [8000, 9000, 9000],

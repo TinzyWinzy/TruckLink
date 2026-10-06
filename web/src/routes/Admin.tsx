@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLive } from '../lib/liveGate'
 import { useSession } from '../store/session'
 import { PageHeader, Section } from '../components/ui'
+import TenantSettings from '../components/TenantSettings'
 
 export default function Admin() {
   const { role } = useSession()
@@ -38,6 +39,7 @@ export default function Admin() {
     <div className="max-w-2xl">
       <PageHeader title="Admin" sub={live ? 'Yard setup controls.' : 'Setup. Works once the tablet is connected.'} mode={live ? 'live' : 'demo'} />
       <div className="space-y-3">
+        {live && <TenantSettings />}
         <Section title="Yard setup" sub="One-time: docks, equipment, axle rules + the practice shift. Safe to run again.">
           <button type="button" onClick={seed} disabled={busy || !live} className="btn-primary touch-target rounded-lg px-4 text-sm disabled:opacity-60">
             {busy ? 'Setting up…' : 'Set up yard + practice shift'}

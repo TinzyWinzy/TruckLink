@@ -2,7 +2,7 @@
 // Client-side only. Firestore rules and the sync-service allow-list are the
 // real enforcement. Tested here so matrix drift fails the build, not the yard.
 
-import { canAccess, type Role } from '../store/session'
+import { canAccess, useSession, type Role } from '../store/session'
 
 export type RouteKey = 'queue' | 'docks' | 'compliance' | 'alerts' | 'reports' | 'audit' | 'admin' | 'hub' | 'guide' | 'modelling' | 'routes'
 
@@ -28,7 +28,11 @@ export const ROUTE_GATES: Record<RouteKey, Role[]> = {
 }
 
 export function canVisit(route: RouteKey, role: Role | null): boolean {
-  return canAccess(role, ROUTE_GATES[route])
+  if (!canAccess(role, ROUTE_GATES[route])) return false
+  const config = useSession.getState().workspace?.configuration?.content
+  const resource = route === 'audit' ? 'audit' : route
+  const allowed = config?.permissions[resource + '.read']
+  return !config || (config.roles[role!]?.enabled !== false && (!allowed || allowed.includes(role!)))
 }
 
 /** Firestore `alerts` update gate mirrored client-side (firestore.rules alerts/update).
@@ -38,13 +42,14 @@ export function canVisit(route: RouteKey, role: Role | null): boolean {
 export const ALERT_ACK_ROLES: Role[] = ['OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'ADMIN']
 
 export function canAckAlert(role: Role | null): boolean {
-  return canAccess(role, ALERT_ACK_ROLES)
+  const allowed = useSession.getState().workspace?.configuration?.content.permissions['alerts.update']
+  return canAccess(role, ALERT_ACK_ROLES) && (!allowed || !!role && allowed.includes(role))
 }
 
 /** Post-sign-in landing. every role must land on a route it canVisit.
  * Yard roles → /queue; EXECUTIVE/ADMIN → /reports; COMPLIANCE → /audit. */
 export function landingPathForRole(role: Role): string {
-  if (role === 'EXECUTIVE' || role === 'ADMIN') return '/reports'
-  if (role === 'COMPLIANCE_OFFICER') return '/audit'
-  return '/queue'
+  const preferred: RouteKey = role === 'EXECUTIVE' || role === 'ADMIN' ? 'reports' : role === 'COMPLIANCE_OFFICER' ? 'audit' : 'queue'
+  const route = [preferred, 'routes', 'hub'].find(key => canVisit(key as RouteKey,role)) ?? 'hub'
+  return '/' + route
 }

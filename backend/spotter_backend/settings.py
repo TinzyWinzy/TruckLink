@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'yard',
     'compliance',
     'regulatory',
+    'tenancy',
     'whatsapp',
 ]
 

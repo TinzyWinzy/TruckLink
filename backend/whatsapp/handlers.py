@@ -24,8 +24,8 @@ VALID_STATUS_TRANSITIONS = {
 }
 
 
-def get_or_create_session(phone: str) -> WhatsAppSession:
-    session, _ = WhatsAppSession.objects.get_or_create(phone_number=phone)
+def get_or_create_session(phone: str, organisation=None) -> WhatsAppSession:
+    session, _ = WhatsAppSession.objects.get_or_create(phone_number=phone,organisation=organisation)
     return session
 
 
@@ -36,12 +36,18 @@ def find_active_trip(driver: Driver) -> Trip | None:
     ).first()
 
 
-def handle_incoming(phone: str, body: str, lat: float | None = None, lon: float | None = None) -> str:
+def handle_incoming(phone: str, body: str, lat: float | None = None, lon: float | None = None, organisation=None) -> str:
     """Route an incoming WhatsApp message to the right handler."""
-    session = get_or_create_session(phone)
-
     try:
-        driver = Driver.objects.filter(phone_number=phone).first()
+        drivers = Driver.objects.filter(phone_number=phone,is_deleted=False)
+        if organisation is not None:
+            drivers = drivers.filter(organisation=organisation)
+        elif drivers.values('organisation_id').distinct().count() > 1:
+            return 'Tenant context is required. Contact your dispatcher.'
+        driver = drivers.first()
+        if organisation is None and driver:
+            organisation = driver.organisation
+        session = get_or_create_session(phone,organisation)
 
         if lat is not None and lon is not None:
             return handle_location(phone, lat, lon, driver, session)

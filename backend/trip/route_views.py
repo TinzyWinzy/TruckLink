@@ -14,15 +14,13 @@ from rest_framework.response import Response
 from core.audit import append_audit
 from core.audit_views import find_facility
 from core.models import Facility
+from core.rbac import rbac_allows
 from regulatory.engine.evaluator import digest
 from regulatory.models import OperationalContext, InspectionAttempt
-from trip.models import Trip, Vehicle, Driver, UserRole
+from trip.models import Trip, Vehicle, Driver
 from trip.permissions import get_user_organisation, get_user_role
 import geocoding
 import routing
-
-WRITERS = {UserRole.ADMIN, UserRole.DISPATCH_SUPERVISOR, UserRole.OPERATIONS_SUPERVISOR, UserRole.FACILITY_MANAGER}
-
 
 class RouteCommandThrottle(UserRateThrottle):
     scope = 'route_command'
@@ -56,7 +54,7 @@ def site(request):
         return None
     ref = request.query_params.get('facility') if request.method == 'GET' else request.data.get('facility')
     yard = find_facility(str(ref or ''), request.user)
-    return yard if yard and yard.organisation_id == org.id else None
+    return yard if yard and yard.organisation_id == org.id and rbac_allows(get_user_role(request.user),'routes','read',org) else None
 
 
 def valid_point(lon, lat):
@@ -128,7 +126,7 @@ def route_workspace(request):
         'facility':{'id':yard.id,'name':yard.name},'trips':[row(t,by_trip.get(t.id)) for t in trips],
         'vehicles':list(Vehicle.objects.filter(organisation=yard.organisation,is_deleted=False).values('id','plate')),
         'drivers':list(Driver.objects.filter(organisation=yard.organisation,is_deleted=False).values('id','name')),
-        'can_save':get_user_role(request.user) in WRITERS})
+        'can_save':rbac_allows(get_user_role(request.user),'routes','create',yard.organisation)})
 
 
 @api_view(['POST'])
@@ -138,7 +136,8 @@ def route_command(request, save=False):
     yard = site(request)
     if not yard:
         return Response({'error':'Yard not found.'},status=404)
-    if save and get_user_role(request.user) not in WRITERS:
+    from core.rbac import rbac_allows
+    if save and not rbac_allows(get_user_role(request.user),'routes','create',yard.organisation):
         return Response({'error':'Your working role cannot save draft routes.'},status=403)
     serializer = RouteInput(data=request.data)
     serializer.is_valid(raise_exception=True)

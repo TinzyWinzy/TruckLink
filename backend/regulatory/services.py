@@ -22,6 +22,10 @@ OPERATORS = (UserRole.OPERATIONS_SUPERVISOR, UserRole.ADMIN)
 def require_role(actor, roles):
     if get_user_role(actor) not in roles or get_user_organisation(actor) is None:
         raise PermissionError('Role is not authorized for this regulatory command')
+    from core.rbac import rbac_allows
+    resource = ('regulatory','inspect') if roles == INSPECTORS else ('regulatory','operate') if roles == OPERATORS else ('regulatory','review') if roles == REVIEWERS else None
+    if resource and not rbac_allows(get_user_role(actor),*resource,get_user_organisation(actor)):
+        raise PermissionError('Tenant policy does not authorize this command')
 
 
 def assert_site(actor, entry):
@@ -126,10 +130,20 @@ def publish_ruleset(actor, ruleset, reason):
 def bundles_for(context, at):
     bundles = []
     for jurisdiction in context.jurisdictions:
+        from .catalogue import shared_bundle
+        shared = shared_bundle(context,jurisdiction,at)
         candidates = list(m.RuleSetVersion.objects.filter(organisation=context.organisation, jurisdiction=jurisdiction,
             route_type=context.route_type, publication__isnull=False, effective_from__lte=at.date(), effective_to__gte=at.date()))
-        if len(candidates) != 1:
+        if len(candidates) > 1 or (not candidates and not shared):
             raise ValidationError(f'CONFIGURATION_REQUIRED: exactly one published ruleset required for {jurisdiction}/{context.route_type}')
+        if shared:
+            bundles.append(shared)
+            if not candidates:
+                continue
+            if any(unit['source']['kind'] != 'INTERNAL_POLICY' for unit in candidates[0].content['units']):
+                raise ValidationError('CONFIGURATION_REQUIRED: adopted platform rules may only be combined with tenant internal policies')
+            if {u['rule_key'] for u in shared['content']['units']} & {u['rule_key'] for u in candidates[0].content['units']}:
+                raise ValidationError('CONFIGURATION_REQUIRED: tenant policy rule keys must not collide with platform rules')
         ruleset = candidates[0]
         validate_bundle(ruleset, at)
         bundles.append({'id': ruleset.pk, 'digest': ruleset.digest, 'content': ruleset.content,
@@ -193,9 +207,12 @@ def create_context(actor, entry, *, evidence_ids, **fields):
     return context
 
 
-def evaluate_inspection(bundles, snapshot, inputs):
+def evaluate_inspection(bundles, snapshot, inputs, policy=None):
     result = evaluate(bundles, snapshot, inputs)
-    missing = [key for key in MANDATORY_CHECKLIST_IDS if inputs['checklist_results'].get(key) is not True]
+    required = policy['mandatory_checks'] if policy else MANDATORY_CHECKLIST_IDS
+    if policy:
+        result['tenant_policy'] = policy
+    missing = [key for key in required if inputs['checklist_results'].get(key) is not True]
     if missing:
         result['controls'].append({'id': 'inspection.attestations', 'status': 'HOLD', 'reason': 'Missing operational attestations',
                                    'missing': missing, 'override_policy': 'NOT_ALLOWED'})
@@ -236,7 +253,8 @@ def inspect_entry(actor, entry, *, axle_weights, total_weight, checklist_results
             raise ValidationError('CONFIGURATION_REQUIRED: recorded vehicle/driver/trip/load/route context is missing')
         snapshot = context_snapshot(context, at)
         bundles = bundles_for(context, at)
-        result = evaluate_inspection(bundles, snapshot, inputs)
+        from tenancy.configuration import workflow
+        result = evaluate_inspection(bundles, snapshot, inputs, workflow(entry.organisation))
     except ValidationError as exc:
         result = {'decision': 'REVIEW_REQUIRED', 'controls': [{'id': 'configuration', 'status': 'REVIEW_REQUIRED',
                   'reason': '; '.join(exc.messages), 'override_policy': 'NOT_ALLOWED'}], 'readiness_percent': 0,
@@ -309,10 +327,18 @@ def release_authority(entry, actor):
     bundles = bundles_for(attempt.context, now)
     if digest(snapshot) != digest(attempt.context_snapshot) or digest(bundles) != digest(attempt.ruleset_snapshot):
         raise ValidationError('Evidence or effective rules changed; re-evaluate before release')
-    reconstructed = evaluate_inspection(bundles, snapshot, attempt.input_snapshot)
+    from tenancy.configuration import workflow
+    policy = workflow(entry.organisation)
+    historical_policy = attempt.result.get('tenant_policy')
+    if historical_policy:
+        if historical_policy['digest'] != policy['digest']:
+            raise ValidationError('Tenant operational policy changed; re-evaluate before release')
+    elif policy['mandatory_checks'] != list(MANDATORY_CHECKLIST_IDS):
+        raise ValidationError('Tenant operational policy changed; re-evaluate before release')
+    reconstructed = evaluate_inspection(bundles, snapshot, attempt.input_snapshot, historical_policy)
     if digest(reconstructed) != digest(attempt.result) or reconstructed['decision'] != attempt.decision:
         raise ValidationError('Inspection result does not reproduce under its recorded engine and policy')
-    if (now - attempt.occurred_at).total_seconds() > min(b['max_age_seconds'] for b in bundles):
+    if (now - attempt.occurred_at).total_seconds() > min(policy['inspection_max_age_seconds'], *(b['max_age_seconds'] for b in bundles)):
         raise ValidationError('Inspection has expired; re-evaluate before release')
     approval = None
     if attempt.decision not in ('PASS', 'PASS_WITH_WARNINGS'):

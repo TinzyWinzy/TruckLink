@@ -9,7 +9,7 @@ const ATTESTATIONS = ['driver-license', 'vehicle-reg', 'cargo-manifest', 'weight
 export default function VersionedInspection({ entryId, data, changeEntry }: {
   entryId: string; data: RegulatoryContext; changeEntry: (value: string) => void
 }) {
-  const { role } = useSession()
+  const { role, workspace } = useSession()
   const [weights, setWeights] = useState<string[]>(() => (data.configuration?.rated_axle_kg ?? ['0']).map(() => ''))
   const [total, setTotal] = useState('')
   const [checked, setChecked] = useState<Record<string, boolean>>({})
@@ -18,7 +18,7 @@ export default function VersionedInspection({ entryId, data, changeEntry }: {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const extraChecks = data.rulesets.flatMap(r => r.content.units.filter(u => u.definition.kind === 'CHECKLIST').map(u => u.definition.item_id!))
-  const checks = [...new Set([...ATTESTATIONS, ...extraChecks])]
+  const checks = [...new Set([...(data.workflow?.mandatory_checks ?? workspace?.configuration?.content.workflow.mandatory_checks ?? ATTESTATIONS), ...extraChecks])]
   const operator = role === 'ADMIN' || role === 'OPERATIONS_SUPERVISOR'
 
   async function run() {

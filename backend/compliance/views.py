@@ -159,7 +159,7 @@ class ComplianceListView(APIView):
                 {"ok": False, "error": "cannot check a released entry"}, status=409,
             )
 
-        missing = missing_checks(validated.get("checklist_results", {}))
+        missing = missing_checks(validated.get("checklist_results", {}), entry.organisation)
         if missing:
             return Response({"ok": False, "error": "Complete mandatory checks first",
                              "missing_checks": missing}, status=400)

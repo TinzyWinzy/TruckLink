@@ -277,7 +277,9 @@ def trip_plan(request):
     vehicle = None
     commodity = None
     user_org = get_user_organisation(request.user)
-    org = user_org or Organisation.objects.filter(is_deleted=False).first()
+    org = user_org
+    if org is None:
+        return Response({'ok':False,'error':'Tenant identity required'},status=403)
 
     if data.get("driver_id"):
         try:
@@ -877,7 +879,14 @@ def public_book(request):
         floor_count=data.get("floor_count", 0),
     )
 
-    org = Organisation.objects.filter(is_deleted=False).first()
+    tenant_slug = request.data.get('tenant') or request.query_params.get('tenant')
+    if tenant_slug:
+        org = Organisation.objects.filter(slug=tenant_slug,is_deleted=False).first()
+    else:
+        tenants = list(Organisation.objects.filter(is_deleted=False)[:2])
+        org = tenants[0] if len(tenants) == 1 else None
+    if org is None:
+        return Response({'ok':False,'error':'Choose a configured tenant for this booking'},status=400)
 
     booking_ref = _generate_booking_reference()
     token = uuid.uuid4()

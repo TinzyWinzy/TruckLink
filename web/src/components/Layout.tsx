@@ -1,11 +1,12 @@
 import { selectFacility } from '../lib/api'
 import { Link, useLocation } from 'react-router-dom'
 import { listPendingActions, isOnline } from '../lib/offline/db'
-import { useSession, isPracticeSession, type Role, canAccess } from '../store/session'
+import { useSession, isPracticeSession, type Role } from '../store/session'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useLive } from '../lib/liveGate'
-import { ROUTE_GATES, landingPathForRole } from '../lib/gates'
+import { ROUTE_GATES, canVisit, landingPathForRole } from '../lib/gates'
+import { tenantLabel } from '../lib/tenant'
 
 const PRIMARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] = [
   { to: '/routes', label: 'Routes & map', route: 'routes' },
@@ -25,7 +26,7 @@ const SECONDARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[
 ]
 
 function visible(items: typeof PRIMARY, role: Role | null) {
-  return items.filter((i) => canAccess(role, ROUTE_GATES[i.route]))
+  return items.filter((i) => canVisit(i.route,role))
 }
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -39,6 +40,16 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [blocked, setBlocked] = useState(0)
   const [critical, setCritical] = useState(0)
   const live = useLive()
+  const tenant = workspace?.configuration
+  const brand = tenant?.content.branding
+  useEffect(() => {
+    if (!brand) return
+    const root = document.documentElement
+    root.style.setProperty('--transport-amber',brand.accent)
+    root.style.setProperty('--transport-navy',brand.navy)
+    root.style.setProperty('--transport-paper',brand.paper)
+    return () => { for (const name of ['--transport-amber','--transport-navy','--transport-paper']) root.style.removeProperty(name) }
+  }, [brand])
 
   useEffect(() => {
     let cancelled = false
@@ -95,9 +106,9 @@ export default function Layout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="bak-workbench min-h-screen text-slate-900">
+    <div className="transport-workbench min-h-screen text-slate-900">
       <a href="#main-content" className="skip-link">Skip to workspace</a>
-      <header className="gantry bak-masthead text-white">
+      <header className="gantry transport-masthead text-white">
         <div className="masthead-inner flex flex-wrap items-center gap-x-4 gap-y-3">
           <Link to={role ? landingPathForRole(role) : '/queue'} className="flex items-center gap-2.5" aria-label="Trucki home">
             <span aria-hidden="true" className="gantry-mark flex h-9 w-9 items-center justify-center rounded-xl text-base font-black text-slate-900">
@@ -105,7 +116,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             </span>
             <span className="leading-none">
               <span className="block text-[10px] font-extrabold uppercase tracking-[0.18em] text-amber-400">
-                {practice ? 'Practice workspace' : workspace?.organisation?.name ?? 'Operations workspace'}
+                {practice ? 'Practice workspace' : brand?.display_name || workspace?.organisation?.name || 'Operations workspace'}
               </span>
               <span className="block text-lg font-extrabold tracking-tight">Trucki</span>
             </span>
@@ -126,7 +137,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             )}
           </div>
           <span className="ml-auto hidden text-xs font-semibold text-white/60 md:inline">
-            {displayName} · {role?.replace(/_/g, ' ') ?? 'signed out'}
+            {displayName} · {role ? tenantLabel(tenant,role) : 'signed out'}
           </span>
           {baseRole === 'ADMIN' && (
             <label className="flex items-center gap-1.5 rounded-lg border border-amber-400/50 bg-white/5 px-2 py-1 text-xs font-bold text-amber-300">
@@ -156,8 +167,8 @@ export default function Layout({ children }: { children: ReactNode }) {
                 }}
                 className="touch-target min-h-0 rounded bg-transparent py-0.5 pr-1 font-extrabold text-white [&>option]:text-slate-900"
               >
-                {(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'EXECUTIVE', 'COMPLIANCE_OFFICER', 'ADMIN'] as Role[]).map((r) => (
-                  <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>
+                {(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'EXECUTIVE', 'COMPLIANCE_OFFICER', 'ADMIN'] as Role[]).filter(r => tenant?.content.roles[r]?.enabled !== false).map((r) => (
+                  <option key={r} value={r}>{tenantLabel(tenant,r)}</option>
                 ))}
               </select>
             </label>

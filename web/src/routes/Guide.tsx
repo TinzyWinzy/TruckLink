@@ -3,20 +3,24 @@ import { Link } from 'react-router-dom'
 import { useLive } from '../lib/liveGate'
 import { GUIDE_STEPS } from '../lib/demoData'
 import { PageHeader, Section } from '../components/ui'
+import { useSession } from '../store/session'
 
 /** System Guide — the gatekeeper's click-by-click walkthrough. Progress persists per tablet. */
-const KEY = 'bak-guide-progress-v1'
+const LEGACY_KEY = 'bak-guide-progress-v1'
 
-function load(): Record<string, boolean> {
+function load(key: string, allowLegacy: boolean): Record<string, boolean> {
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, boolean>
+    return JSON.parse(localStorage.getItem(key) ?? (allowLegacy ? localStorage.getItem(LEGACY_KEY) : null) ?? '{}') as Record<string, boolean>
   } catch {
     return {}
   }
 }
 
 export default function Guide() {
-  const [done, setDone] = useState<Record<string, boolean>>(load)
+  const { workspace, userId } = useSession()
+  const key = ['trucki-guide-progress-v2',workspace?.organisation?.id ?? 'practice',userId ?? 'anonymous',workspace?.selectedFacility ?? 'practice'].join(':')
+  const allowLegacy = !workspace || ['bak-operations','bak-logistics'].includes(workspace.organisation?.slug ?? '')
+  const [done, setDone] = useState<Record<string, boolean>>(() => load(key,allowLegacy))
   const live = useLive()
   const finished = GUIDE_STEPS.filter((s) => done[s.n]).length
 
@@ -24,7 +28,7 @@ export default function Guide() {
     setDone((d) => {
       const next = { ...d, [n]: !d[n] }
       try {
-        localStorage.setItem(KEY, JSON.stringify(next))
+        localStorage.setItem(key, JSON.stringify(next))
       } catch {
         // private-mode tablets — progress just won't persist.
       }

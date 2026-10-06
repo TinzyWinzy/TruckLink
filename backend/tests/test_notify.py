@@ -202,6 +202,14 @@ class TestPushEndpoints:
         assert anon_client.get("/api/push/public-key/").status_code == 401
 
     def test_public_key_returns_vapid(self, api_client, settings):
+        from tenancy.configuration import defaults
+        from tenancy.models import TenantConfiguration
+        from regulatory.engine.evaluator import digest
+        from trip.models import Organisation
+        org = Organisation.objects.get(slug='default')
+        content = defaults()
+        content['integrations'] = {'notifications':{'webpush':{'enabled':True,'env_prefix':'VAPID'}}}
+        TenantConfiguration.objects.create(organisation=org,version=1,content=content,digest=digest(content),reason='Synthetic push binding')
         settings.VAPID_PUBLIC_KEY = "BEnext"
         resp = api_client.get("/api/push/public-key/")
         assert resp.status_code == 200

@@ -13,13 +13,13 @@ from .handlers import handle_incoming
 logger = logging.getLogger(__name__)
 
 
-def _validate_twilio_request(request):
+def _validate_twilio_request(request, token):
     """Validate that the request genuinely came from Twilio."""
     twilio_signature = request.META.get("HTTP_X_TWILIO_SIGNATURE", "")
     if not twilio_signature:
         return False
 
-    validator = RequestValidator(settings.TWILIO_AUTH_TOKEN)
+    validator = RequestValidator(token)
     url = request.build_absolute_uri()
     post_data = request.POST.dict() if request.POST else parse_qs(request.body.decode("utf-8"))
     flat_post = {k: v[0] if isinstance(v, list) else v for k, v in post_data.items()}
@@ -28,16 +28,23 @@ def _validate_twilio_request(request):
 
 
 @csrf_exempt
-def webhook(request):
+def webhook(request, tenant_slug=None):
     """Twilio WhatsApp webhook: receive messages and reply."""
     if request.method != "POST":
         return HttpResponse(status=405)
 
-    # Validate Twilio signature (skip if Twilio not configured)
-    if settings.TWILIO_AUTH_TOKEN:
-        if not _validate_twilio_request(request):
-            logger.warning("Invalid Twilio signature — rejecting webhook request")
-            return HttpResponse(status=403)
+    from trip.models import Organisation
+    from tenancy.integrations import credential
+    if tenant_slug:
+        organisation = Organisation.objects.filter(slug=tenant_slug,is_deleted=False).first()
+    else:
+        configured = [org for org in Organisation.objects.filter(is_deleted=False) if credential(org,'twilio','AUTH_TOKEN')]
+        organisation = configured[0] if len(configured) == 1 else None
+    if not organisation:
+        return HttpResponse(status=404)
+    token = credential(organisation,'twilio','AUTH_TOKEN')
+    if not token or not _validate_twilio_request(request,token):
+        return HttpResponse(status=403)
 
     try:
         body_text = request.body.decode("utf-8")
@@ -69,6 +76,7 @@ def webhook(request):
             body=message_body,
             lat=lat,
             lon=lon,
+            organisation=organisation,
         )
 
         resp = MessagingResponse()

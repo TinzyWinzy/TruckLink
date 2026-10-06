@@ -1,5 +1,7 @@
 # BAK directory and product strategy
 
+Historical strategy. Superseded on 6 October 2026 by [tenant platform architecture](TENANT_PLATFORM_ARCHITECTURE.md): Trucki owns the application domain and BAK Logistics is its first configured tenant/reference implementation.
+
 Date: 5 October 2026. Status: recommended reset following the repository audit. Application behavior and existing directories remain unchanged by this document.
 
 ## Strategic decision

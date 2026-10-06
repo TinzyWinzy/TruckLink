@@ -1,7 +1,10 @@
 from django.urls import path
 from . import views as v
+from .catalogue import CatalogueView, SelectionView
 
 urlpatterns = [
+    path('platform-catalogue/', CatalogueView.as_view()),
+    path('tenant-selections/', SelectionView.as_view()),
     *[path(f'{kind}/', v.RegistryView.as_view(), {'kind': kind}) for kind in ('sources', 'evidence', 'vehicle-configurations', 'loads', 'rule-units', 'rulesets')],
     path('reviews/', v.ReviewView.as_view()),
     path('rulesets/<int:pk>/publish/', v.PublishView.as_view()),

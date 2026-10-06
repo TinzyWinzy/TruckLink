@@ -123,6 +123,9 @@ def provision_pin(request):
         )
 
     facility = None
+    from tenancy.configuration import role_enabled
+    if not role_enabled(org,role):
+        return Response({'ok':False,'error':'Role is disabled for this tenant'},status=400)
     if facility_id:
         facility = Facility.objects.filter(pk=facility_id, organisation=org).first()
         if facility is None:
@@ -165,7 +168,9 @@ def provision_pin(request):
 @permission_classes([IsAuthenticated])
 def push_public_key(request):
     """GET /api/push/public-key/ - the VAPID applicationServerKey for the PWA."""
-    return Response({"public_key": getattr(settings, "VAPID_PUBLIC_KEY", "")})
+    from tenancy.integrations import credential
+    org = get_user_organisation(request.user)
+    return Response({"public_key": credential(org,'webpush','PUBLIC_KEY') if org else ''})
 
 
 @api_view(["POST"])

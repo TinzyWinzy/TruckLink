@@ -2,9 +2,9 @@
 
 Producers only append OutboxEvent rows inside their own transaction (never
 blocked on a provider call); this module runs later via `manage.py notify`.
-Until Twilio/VAPID credentials exist every leg is recorded LOGGED, and the
-10-minute facility-manager / 30-minute executive escalation timers are
-likewise logged-only — matching SAD §10 exactly.
+Until tenant-bound Twilio/VAPID credentials exist every leg is recorded LOGGED.
+Escalation timers come from the tenant workflow; BAK retains its existing
+10-minute facility-manager / 30-minute executive settings.
 """
 from __future__ import annotations
 
@@ -20,12 +20,6 @@ from .models import NotificationLog, OutboxEvent, PushSubscription
 logger = logging.getLogger(__name__)
 
 MAX_ATTEMPTS = 5
-FM_ESCALATION_MINUTES = 10
-EXEC_ESCALATION_MINUTES = 30
-_ESCALATION_WINDOWS = (
-    ("FM", FM_ESCALATION_MINUTES),
-    ("EXEC", EXEC_ESCALATION_MINUTES),
-)
 
 
 def message_for(event: OutboxEvent, facility_name: str) -> str:
@@ -43,9 +37,10 @@ def message_for(event: OutboxEvent, facility_name: str) -> str:
     return f"{event.event_type}: {json.dumps(p, default=str)}"
 
 
-def _twilio():
-    sid = getattr(settings, "TWILIO_ACCOUNT_SID", "")
-    token = getattr(settings, "TWILIO_AUTH_TOKEN", "")
+def _twilio(event):
+    from tenancy.integrations import credential
+    sid = credential(event.organisation,'twilio','ACCOUNT_SID')
+    token = credential(event.organisation,'twilio','AUTH_TOKEN')
     if not sid or not token:
         return None
     from twilio.rest import Client
@@ -65,7 +60,7 @@ def _log(event, channel, destination, status, response) -> NotificationLog:
 
 
 def _send_via_twilio(event, channel, destination, body, from_number) -> None:
-    client = _twilio()
+    client = _twilio(event)
     if client is None or not from_number:
         _log(
             event, channel, destination, NotificationLog.Status.LOGGED,
@@ -93,7 +88,8 @@ def _push_leg(event, facility_name, body) -> None:
             "no push subscriptions",
         )
         return
-    private_key = getattr(settings, "VAPID_PRIVATE_KEY", "")
+    from tenancy.integrations import credential
+    private_key = credential(event.organisation,'webpush','PRIVATE_KEY')
     if not private_key:
         _log(
             event, NotificationLog.Channel.PUSH, "-", NotificationLog.Status.LOGGED,
@@ -115,7 +111,7 @@ def _push_leg(event, facility_name, body) -> None:
                 },
                 data=payload,
                 vapid_private_key=private_key,
-                vapid_claims={"sub": f"mailto:{getattr(settings, 'VAPID_CLAIMS_EMAIL', '')}"},
+                vapid_claims={"sub": f"mailto:{credential(event.organisation,'webpush','CLAIMS_EMAIL')}"},
             )
             _log(
                 event, NotificationLog.Channel.PUSH, sub.endpoint,
@@ -143,6 +139,7 @@ def _push_leg(event, facility_name, body) -> None:
 
 def dispatch_event(event: OutboxEvent) -> None:
     """Attempt every leg for one event, recording per-leg results (SAD §10)."""
+    from tenancy.integrations import credential
     facility_name = event.facility.name if event.facility_id else event.organisation.name
     body = message_for(event, facility_name)
     phone = (event.organisation.contact_phone or "").strip()
@@ -156,7 +153,7 @@ def dispatch_event(event: OutboxEvent) -> None:
     else:
         _send_via_twilio(
             event, NotificationLog.Channel.WHATSAPP, phone, body,
-            getattr(settings, "TWILIO_WHATSAPP_NUMBER", ""),
+            credential(event.organisation,'twilio','WHATSAPP_NUMBER'),
         )
         whatsapp_sent = NotificationLog.objects.filter(
             event=event, channel=NotificationLog.Channel.WHATSAPP,
@@ -167,15 +164,18 @@ def dispatch_event(event: OutboxEvent) -> None:
     if phone and not whatsapp_sent:
         _send_via_twilio(
             event, NotificationLog.Channel.SMS, phone, body,
-            getattr(settings, "TWILIO_FROM_NUMBER", ""),
+            credential(event.organisation,'twilio','FROM_NUMBER'),
         )
 
     _push_leg(event, facility_name, body)
 
 
 def _escalate_event(event: OutboxEvent) -> int:
+    from tenancy.integrations import credential
+    from tenancy.configuration import workflow
+    windows = workflow(event.organisation)['escalation_minutes']
     age_minutes = (timezone.now() - event.created_at).total_seconds() / 60
-    if age_minutes < FM_ESCALATION_MINUTES:
+    if age_minutes < windows['FM']:
         return 0
     queue_entry_id = (event.payload or {}).get("queue_entry_id")
     if queue_entry_id:
@@ -188,7 +188,7 @@ def _escalate_event(event: OutboxEvent) -> int:
             return 0
     phone = (event.organisation.contact_phone or "").strip()
     created = 0
-    for label, threshold in _ESCALATION_WINDOWS:
+    for label, threshold in windows.items():
         if age_minutes < threshold:
             continue
         marker = f"ESCALATION {label}"
@@ -207,7 +207,7 @@ def _escalate_event(event: OutboxEvent) -> int:
             _send_via_twilio(
                 event, NotificationLog.Channel.WHATSAPP, phone,
                 f"ESCALATION ({label}): {message_for(event, event.facility.name if event.facility_id else event.organisation.name)}",
-                getattr(settings, "TWILIO_WHATSAPP_NUMBER", ""),
+                credential(event.organisation,'twilio','WHATSAPP_NUMBER'),
             )
             NotificationLog.objects.filter(
                 event=event, provider_response="not credentialled",

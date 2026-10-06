@@ -26,6 +26,11 @@ ALL_ROLES = {
 # (resource, action) -> allowed roles. Actions: read | create | update | delete
 # Unknown (resource, action) => deny (fail-closed).
 ROLE_MATRIX: dict[tuple[str, str], set[str]] = {
+    ('regulatory','review'): {UserRole.ADMIN, UserRole.COMPLIANCE_OFFICER},
+    ('regulatory','inspect'): {UserRole.DISPATCH_SUPERVISOR},
+    ('regulatory','operate'): {UserRole.ADMIN, UserRole.OPERATIONS_SUPERVISOR},
+    ('routes','read'): ALL_ROLES,
+    ('routes','create'): {UserRole.ADMIN, UserRole.DISPATCH_SUPERVISOR, UserRole.OPERATIONS_SUPERVISOR, UserRole.FACILITY_MANAGER},
     # queue: create=DISPATCH/OPERATIONS, update adds FACILITY, read=members,
     # delete=never (firestore: allow delete: if false)
     ("queue", "read"): ALL_ROLES,
@@ -78,14 +83,20 @@ ROLE_MATRIX: dict[tuple[str, str], set[str]] = {
 }
 
 
-def rbac_allows(role: str | None, resource: str, action: str) -> bool:
+def rbac_allows(role: str | None, resource: str, action: str, organisation=None) -> bool:
     """True if the role may perform action on resource (fail-closed)."""
     if role is None:
         return False
     allowed = ROLE_MATRIX.get((resource, action))
     if allowed is None:
         return False
-    return role in allowed
+    if role not in allowed:
+        return False
+    if organisation is not None:
+        from tenancy.configuration import resolved
+        config = resolved(organisation)['content']
+        return config['roles'].get(role,{}).get('enabled',False) and role in config['permissions'].get(f'{resource}.{action}',allowed)
+    return True
 
 
 _METHOD_ACTION = {
@@ -110,4 +121,5 @@ class RoleAccess(BasePermission):
         action = getattr(view, "rbac_action", None) or _METHOD_ACTION.get(request.method)
         if action is None:
             return False
-        return rbac_allows(get_user_role(request.user), resource, action)
+        from trip.permissions import get_user_organisation
+        return rbac_allows(get_user_role(request.user), resource, action, get_user_organisation(request.user))

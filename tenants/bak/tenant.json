@@ -1,0 +1,73 @@
+{
+  "tenant_key": "bak-logistics",
+  "reference_implementation": true,
+  "configuration": {
+    "schema_version": 1,
+    "branding": {
+      "display_name": "BAK Logistics",
+      "accent": "#c2570b",
+      "navy": "#0b1526",
+      "paper": "#f4f1e8"
+    },
+    "roles": {
+      "DISPATCH_SUPERVISOR": {
+        "label": "Dispatch Supervisor",
+        "enabled": true
+      },
+      "FACILITY_MANAGER": {
+        "label": "Facility Manager",
+        "enabled": true
+      },
+      "OPERATIONS_SUPERVISOR": {
+        "label": "Operations Supervisor",
+        "enabled": true
+      },
+      "EXECUTIVE": {
+        "label": "Executive",
+        "enabled": true
+      },
+      "ADMIN": {
+        "label": "Admin",
+        "enabled": true
+      },
+      "COMPLIANCE_OFFICER": {
+        "label": "Compliance Officer",
+        "enabled": true
+      }
+    },
+    "permissions": {},
+    "workflow": {
+      "mandatory_checks": [
+        "driver-license",
+        "vehicle-reg",
+        "cargo-manifest",
+        "weight-cert",
+        "axle-calc"
+      ],
+      "inspection_max_age_seconds": 3600,
+      "escalation_minutes": {
+        "FM": 10,
+        "EXEC": 30
+      }
+    },
+    "integrations": {
+      "notifications": {
+        "twilio": {
+          "enabled": true,
+          "env_prefix": "TWILIO"
+        },
+        "webpush": {
+          "enabled": true,
+          "env_prefix": "VAPID"
+        }
+      }
+    }
+  },
+  "sites": [
+    {
+      "slug": "bak-main-yard",
+      "name": "BAK Main Yard",
+      "timezone": "Africa/Harare"
+    }
+  ]
+}

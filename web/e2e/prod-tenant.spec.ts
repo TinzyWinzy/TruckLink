@@ -1,0 +1,23 @@
+import { test, expect } from '@playwright/test'
+
+test.use({ trace:'off' })
+test('BAK is configured as a tenant and platform settings are readable without mutation', async ({ page }) => {
+  test.skip(!process.env.BAK_ADMIN_PIN, 'Explicit admin credentials required')
+  await page.goto('/')
+  await page.getByLabel('Staff ID', { exact:true }).fill(process.env.BAK_ADMIN_STAFF_ID || 'TRK-BAK-ADMIN')
+  await page.getByLabel('PIN', { exact:true }).fill(process.env.BAK_ADMIN_PIN!)
+  await page.getByRole('button', { name:'Sign in to shift',exact:true }).click()
+  await expect(page).toHaveURL(/\/reports$/)
+  await expect(page.getByRole('banner')).toContainText('BAK Logistics')
+  await page.getByRole('link', { name:'Admin',exact:true }).click()
+  await expect(page.getByLabel('Tenant display name')).toHaveValue('BAK Logistics')
+  await expect(page.getByLabel('Maximum inspection age in seconds')).toHaveValue('3600')
+  await expect(page.getByLabel('Mandatory inspection checks (one identifier per line)')).toHaveValue(/driver-license/)
+  await expect(page.getByRole('button', { name:'Save tenant configuration' })).toBeVisible()
+  await page.setViewportSize({ width:390,height:1000 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path:'../docs/design/tenant-configuration-production-mobile.png',fullPage:true })
+  await page.reload()
+  await expect(page.getByLabel('Tenant display name')).toHaveValue('BAK Logistics')
+  await page.getByRole('button', { name:'Sign out',exact:true }).click()
+})

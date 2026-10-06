@@ -1,11 +1,16 @@
-# Trucki — Yard Operations
+# Trucki transport operations platform
 
-## Renewed BAK direction — 5 October 2026
+## Tenant platform direction, 6 October 2026
 
-BAK is back in scope. The existing Trucki/BAK-derived yard application is the
-baseline for BAK INTEL and a reusable N-ROK regulatory gate. The audit found
-release-authority, configuration-trust and evidence gaps; this checkout should
-not yet be represented as a production-verified regulatory system.
+Trucki owns the reusable transport entities, regulatory evaluator and operational
+workflows. BAK Logistics is the first configured tenant and reference implementation.
+Tenant branding, policies, sites, role configuration and credential bindings are
+separate from platform behavior. The refactor preserves existing entity IDs,
+credentials, evidence, audit history and validated prototype flows.
+
+Start with the [tenant platform architecture](docs/TENANT_PLATFORM_ARCHITECTURE.md)
+and [BAK tenant reference](tenants/bak/README.md). The existing regulatory source
+verification boundaries remain in place; this refactor does not verify new law.
 
 Start with the [current documentation index](docs/README.md),
 [repository audit](docs/BAK_EXISTING_SYSTEM_AUDIT.md),
@@ -13,7 +18,7 @@ Start with the [current documentation index](docs/README.md),
 [directory/product strategy](docs/BAK_DIRECTORY_AND_PRODUCT_STRATEGY.md).
 The [implementation progress](docs/BAK_IMPLEMENTATION_PROGRESS.md) records the
 first stabilization changes and migration/activation constraints.
-The Trucki specifications below are preserved as prior roadmap/architecture
+The earlier BAK strategy and Trucki specifications are preserved as prior roadmap/architecture
 lineage. The existing web/backend directories remain the active runtime.
 
 Multi-tenant yard OS: weighbridge compliance, dock scheduling, dwell/turnaround
@@ -24,6 +29,8 @@ Product specs: [`docs/PRD_v2_Trucki.md`](docs/PRD_v2_Trucki.md) ·
 ## Layout
 
 - `backend/` — Django 6 + DRF API (auth, tenancy, yard, compliance engine, audit chain)
+- `backend/tenancy/` — versioned tenant configuration and integration bindings
+- `tenants/bak/` — BAK Logistics reference configuration
 - `web/` — React PWA frontend
 - `docs/` — PRD/SAD; `docs/archive/` — superseded BAK-era documents
 - `render.yaml` — production blueprint (API + Postgres)

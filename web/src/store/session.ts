@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { TenantConfiguration } from '../lib/tenant'
 
 export type Role =
   | 'DISPATCH_SUPERVISOR'
@@ -23,7 +24,8 @@ export function roleFromSlug(raw: string | null): Role | null {
   return ROLE_SLUGS[raw.trim().toLowerCase()] ?? null
 }
 
-const DEMO_KEY = 'bak-practice-session'
+const DEMO_KEY = 'trucki-practice-session'
+const LEGACY_DEMO_KEY = 'bak-practice-session'
 
 interface DemoSession {
   baseRole?: Role
@@ -33,7 +35,7 @@ interface DemoSession {
 function loadDemoSession(): DemoSession | null {
   try {
     if (typeof sessionStorage === 'undefined') return null
-    const raw = sessionStorage.getItem(DEMO_KEY)
+    const raw = sessionStorage.getItem(DEMO_KEY) ?? sessionStorage.getItem(LEGACY_DEMO_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as DemoSession
     const roles: Role[] = [
@@ -62,6 +64,7 @@ function saveDemoSession(role: Role, baseRole: Role): void {
 function clearDemoSession(): void {
   try {
     sessionStorage.removeItem(DEMO_KEY)
+    sessionStorage.removeItem(LEGACY_DEMO_KEY)
   } catch {
     // Ignore.
   }
@@ -72,6 +75,7 @@ function demoDisplay(role: Role): { userId: string; displayName: string } {
 }
 
 export interface Workspace {
+  configuration?: TenantConfiguration | null
   organisation: { id: number; name: string; slug: string } | null
   facilities: { id: number; name: string; slug: string }[]
   selectedFacility: string

@@ -52,18 +52,25 @@ class UserSerializer(serializers.ModelSerializer):
     organisation_id = serializers.SerializerMethodField()
     organisation = serializers.SerializerMethodField()
     facilities = serializers.SerializerMethodField()
+    tenant_configuration = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             "id", "username", "is_admin", "role", "base_role", "driver_id",
-            "organisation_id", "organisation", "facilities", "date_joined",
+            "organisation_id", "organisation", "facilities", "tenant_configuration", "date_joined",
         ]
 
     def get_is_admin(self, obj):
         from .permissions import get_user_role
         from .models import UserRole
         return get_user_role(obj) == UserRole.ADMIN
+
+    def get_tenant_configuration(self, obj):
+        from tenancy.configuration import resolved
+        from .permissions import get_user_organisation
+        org = get_user_organisation(obj)
+        return resolved(org) if org else None
 
     def get_base_role(self, obj):
         profile = getattr(obj, "profile", None)

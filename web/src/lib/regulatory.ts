@@ -16,11 +16,12 @@ export interface Attempt {
   result: { controls: Control[]; readiness_percent: number; override_eligible: boolean; engine_version: string; monetary_penalty: null }
 }
 export interface RegulatoryContext {
+  workflow?: { mandatory_checks: string[]; version: number; digest: string }
   mode: 'VERSIONED' | 'LEGACY_DEMO'
   context: { id: number; driver: number; trip: number; load: number; jurisdictions: string[]; route_type: string; origin: string; destination: string } | null
   configuration: { id: number; revision: number; vehicle: number; vehicle_class: string; rated_axle_kg: string[]; rated_gross_kg: string; review_status: string } | null
   readiness_error: string | null
-  rulesets: { id: number; digest: string; content: { name: string; version: number; jurisdiction: string; effective_from: string; effective_to: string; units: { definition: { kind: string; item_id?: string } }[] } }[]
+  rulesets: { id: number | string; digest: string; content: { name: string; version: number; jurisdiction: string; effective_from: string; effective_to: string; units: { definition: { kind: string; item_id?: string } }[] } }[]
   attempt: Attempt | null
 }
 

@@ -1,9 +1,11 @@
 # Trucki documentation index
 
-Current direction: renewed BAK INTEL work, grounded in the existing yard application and a reusable N-ROK regulatory service. Documentation status as of 5 October 2026:
+Current direction: Trucki is a tenant-aware transport operations platform. BAK Logistics is the first configured tenant/reference implementation. The platform/tenant ownership described in the tenant architecture supersedes the older BAK-first application strategy. Documentation status as of 6 October 2026:
 
 | Document | Authority/status |
 | --- | --- |
+| [Tenant platform architecture](TENANT_PLATFORM_ARCHITECTURE.md) | Current platform/tenant ownership, configuration, migration compatibility and preservation checks |
+| [BAK reference tenant](../tenants/bak/README.md) | Tenant-specific manifest, preserved identity and integration bindings |
 | [NetOne design reference](NETONE_DESIGN_REFERENCE.md) | Reviewed source patterns and Reports adaptation with desktop/mobile validation |
 | [Tenant workspaces and synthetic modelling](TENANT_MODELLING.md) | Implemented tenant scope, reproducible evaluator fixtures and capacity model assumptions |
 | [User stories and delivery backlog](BAK_USER_STORIES.md) | Draft stories, acceptance criteria, implementation gaps, dependencies and PRD/SAD/brief traceability |

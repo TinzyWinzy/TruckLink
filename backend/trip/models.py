@@ -6,7 +6,7 @@ from django.db import models
 
 
 class UserRole(models.TextChoices):
-    """Six BAK roles (web/src/store/session.ts). Server-authoritative."""
+    """Stable platform capability groups; tenant labels and enablement are configurable."""
     DISPATCH_SUPERVISOR = 'DISPATCH_SUPERVISOR', 'Dispatch Supervisor'
     FACILITY_MANAGER = 'FACILITY_MANAGER', 'Facility Manager'
     OPERATIONS_SUPERVISOR = 'OPERATIONS_SUPERVISOR', 'Operations Supervisor'
@@ -75,7 +75,7 @@ class OrganisationQuerySet(models.QuerySet):
 
 
 class Organisation(models.Model):
-    """Fleet owner organisation."""
+    """Transport platform tenant; retained database identity and table for compatibility."""
     name = models.CharField(max_length=200)
     slug = models.SlugField(max_length=100, unique=True)
     license_key = models.CharField(max_length=100, blank=True, default="")

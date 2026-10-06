@@ -217,6 +217,58 @@ class RuleSetVersion(Record):
                 raise ValidationError('Ruleset metadata must match canonical content')
 
 
+class PlatformRuleBundle(models.Model):
+    """Explicit platform publication of reusable regulatory content, never entity evidence."""
+    origin = models.OneToOneField(RuleSetVersion, on_delete=models.PROTECT)
+    creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    content = models.JSONField()
+    digest = models.CharField(max_length=64)
+    reason = models.TextField()
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    objects = ImmutableQuerySet.as_manager()
+
+    def clean(self):
+        from regulatory.engine.evaluator import digest
+        if not self.creator.is_superuser or not self.creator.is_active or self.creator_id == self.origin.creator_id:
+            raise ValidationError('Independent platform custodian required')
+        if self.digest != digest(self.content) or self.content != self.origin.content or not self.reason.strip():
+            raise ValidationError('Catalogue content must match the immutable reviewed origin')
+        if any(unit['source']['kind'] == 'INTERNAL_POLICY' for unit in self.content.get('units',[])):
+            raise ValidationError('Tenant internal policy cannot be published as platform regulatory content')
+        from regulatory.services import validate_bundle
+        validate_bundle(self.origin, timezone.datetime.combine(self.origin.effective_from, timezone.datetime.min.time(), tzinfo=timezone.get_current_timezone()))
+        if not Publication.objects.filter(ruleset=self.origin).exists():
+            raise ValidationError('Origin requires independent publication first')
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError('Platform catalogue history is immutable')
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Platform catalogue history is retained')
+
+
+class TenantRuleSelection(Record):
+    """Append-only tenant adoption/revocation, separate from platform publication."""
+    jurisdiction = models.CharField(max_length=32)
+    route_type = models.CharField(max_length=24)
+    version = models.PositiveIntegerField()
+    bundle = models.ForeignKey(PlatformRuleBundle, on_delete=models.PROTECT, null=True, blank=True)
+    reason = models.TextField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['organisation','jurisdiction','route_type','version'], name='unique_tenant_rule_selection')]
+
+    def clean(self):
+        super().clean()
+        if self.route_type not in ('DOMESTIC','CROSS_BORDER','ABNORMAL') or not self.reason.strip():
+            raise ValidationError('Valid route scope and adoption reason required')
+        if self.bundle_id and (self.bundle.content['jurisdiction'] != self.jurisdiction or self.bundle.content['route_type'] != self.route_type):
+            raise ValidationError('Platform bundle must match tenant adoption scope')
+
+
 class RuleSetMember(Record):
     ruleset = models.ForeignKey(RuleSetVersion, on_delete=models.PROTECT, related_name='members')
     unit = models.ForeignKey(RuleUnit, on_delete=models.PROTECT)

@@ -61,7 +61,7 @@ def validate_demo_release(entry):
     if (check is None or check.status != expected or check.inspector_id is None
             or check.organisation_id != entry.organisation_id
             or check.facility_id != entry.facility_id
-            or missing_checks(check.checklist_results)):
+            or missing_checks(check.checklist_results, entry.organisation)):
         raise ReleaseBlocked("Cannot release without a current authorized inspection and mandatory checks")
     if expected == "OVERRIDE_APPROVED":
         if (not check.override_reason.strip() or not check.override_requester_id

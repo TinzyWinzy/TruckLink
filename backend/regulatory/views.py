@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from trip.permissions import get_user_organisation, get_user_role, scope_facility
 from yard.models import QueueEntry
 from . import models as m, services as s, serializers as z
+from tenancy.configuration import workflow
 
 
 def output(record):
@@ -101,6 +102,7 @@ class ContextView(TenantView):
             except ValidationError as exc:
                 readiness_error = '; '.join(exc.messages)
         return Response({'ok': True, 'mode': 'VERSIONED' if context or entry.facility.yard_config.get('mode') != 'DEMO' else 'LEGACY_DEMO',
+            'workflow': workflow(entry.organisation),
             'context': output(context) if context else None, 'configuration': configuration, 'readiness_error': readiness_error,
             'rulesets': [{'id': x['id'], 'digest': x['digest'], 'content': x['content']} for x in bundles],
             'attempt': output(attempt) if attempt else None})

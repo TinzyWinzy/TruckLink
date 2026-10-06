@@ -18,7 +18,10 @@ def get_user_role(user):
     if profile is None:
         return None
     role = getattr(user, "_working_role", profile.role) if profile.role == UserRole.ADMIN else profile.role
-    return role if role in UserRole.values else None
+    if role not in UserRole.values:
+        return None
+    from tenancy.configuration import role_enabled
+    return role if profile.organisation_id and role_enabled(profile.organisation,role) else None
 
 
 def get_user_organisation(user):
