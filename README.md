@@ -12,6 +12,13 @@ Start with the [tenant platform architecture](docs/TENANT_PLATFORM_ARCHITECTURE.
 and [BAK tenant reference](tenants/bak/README.md). The existing regulatory source
 verification boundaries remain in place; this refactor does not verify new law.
 
+The [architecture amendment](docs/TRANSPORT_REGOPS_ARCHITECTURE_AMENDMENT.md)
+sets the next implementation boundary for configurable modules, full workflow
+versions and platform-owned regulatory knowledge. It distinguishes that target
+from the deployed foundation. A second tenant requires operational discovery.
+The [release implementation](docs/TENANT_RELEASE_IMPLEMENTATION.md) records the
+implemented schemas, APIs, activation and migration behavior for this amendment.
+
 Start with the [current documentation index](docs/README.md),
 [repository audit](docs/BAK_EXISTING_SYSTEM_AUDIT.md),
 [upgrade plan](docs/BAK_REGOPS_UPGRADE_PLAN.md), and

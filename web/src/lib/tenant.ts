@@ -1,4 +1,7 @@
 export interface TenantConfiguration {
+  id?: number | null
+  modules?: Record<string, boolean> | null
+  release?: { id: number; version: number; digest: string } | null
   version: number
   digest: string
   content: {

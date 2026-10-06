@@ -67,6 +67,8 @@ class RegistryView(TenantView):
         data = self.validate(serializer, request.data)
         def create():
             s.require_role(request.user, s.REVIEWERS)
+            if (model == m.SourceRevision and data.get('kind') == 'STATUTE') or (model == m.RuleUnit and data['source'].kind == 'STATUTE'):
+                raise PermissionError('New statutory sources and ROUs belong to the platform knowledge registry')
             row = model.objects.create(organisation=get_user_organisation(request.user), creator=request.user, **data)
             return {'record': output(row)}
         return command(create)
@@ -97,12 +99,14 @@ class ContextView(TenantView):
         bundles = []
         if context:
             try:
+                from tenancy.releases import snapshot
+                snapshot(entry.organisation,entry.facility)
                 s.context_snapshot(context, s.timezone.now())
                 bundles = s.bundles_for(context, s.timezone.now())
             except ValidationError as exc:
                 readiness_error = '; '.join(exc.messages)
         return Response({'ok': True, 'mode': 'VERSIONED' if context or entry.facility.yard_config.get('mode') != 'DEMO' else 'LEGACY_DEMO',
-            'workflow': workflow(entry.organisation),
+            'workflow': workflow(entry.organisation,entry.facility),
             'context': output(context) if context else None, 'configuration': configuration, 'readiness_error': readiness_error,
             'rulesets': [{'id': x['id'], 'digest': x['digest'], 'content': x['content']} for x in bundles],
             'attempt': output(attempt) if attempt else None})

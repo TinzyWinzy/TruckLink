@@ -114,10 +114,11 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'core.authentication.WorkingRoleTokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+        'core.authentication.ModuleSessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
+        'tenancy.access.ModuleAccess',
     ],
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',

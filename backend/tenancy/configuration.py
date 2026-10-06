@@ -62,22 +62,34 @@ def validate(content):
             raise ValidationError('Integration bindings use environment prefixes, never secret values')
 
 
-def resolved(organisation, at=None):
+def resolved(organisation, at=None, facility=None):
     from django.utils import timezone
     from .models import TenantConfiguration
     row = TenantConfiguration.objects.filter(organisation=organisation, effective_from__lte=at or timezone.now()).order_by('-version').first()
     content = deepcopy(row.content) if row else defaults()
     if not row and not content['branding']['display_name']:
         content['branding']['display_name'] = organisation.name
-    return {'version': row.version if row else 0, 'digest': row.digest if row else '', 'content': content}
+    from .releases import active_release,release_config,artifacts
+    release = active_release(organisation,at)
+    if release:
+        content = release_config(release,facility,at)
+        row = release.configuration
+    modules = artifacts(release,kind='MODULES',at=at)[0].content if release else None
+    if not release and getattr(organisation,'requires_release',False):
+        from .registry import MODULES
+        modules = {key:key == 'audit' for key in MODULES}
+    from regulatory.engine.evaluator import digest
+    return {'id':row.pk if row else None,'version': row.version if row else 0, 'digest': row.digest if row else '', 'content': content,
+        'effective_digest':digest(content),
+        'modules':modules,'release':{'id':release.pk,'version':release.version,'digest':release.digest} if release else None}
 
 
 def role_enabled(organisation, role):
     return bool(role and resolved(organisation)['content']['roles'].get(role,{}).get('enabled'))
 
 
-def workflow(organisation):
+def workflow(organisation, facility=None):
     from regulatory.engine.evaluator import digest
-    config = resolved(organisation)
+    config = resolved(organisation,facility=facility)
     flow = config['content']['workflow']
     return {**flow, 'version': config['version'], 'digest': digest(flow)}

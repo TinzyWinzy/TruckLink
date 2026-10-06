@@ -140,6 +140,8 @@ def _push_leg(event, facility_name, body) -> None:
 def dispatch_event(event: OutboxEvent) -> None:
     """Attempt every leg for one event, recording per-leg results (SAD §10)."""
     from tenancy.integrations import credential
+    from tenancy.releases import require_module
+    require_module(event.organisation,'notifications')
     facility_name = event.facility.name if event.facility_id else event.organisation.name
     body = message_for(event, facility_name)
     phone = (event.organisation.contact_phone or "").strip()
@@ -173,7 +175,10 @@ def dispatch_event(event: OutboxEvent) -> None:
 def _escalate_event(event: OutboxEvent) -> int:
     from tenancy.integrations import credential
     from tenancy.configuration import workflow
-    windows = workflow(event.organisation)['escalation_minutes']
+    from tenancy.releases import module_enabled
+    if not module_enabled(event.organisation,'notifications'):
+        return 0
+    windows = workflow(event.organisation,event.facility)['escalation_minutes']
     age_minutes = (timezone.now() - event.created_at).total_seconds() / 60
     if age_minutes < windows['FM']:
         return 0
@@ -239,6 +244,9 @@ def run(limit: int = 50, facility_ref: str = "") -> dict:
             pass
     done = failed = 0
     for event in qs:
+        from tenancy.releases import module_enabled
+        if not module_enabled(event.organisation,'notifications'):
+            continue  # Preserve pending delivery; disabling a module must not discard outbox work.
         try:
             with transaction.atomic():
                 dispatch_event(event)

@@ -1,8 +1,13 @@
 from django.urls import path
+from . import knowledge_api
 from . import views as v
 from .catalogue import CatalogueView, SelectionView
 
 urlpatterns = [
+    path('knowledge/',knowledge_api.knowledge),
+    path('knowledge/<int:pk>/review/',knowledge_api.review),
+    path('knowledge/import-legacy/',knowledge_api.import_legacy),
+    path('governance-audit/',knowledge_api.audit),
     path('platform-catalogue/', CatalogueView.as_view()),
     path('tenant-selections/', SelectionView.as_view()),
     *[path(f'{kind}/', v.RegistryView.as_view(), {'kind': kind}) for kind in ('sources', 'evidence', 'vehicle-configurations', 'loads', 'rule-units', 'rulesets')],

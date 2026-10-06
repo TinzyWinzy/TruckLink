@@ -25,6 +25,17 @@ def django_db_modify_db_settings(django_db_modify_db_settings_parallel_suffix, t
 
 def test_user_story_browser_journeys(domain, live_server, settings):
     d = domain
+    if os.environ.get('RUN_AMENDMENT_FLOW') == '1':
+        from django.apps import apps
+        from importlib import import_module
+        from tenancy.configuration import defaults
+        from tenancy.models import TenantConfiguration
+        from regulatory.engine.evaluator import digest
+        d['org'].name = 'BAK Operations'; d['org'].slug = 'bak-operations'; d['org'].save()
+        content = defaults(); content['branding']['display_name'] = 'BAK Logistics'
+        content['workflow']['inspection_max_age_seconds'] = 3600
+        TenantConfiguration.objects.create(organisation=d['org'],version=1,content=content,digest=digest(content),reason='Disposable BAK compatibility story fixture')
+        import_module('tenancy.migrations.0004_bak_compatibility_release').preserve_bak(apps,None)
     settings.CORS_ALLOW_ALL_ORIGINS = True
     actors = {'inspector': d['inspector'], 'requester': d['ops'], 'approver': d['ops2']}
     for actor in actors.values():
@@ -55,3 +66,7 @@ def test_user_story_browser_journeys(domain, live_server, settings):
     assert m.InspectionAttempt.objects.filter(queue_entry_id=entries['remediation']).count() == 2
     original = m.InspectionAttempt.objects.get(queue_entry_id=entries['exception'])
     assert original.decision == 'QUARANTINE'
+    if os.environ.get('RUN_AMENDMENT_FLOW') == '1':
+        from tenancy.models import WorkflowExecution
+        assert WorkflowExecution.objects.filter(organisation=d['org']).count() == 4
+        assert WorkflowExecution.objects.filter(organisation=d['org'],events__transition='release').distinct().count() == 3

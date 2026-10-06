@@ -19,12 +19,12 @@ INSPECTORS = (UserRole.DISPATCH_SUPERVISOR,)
 OPERATORS = (UserRole.OPERATIONS_SUPERVISOR, UserRole.ADMIN)
 
 
-def require_role(actor, roles):
+def require_role(actor, roles, facility=None):
     if get_user_role(actor) not in roles or get_user_organisation(actor) is None:
         raise PermissionError('Role is not authorized for this regulatory command')
     from core.rbac import rbac_allows
     resource = ('regulatory','inspect') if roles == INSPECTORS else ('regulatory','operate') if roles == OPERATORS else ('regulatory','review') if roles == REVIEWERS else None
-    if resource and not rbac_allows(get_user_role(actor),*resource,get_user_organisation(actor)):
+    if resource and not rbac_allows(get_user_role(actor),*resource,get_user_organisation(actor),facility):
         raise PermissionError('Tenant policy does not authorize this command')
 
 
@@ -129,7 +129,23 @@ def publish_ruleset(actor, ruleset, reason):
 
 def bundles_for(context, at):
     bundles = []
+    from tenancy.releases import active_release,artifacts
+    release = active_release(context.organisation,at)
+    assigned = artifacts(release,context.queue_entry.facility,kind='PACK_ASSIGNMENT',at=at) if release else []
     for jurisdiction in context.jurisdictions:
+        selected = [r for r in assigned if r.content['jurisdiction'] == jurisdiction and r.content['route_type'] == context.route_type]
+        local = [r for r in selected if r.facility_id == context.queue_entry.facility_id]
+        selected = local or [r for r in selected if r.facility_id is None]
+        if selected:
+            if len(selected) != 1:
+                raise ValidationError('CONFIGURATION_REQUIRED: ambiguous platform pack assignment')
+            from .knowledge import KnowledgeRevision,validate_pack
+            pack = KnowledgeRevision.objects.get(pk=selected[0].content['pack_id'],kind='PACK')
+            validate_pack(pack,at)
+            bundles.append({'id':f'pack:{pack.pk}','digest':pack.digest,'content':pack.content,
+                'publication_id':pack.reviews.order_by('-created_at','-pk').first().pk,
+                'max_age_seconds':pack.content['max_age_seconds'],'assignment_id':selected[0].pk})
+            continue
         from .catalogue import shared_bundle
         shared = shared_bundle(context,jurisdiction,at)
         candidates = list(m.RuleSetVersion.objects.filter(organisation=context.organisation, jurisdiction=jurisdiction,
@@ -148,6 +164,22 @@ def bundles_for(context, at):
         validate_bundle(ruleset, at)
         bundles.append({'id': ruleset.pk, 'digest': ruleset.digest, 'content': ruleset.content,
                         'publication_id': ruleset.publication.pk, 'max_age_seconds': ruleset.max_age_seconds})
+    if release and not release.compatibility:
+        from tenancy.models import ArtifactReview
+        for policy in artifacts(release,context.queue_entry.facility,kind='POLICY',at=at):
+            review = ArtifactReview.objects.filter(artifact=policy).order_by('-created_at','-pk').first()
+            if policy.creator_id and (not review or not review.approved):
+                raise ValidationError('Tenant policy is unapproved or revoked')
+            source = {'id':f'policy:{policy.pk}','source_key':policy.key,'revision':policy.version,
+                'kind':'INTERNAL_POLICY','classification':'TENANT_POLICY','authority':context.organisation.name,
+                'title':policy.key,'jurisdiction':'TENANT','provision':policy.key,
+                'document_ref':policy.content['document_ref'],'document_sha256':policy.content['document_sha256'],
+                'effective_from':policy.effective_from.isoformat(),'effective_to':policy.effective_to.isoformat() if policy.effective_to else None}
+            units = [{'id':f'policy:{policy.pk}:{c["key"]}','rule_key':c['key'],'revision':policy.version,
+                'definition':c['definition'],'source':source} for c in policy.content['controls']]
+            bundles.append({'id':f'policy:{policy.pk}','digest':policy.digest,'content':{'units':units,
+                'name':f'Tenant policy: {policy.key}','version':policy.version,'classification':'TENANT_POLICY'},
+                'publication_id':review.pk if review else None,'max_age_seconds':86400})
     return bundles
 
 
@@ -226,7 +258,7 @@ def evaluate_inspection(bundles, snapshot, inputs, policy=None):
 
 @transaction.atomic
 def inspect_entry(actor, entry, *, axle_weights, total_weight, checklist_results, client_key='', context_id=None):
-    require_role(actor, INSPECTORS)
+    require_role(actor, INSPECTORS,entry.facility)
     assert_site(actor, entry)
     entry = QueueEntry.objects.select_for_update().get(pk=entry.pk)
     Facility.objects.select_for_update().get(pk=entry.facility_id)
@@ -247,21 +279,24 @@ def inspect_entry(actor, entry, *, axle_weights, total_weight, checklist_results
     context = entry.regulatory_contexts.order_by('-created_at', '-pk').first()
     if context_id is not None and (context is None or context.pk != context_id):
         raise ValidationError('Context changed; refresh before recording this inspection')
-    snapshot, bundles = {}, []
+    snapshot, bundles, tenant_snapshot = {}, [], {}
     try:
+        from tenancy.releases import snapshot as configuration_snapshot
+        tenant_snapshot = configuration_snapshot(entry.organisation,entry.facility)
         if context is None:
             raise ValidationError('CONFIGURATION_REQUIRED: recorded vehicle/driver/trip/load/route context is missing')
         snapshot = context_snapshot(context, at)
         bundles = bundles_for(context, at)
         from tenancy.configuration import workflow
-        result = evaluate_inspection(bundles, snapshot, inputs, workflow(entry.organisation))
+        result = evaluate_inspection(bundles, snapshot, inputs, workflow(entry.organisation,entry.facility))
     except ValidationError as exc:
         result = {'decision': 'REVIEW_REQUIRED', 'controls': [{'id': 'configuration', 'status': 'REVIEW_REQUIRED',
                   'reason': '; '.join(exc.messages), 'override_policy': 'NOT_ALLOWED'}], 'readiness_percent': 0,
                   'override_eligible': False, 'engine_version': 'nrok-1', 'monetary_penalty': None}
     attempt = m.InspectionAttempt.objects.create(organisation=entry.organisation, facility=entry.facility, creator=actor,
         queue_entry=entry, context=context, client_key=client_key, submission_digest=submission, occurred_at=at,
-        input_snapshot=inputs, context_snapshot=snapshot, ruleset_snapshot=bundles, result=result, decision=result['decision'])
+        input_snapshot=inputs, context_snapshot=snapshot, ruleset_snapshot=bundles, result=result, decision=result['decision'],
+        tenant_configuration_snapshot=tenant_snapshot)
     entry.status = 'COMPLETED' if attempt.decision in ('PASS', 'PASS_WITH_WARNINGS') else 'QUARANTINED'
     entry.save(update_fields=['status', 'updated_at'])
     if entry.status == 'QUARANTINED':
@@ -284,7 +319,7 @@ def lock_current_attempt(actor, attempt):
 
 @transaction.atomic
 def request_override(actor, attempt, reason):
-    require_role(actor, OPERATORS)
+    require_role(actor, OPERATORS,attempt.facility)
     entry = lock_current_attempt(actor, attempt)
     if not attempt.result.get('override_eligible') or not reason.strip():
         raise ValidationError('This attempt cannot be overridden; remediate and re-evaluate')
@@ -299,7 +334,7 @@ def request_override(actor, attempt, reason):
 
 @transaction.atomic
 def approve_override(actor, request, approved, reason):
-    require_role(actor, OPERATORS)
+    require_role(actor, OPERATORS,request.attempt.facility)
     entry = lock_current_attempt(actor, request.attempt)
     latest = request.attempt.override_requests.order_by('-created_at', '-pk').first()
     if latest.pk != request.pk or entry.status != 'PENDING_OVERRIDE' or not request.attempt.result.get('override_eligible'):
@@ -314,6 +349,11 @@ def approve_override(actor, request, approved, reason):
 def release_authority(entry, actor):
     """Caller holds queue lock; revalidate effective policy and evidence at exit."""
     require_role(actor, (UserRole.DISPATCH_SUPERVISOR, UserRole.OPERATIONS_SUPERVISOR, UserRole.FACILITY_MANAGER))
+    from core.rbac import rbac_allows
+    from tenancy.releases import require_module
+    require_module(entry.organisation,'release')
+    if not rbac_allows(get_user_role(actor),'queue','update',entry.organisation,entry.facility):
+        raise PermissionError('Site permission profile does not authorize release')
     from trip.models import Organisation
     Organisation.objects.select_for_update().get(pk=entry.organisation_id)
     attempt = entry.inspection_attempts.first()
@@ -328,7 +368,14 @@ def release_authority(entry, actor):
     if digest(snapshot) != digest(attempt.context_snapshot) or digest(bundles) != digest(attempt.ruleset_snapshot):
         raise ValidationError('Evidence or effective rules changed; re-evaluate before release')
     from tenancy.configuration import workflow
-    policy = workflow(entry.organisation)
+    from tenancy.releases import snapshot as configuration_snapshot,active_release
+    current_configuration = configuration_snapshot(entry.organisation,entry.facility)
+    if attempt.tenant_configuration_snapshot:
+        if attempt.tenant_configuration_snapshot.get('decision_digest') != current_configuration.get('decision_digest'):
+            raise ValidationError('Tenant workflow, site, policy or regulatory assignment changed; re-evaluate')
+    elif active_release(entry.organisation) and not active_release(entry.organisation).compatibility:
+        raise ValidationError('Tenant release changed; re-evaluate under its recorded configuration')
+    policy = workflow(entry.organisation,entry.facility)
     historical_policy = attempt.result.get('tenant_policy')
     if historical_policy:
         if historical_policy['digest'] != policy['digest']:

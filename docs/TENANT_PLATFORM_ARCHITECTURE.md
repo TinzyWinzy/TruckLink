@@ -2,6 +2,8 @@
 
 Status: implemented refactor, 6 October 2026. This direction supersedes the BAK-first application/domain ownership in the earlier directory strategy and brief. BAK Logistics is the first configured tenant and reference implementation. The application, regulatory engine and reusable transport workflows belong to Trucki.
 
+The [architecture amendment](TRANSPORT_REGOPS_ARCHITECTURE_AMENDMENT.md) defines the fuller configuration boundary. The [release implementation](TENANT_RELEASE_IMPLEMENTATION.md) records the new platform-owned source/ROU/pack registry, module activation, reviewed workflows/policies and pinned execution histories. This document describes the original foundation; production release evidence identifies which implementation is live. No second tenant is configured before operational discovery.
+
 ## Ownership
 
 | Platform | Tenant |

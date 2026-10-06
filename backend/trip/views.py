@@ -4,6 +4,7 @@ from datetime import datetime
 
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from tenancy.access import ModuleAccess
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
@@ -136,7 +137,7 @@ def _serialize_hos_daily_logs(days):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 @throttle_classes([TripUserThrottle])
 def trip_estimate(request):
     """Estimate trip cost without persisting a trip."""
@@ -224,7 +225,7 @@ def trip_estimate(request):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 @throttle_classes([TripUserThrottle])
 def trip_plan(request):
     """Plan a trip: geocode -> route -> HOS -> cost estimate -> persist."""
@@ -405,7 +406,7 @@ def trip_plan(request):
 # ---------------------------------------------------------------------------
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def trips_list(request):
     qs = Trip.objects.select_related("driver", "vehicle").prefetch_related("status_logs", "commodity__category").order_by("-created_at")
     qs = scope_organisation(qs, request.user)
@@ -437,7 +438,7 @@ def trips_list(request):
 
 
 @api_view(["GET", "PATCH"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def trip_detail(request, pk):
     try:
         trip = Trip.objects.select_related("driver", "vehicle").get(pk=pk)
@@ -458,7 +459,7 @@ def trip_detail(request, pk):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def trip_update_status(request, pk):
     """Update trip status with transition validation."""
     try:
@@ -521,7 +522,7 @@ def trip_update_status(request, pk):
 # ---------------------------------------------------------------------------
 
 @api_view(["GET", "POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def vehicles_list(request):
     if request.method == "GET":
         qs = Vehicle.objects.select_related("organisation").filter(is_deleted=False)
@@ -546,7 +547,7 @@ def vehicles_list(request):
 
 
 @api_view(["GET", "PATCH", "DELETE"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def vehicle_detail(request, pk):
     try:
         vehicle = Vehicle.objects.select_related("organisation").get(pk=pk)
@@ -573,7 +574,7 @@ def vehicle_detail(request, pk):
 # ---------------------------------------------------------------------------
 
 @api_view(["GET", "POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def fuel_list(request):
     if request.method == "GET":
         qs = FuelRecord.objects.select_related("trip", "vehicle", "recorded_by").order_by("-created_at")
@@ -606,7 +607,7 @@ def fuel_list(request):
 # ---------------------------------------------------------------------------
 
 @api_view(["GET", "POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def drivers_list(request):
     if request.method == "GET":
         qs = Driver.objects.select_related("organisation").filter(is_deleted=False)
@@ -624,7 +625,7 @@ def drivers_list(request):
 
 
 @api_view(["GET", "PATCH", "DELETE"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def driver_detail(request, pk):
     try:
         driver = Driver.objects.select_related("organisation").get(pk=pk)
@@ -651,7 +652,7 @@ def driver_detail(request, pk):
 # ---------------------------------------------------------------------------
 
 @api_view(["GET", "POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def trip_positions(request, pk):
     """Get position history or report a new position for a trip."""
     try:
@@ -693,7 +694,7 @@ def trip_positions(request, pk):
 # ---------------------------------------------------------------------------
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def trip_sos(request, pk):
     """Trigger an SOS alert for a trip."""
     try:
@@ -722,7 +723,7 @@ def trip_sos(request, pk):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def trip_sos_acknowledge(request, pk):
     """Acknowledge an SOS alert (dispatcher action)."""
     try:
@@ -759,7 +760,7 @@ def health(request):
 # ---------------------------------------------------------------------------
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def commodity_list(request):
     qs = Commodity.objects.select_related("category").filter(is_active=True)
     return Response({
@@ -769,7 +770,7 @@ def commodity_list(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def commodity_categories(request):
     qs = CommodityCategory.objects.all()
     return Response({
@@ -887,6 +888,9 @@ def public_book(request):
         org = tenants[0] if len(tenants) == 1 else None
     if org is None:
         return Response({'ok':False,'error':'Choose a configured tenant for this booking'},status=400)
+    from tenancy.releases import module_enabled
+    if not module_enabled(org,'fleet'):
+        return Response({'ok':False,'error':'Tenant fleet module requires an active discovered configuration'},status=403)
 
     booking_ref = _generate_booking_reference()
     token = uuid.uuid4()
@@ -1046,7 +1050,7 @@ def public_track(request, ref):
 # ---------------------------------------------------------------------------
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def bookings_list(request):
     """Admin list bookings (trips in inquiry/quoted/confirmed/assigned)."""
     qs = Trip.objects.select_related("driver", "vehicle").order_by("-created_at")
@@ -1084,7 +1088,7 @@ def bookings_list(request):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def booking_assign(request, pk):
     """Admin assigns driver + vehicle to a confirmed booking."""
     try:
@@ -1141,7 +1145,7 @@ def booking_assign(request, pk):
 
 
 @api_view(["GET", "POST"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, ModuleAccess])
 def booking_images(request, pk):
     """Upload or list images for a booking/trip."""
     try:

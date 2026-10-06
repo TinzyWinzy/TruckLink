@@ -78,6 +78,7 @@ class Organisation(models.Model):
     """Transport platform tenant; retained database identity and table for compatibility."""
     name = models.CharField(max_length=200)
     slug = models.SlugField(max_length=100, unique=True)
+    requires_release = models.BooleanField(default=False)
     license_key = models.CharField(max_length=100, blank=True, default="")
     licensed_vehicles = models.IntegerField(default=50)
     contact_phone = models.CharField(max_length=30, blank=True, default="")

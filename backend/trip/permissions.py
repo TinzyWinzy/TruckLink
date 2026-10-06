@@ -120,6 +120,8 @@ class IsAdmin(BasePermission):
     """ADMIN role only (replaces the is_staff shortcut — SAD §5)."""
 
     def has_permission(self, request, view):
+        from tenancy.access import enforce_request
+        enforce_request(request.user,request)
         return get_user_role(request.user) == UserRole.ADMIN
 
 
@@ -127,6 +129,8 @@ class IsOwnerOrReadOnly(BasePermission):
     """ADMIN role full access; other authenticated roles read-only."""
 
     def has_permission(self, request, view):
+        from tenancy.access import enforce_request
+        enforce_request(request.user,request)
         if not request.user or not request.user.is_authenticated:
             return False
         if request.method in SAFE_METHODS:

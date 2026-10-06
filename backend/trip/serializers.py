@@ -31,7 +31,7 @@ class RegisterSerializer(serializers.Serializer):
         )
         # Self-service registration may create its own workspace, never join
         # an existing tenant or acquire a yard supervisor identity implicitly.
-        org = Organisation.objects.create(slug=f"self-service-{uuid.uuid4().hex}", name=user.username)
+        org = Organisation.objects.create(slug=f"self-service-{uuid.uuid4().hex}", name=user.username, requires_release=True)
         from .models import UserRole
         UserProfile.objects.create(user=user, organisation=org, role=UserRole.EXECUTIVE)
         Driver.objects.create(user=user, name=validated["name"], organisation=org)

@@ -13,6 +13,9 @@ test('a second tenant edits its branding and workflow without a BAK default', as
       return
     }
     let response: unknown = {}
+    if (path === '/api/tenant/registry/') response = { modules:{yard:[],inspection:['yard'],release:['inspection'],routing:[],audit:[]},release:null,activation_version:0 }
+    if (path === '/api/tenant/revisions/') response = { revisions:[] }
+    if (path === '/api/tenant/releases/') response = { releases:[] }
     if (path === '/api/auth/pin/') response = { token:'synthetic-only',user:user() }
     if (path === '/api/auth/me/') response = { user:user() }
     if (path === '/api/tenant/configuration/') {

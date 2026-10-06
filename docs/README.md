@@ -4,6 +4,8 @@ Current direction: Trucki is a tenant-aware transport operations platform. BAK L
 
 | Document | Authority/status |
 | --- | --- |
+| [Tenant release implementation](TENANT_RELEASE_IMPLEMENTATION.md) | Implemented configuration schemas, activation, workflow history, native platform knowledge, APIs, onboarding and compatibility migration |
+| [Transport RegOps architecture amendment](TRANSPORT_REGOPS_ARCHITECTURE_AMENDMENT.md) | Target model, deployed gaps, versioned modules/workflows/policies, preservation gates and discovery-first onboarding |
 | [Tenant platform architecture](TENANT_PLATFORM_ARCHITECTURE.md) | Current platform/tenant ownership, configuration, migration compatibility and preservation checks |
 | [BAK reference tenant](../tenants/bak/README.md) | Tenant-specific manifest, preserved identity and integration bindings |
 | [NetOne design reference](NETONE_DESIGN_REFERENCE.md) | Reviewed source patterns and Reports adaptation with desktop/mobile validation |

@@ -122,7 +122,7 @@ def evaluate(bundles, context, inputs):
             add(key, passed, f'{kind} requirement evaluated', expected=expected, measured=measured,
                 failure='HOLD' if kind in ('EVIDENCE', 'CHECKLIST') and rule['failure_action'] != 'PASS_WITH_WARNINGS' else rule['failure_action'],
                 override='NOT_ALLOWED' if kind in ('EVIDENCE', 'CHECKLIST') else rule['override_policy'], provenance=provenance)
-        if not any(c['status'] != 'NOT_APPLICABLE' for c in controls[first_control:]):
+        if bundle['content'].get('classification') != 'TENANT_POLICY' and not any(c['status'] != 'NOT_APPLICABLE' for c in controls[first_control:]):
             add(f"configuration.applicability:{bundle['id']}", False,
                 'No control applies in this jurisdiction; review applicability', failure='REVIEW_REQUIRED')
     active = [c for c in controls if c['status'] != 'NOT_APPLICABLE']

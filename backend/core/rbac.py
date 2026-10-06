@@ -83,7 +83,7 @@ ROLE_MATRIX: dict[tuple[str, str], set[str]] = {
 }
 
 
-def rbac_allows(role: str | None, resource: str, action: str, organisation=None) -> bool:
+def rbac_allows(role: str | None, resource: str, action: str, organisation=None, facility=None) -> bool:
     """True if the role may perform action on resource (fail-closed)."""
     if role is None:
         return False
@@ -93,8 +93,13 @@ def rbac_allows(role: str | None, resource: str, action: str, organisation=None)
     if role not in allowed:
         return False
     if organisation is not None:
+        from tenancy.registry import RESOURCE_MODULE
+        from tenancy.releases import module_enabled
+        module = RESOURCE_MODULE.get(resource)
+        if action != 'read' and module and not module_enabled(organisation,module):
+            return False
         from tenancy.configuration import resolved
-        config = resolved(organisation)['content']
+        config = resolved(organisation,facility=facility)['content']
         return config['roles'].get(role,{}).get('enabled',False) and role in config['permissions'].get(f'{resource}.{action}',allowed)
     return True
 
@@ -115,11 +120,29 @@ class RoleAccess(BasePermission):
     (and optionally `rbac_action` to override method-derived action)."""
 
     def has_permission(self, request, view):
+        from tenancy.access import enforce_request
+        enforce_request(request.user,request)
         resource = getattr(view, "rbac_resource", None)
         if resource is None:
             return False  # fail-closed: no resource declared, no access
         action = getattr(view, "rbac_action", None) or _METHOD_ACTION.get(request.method)
         if action is None:
             return False
-        from trip.permissions import get_user_organisation
-        return rbac_allows(get_user_role(request.user), resource, action, get_user_organisation(request.user))
+        from trip.permissions import get_user_organisation,user_facilities
+        org = get_user_organisation(request.user)
+        ref = request.query_params.get('facility') if request.method in ('GET','HEAD') else request.data.get('facility')
+        site = None
+        if ref:
+            from core.audit_views import find_facility
+            site = find_facility(str(ref),request.user)
+        elif getattr(view,'kwargs',{}).get('pk'):
+            from yard.models import QueueEntry,Dock,Alert,ComplianceCheck
+            models = {'queue':QueueEntry,'docks':Dock,'alerts':Alert,'compliance':ComplianceCheck}
+            model = models.get(resource)
+            if model:
+                try:
+                    site_id = model.objects.filter(pk=view.kwargs['pk'],organisation=org).values_list('facility_id',flat=True).first()
+                    site = user_facilities(request.user).filter(pk=site_id,organisation=org).first()
+                except (ValueError,TypeError):
+                    pass  # The view will return its normal invalid/missing-object response.
+        return rbac_allows(get_user_role(request.user), resource, action, org, site)

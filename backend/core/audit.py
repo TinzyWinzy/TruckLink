@@ -85,6 +85,9 @@ def append_audit(
         meta.current_hash = digest
         meta.seq += 1
         meta.save(update_fields=["current_hash", "seq", "updated_at"])
+        if isinstance(payload,dict):
+            from tenancy.execution import record_audit
+            record_audit(row,payload)
         return row
 
 

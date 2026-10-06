@@ -1,5 +1,6 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from tenancy.access import ModuleAccess
 from rest_framework.response import Response
 from trip.permissions import get_user_role, get_user_organisation
 from core.audit_views import find_facility
@@ -7,7 +8,7 @@ from regulatory.modelling import run_model
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated,ModuleAccess])
 def model_workspace(request):
     org = get_user_organisation(request.user)
     if not org or get_user_role(request.user) not in ('ADMIN','EXECUTIVE','FACILITY_MANAGER'):

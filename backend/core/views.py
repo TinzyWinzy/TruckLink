@@ -60,7 +60,7 @@ def tenancy_signup(request):
         )
 
     with transaction.atomic():
-        org = Organisation.objects.create(name=org_name, slug=slug)
+        org = Organisation.objects.create(name=org_name, slug=slug, requires_release=True)
         fac_slug = slugify(facility_name)[:100] or "yard"
         facility = Facility.objects.create(
             organisation=org, name=facility_name, slug=fac_slug,

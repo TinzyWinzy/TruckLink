@@ -133,6 +133,12 @@ def route_workspace(request):
 @permission_classes([IsAuthenticated])
 @throttle_classes([RouteCommandThrottle])
 def route_command(request, save=False):
+    from tenancy.releases import module_enabled
+    if not module_enabled(get_user_organisation(request.user),'routing'):
+        return Response({'error':'Tenant routing module is disabled.'},status=403)
+    from tenancy.integrations import adapter_enabled
+    if not adapter_enabled(get_user_organisation(request.user),'road-routing-v1'):
+        return Response({'error':'Tenant road-routing adapter is disabled.'},status=403)
     yard = site(request)
     if not yard:
         return Response({'error':'Yard not found.'},status=404)

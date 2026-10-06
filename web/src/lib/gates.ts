@@ -29,7 +29,10 @@ export const ROUTE_GATES: Record<RouteKey, Role[]> = {
 
 export function canVisit(route: RouteKey, role: Role | null): boolean {
   if (!canAccess(role, ROUTE_GATES[route])) return false
-  const config = useSession.getState().workspace?.configuration?.content
+  const tenant = useSession.getState().workspace?.configuration
+  const config = tenant?.content
+  const modules: Partial<Record<RouteKey,string>> = { queue:'yard',docks:'docks',compliance:'inspection',alerts:'yard',routes:'routing',reports:'reports',modelling:'modelling',audit:'audit' }
+  if (modules[route] && tenant?.modules?.[modules[route]!] === false) return false
   const resource = route === 'audit' ? 'audit' : route
   const allowed = config?.permissions[resource + '.read']
   return !config || (config.roles[role!]?.enabled !== false && (!allowed || allowed.includes(role!)))

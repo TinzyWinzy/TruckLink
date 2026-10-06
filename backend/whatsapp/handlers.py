@@ -47,6 +47,10 @@ def handle_incoming(phone: str, body: str, lat: float | None = None, lon: float 
         driver = drivers.first()
         if organisation is None and driver:
             organisation = driver.organisation
+        if organisation:
+            from tenancy.releases import module_enabled
+            if not module_enabled(organisation,'fleet'):
+                return 'Fleet operations are disabled for this tenant. Contact your dispatcher.'
         session = get_or_create_session(phone,organisation)
 
         if lat is not None and lon is not None:

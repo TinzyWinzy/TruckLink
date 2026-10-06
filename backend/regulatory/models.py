@@ -347,6 +347,7 @@ class InspectionAttempt(Record):
     input_snapshot = models.JSONField()
     context_snapshot = models.JSONField(default=dict, blank=True)
     ruleset_snapshot = models.JSONField(default=list, blank=True)
+    tenant_configuration_snapshot = models.JSONField(default=dict, blank=True)
     result = models.JSONField()
     decision = models.CharField(max_length=24)
     engine_version = models.CharField(max_length=24, default='nrok-1')
@@ -392,3 +393,7 @@ class ReleaseRecord(Record):
         super().clean()
         if self.attempt.queue_entry_id != self.queue_entry_id or (self.approval_id and self.approval.request.attempt_id != self.attempt_id):
             raise ValidationError('Release authority must refer to this entry and attempt')
+
+
+# Register platform-owned knowledge models without changing legacy app/table labels.
+from .knowledge import KnowledgeRevision, KnowledgeReview, GovernanceEvent, LegacyKnowledgeMap  # noqa: E402,F401
