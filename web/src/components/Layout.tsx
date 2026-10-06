@@ -28,8 +28,10 @@ function visible(items: typeof PRIMARY, role: Role | null) {
 export default function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const { role, userId, displayName, online, setOnline, signOut, signInDemo } = useSession()
+  const { role, baseRole, signInReal, userId, displayName, online, setOnline, signOut, signInDemo } = useSession()
   const practice = isPracticeSession(userId)
+  const [switching, setSwitching] = useState(false)
+  const [switchError, setSwitchError] = useState<string | null>(null)
   const [pending, setPending] = useState(0)
   const [blocked, setBlocked] = useState(0)
   const [critical, setCritical] = useState(0)
@@ -123,16 +125,31 @@ export default function Layout({ children }: { children: ReactNode }) {
           <span className="ml-auto hidden text-xs font-semibold text-white/60 md:inline">
             {displayName} · {role?.replace(/_/g, ' ') ?? 'signed out'}
           </span>
-          {practice && (
+          {baseRole === 'ADMIN' && (
             <label className="flex items-center gap-1.5 rounded-lg border border-amber-400/50 bg-white/5 px-2 py-1 text-xs font-bold text-amber-300">
               View as
               <select
-                aria-label="Switch practice role"
+                aria-label={practice ? 'Switch practice role' : 'Switch working role'}
+                disabled={switching || (!practice && !online)}
                 value={role ?? ''}
-                onChange={(e) => {
+                onChange={async (e) => {
                   const next = e.target.value as Role
-                  signInDemo(next)
-                  navigate(landingPathForRole(next))
+                  setSwitchError(null)
+                  if (practice) {
+                    signInDemo(next)
+                    navigate(landingPathForRole(next))
+                    return
+                  }
+                  setSwitching(true)
+                  try {
+                    const session = await (await import('../lib/live')).switchRoleLive(next)
+                    signInReal(session.uid, session.role, session.displayName, session.baseRole)
+                    navigate(landingPathForRole(session.role))
+                  } catch (error) {
+                    setSwitchError((error as Error).message)
+                  } finally {
+                    setSwitching(false)
+                  }
                 }}
                 className="touch-target min-h-0 rounded bg-transparent py-0.5 pr-1 font-extrabold text-white [&>option]:text-slate-900"
               >
@@ -158,6 +175,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           </button>
         </div>
       </header>
+      {switchError && <p role="alert" className="p-4 text-red-800">{switchError}</p>}
       <div className="workbench-body">
       <aside className="workspace-rail">
         <div className="rail-heading"><span className="eyebrow">Workspace</span><p>{role?.replace(/_/g, ' ').toLowerCase()}</p></div>

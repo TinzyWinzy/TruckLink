@@ -42,6 +42,7 @@ function hasRole(value: unknown): value is LiveRole {
 }
 
 interface SessionUser {
+  baseRole: LiveRole
   uid: string
   role: LiveRole
   displayName: string
@@ -51,6 +52,7 @@ function sessionFrom(user: {
   id?: string | number
   username?: string
   role?: string
+  base_role?: string
 }): SessionUser {
   if (!hasRole(user.role)) {
     clearToken()
@@ -59,6 +61,7 @@ function sessionFrom(user: {
     )
   }
   return {
+    baseRole: hasRole(user.base_role) ? user.base_role : user.role,
     uid: String(user.id ?? ''),
     role: user.role,
     displayName: user.username ?? 'Trucki user',
@@ -606,4 +609,12 @@ async function replayPendingActions(): Promise<{ done: number; failed: number }>
     }
   }
   return { done, failed }
+}
+
+
+export async function switchRoleLive(role: LiveRole): Promise<SessionUser> {
+  const data = await apiFetch<{ user: { id: number; username: string; role: string; base_role: string } }>(
+    '/auth/switch-role/', { method: 'POST', body: { role } },
+  )
+  return sessionFrom(data.user)
 }

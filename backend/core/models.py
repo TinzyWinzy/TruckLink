@@ -186,3 +186,10 @@ class PushSubscription(models.Model):
 
     def __str__(self):
         return f'push[{self.user_id}] {self.endpoint[:48]}'
+
+
+class AdminRoleSelection(models.Model):
+    """Selected working role for an administrator's existing API token."""
+    token = models.OneToOneField('authtoken.Token', on_delete=models.CASCADE)
+    role = models.CharField(max_length=32, choices=UserRole.choices)
+    updated_at = models.DateTimeField(auto_now=True)

@@ -43,6 +43,7 @@ urlpatterns = [
     path("auth/pin/", auth_views.pin_login),
     path("auth/logout/", auth_views.logout_view),
     path("auth/me/", auth_views.me),
+    path("auth/switch-role/", auth_views.switch_role),
     # Tenancy (core app)
     path("tenancy/signup/", core_views.tenancy_signup),
     path("admin/pins/", core_views.provision_pin),

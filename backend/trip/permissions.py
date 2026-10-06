@@ -16,7 +16,8 @@ def get_user_role(user):
     profile = getattr(user, "profile", None)
     if profile is None:
         return None
-    return profile.role
+    role = getattr(user, "_working_role", profile.role) if profile.role == UserRole.ADMIN else profile.role
+    return role if role in UserRole.values else None
 
 
 def get_user_organisation(user):

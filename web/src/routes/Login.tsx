@@ -65,7 +65,7 @@ export default function Login() {
       const s = pinMode
         ? await live.signInPinLive(value, secret)
         : await live.signInLive(value, secret)
-      signInReal(s.uid, s.role, s.displayName)
+      signInReal(s.uid, s.role, s.displayName, s.baseRole)
       navigate(landingPathForRole(s.role))
     } catch (e) {
       setError(friendlyAuthError((e as Error).message, pinMode))

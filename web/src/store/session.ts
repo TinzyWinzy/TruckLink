@@ -26,6 +26,7 @@ export function roleFromSlug(raw: string | null): Role | null {
 const DEMO_KEY = 'bak-practice-session'
 
 interface DemoSession {
+  baseRole?: Role
   role: Role
 }
 
@@ -44,15 +45,15 @@ function loadDemoSession(): DemoSession | null {
       'COMPLIANCE_OFFICER',
     ]
     if (!parsed || !roles.includes(parsed.role)) return null
-    return { role: parsed.role }
+    return { role: parsed.role, baseRole: parsed.baseRole === 'ADMIN' ? 'ADMIN' : parsed.role }
   } catch {
     return null
   }
 }
 
-function saveDemoSession(role: Role): void {
+function saveDemoSession(role: Role, baseRole: Role): void {
   try {
-    sessionStorage.setItem(DEMO_KEY, JSON.stringify({ role } satisfies DemoSession))
+    sessionStorage.setItem(DEMO_KEY, JSON.stringify({ role, baseRole } satisfies DemoSession))
   } catch {
     // Private mode — session just won't survive refresh.
   }
@@ -73,10 +74,11 @@ function demoDisplay(role: Role): { userId: string; displayName: string } {
 interface SessionState {
   userId: string | null
   role: Role | null
+  baseRole: Role | null
   displayName: string
   online: boolean
   signInDemo: (role: Role) => void
-  signInReal: (userId: string, role: Role, displayName: string) => void
+  signInReal: (userId: string, role: Role, displayName: string, baseRole?: Role) => void
   signOut: () => void
   setOnline: (online: boolean) => void
 }
@@ -84,27 +86,29 @@ interface SessionState {
 const initialDemo = loadDemoSession()
 const initialIdentity = initialDemo ? demoDisplay(initialDemo.role) : null
 
-export const useSession = create<SessionState>((set) => ({
+export const useSession = create<SessionState>((set, get) => ({
   userId: initialIdentity?.userId ?? null,
   role: initialDemo?.role ?? null,
+  baseRole: initialDemo?.baseRole ?? initialDemo?.role ?? null,
   displayName: initialIdentity?.displayName ?? 'Practice user',
   online: typeof navigator === 'undefined' ? true : navigator.onLine,
   signInDemo: (role) => {
-    saveDemoSession(role)
-    set({ ...demoDisplay(role), role })
+    const baseRole = isPracticeSession(get().userId) && get().baseRole === 'ADMIN' ? 'ADMIN' : role
+    saveDemoSession(role, baseRole)
+    set({ ...demoDisplay(role), role, baseRole })
   },
-  signInReal: (userId, role, displayName) => {
+  signInReal: (userId, role, displayName, baseRole = role) => {
     clearDemoSession()
-    set({ userId, role, displayName })
+    set({ userId, role, displayName, baseRole })
   },
   signOut: () => {
     clearDemoSession()
-    set({ userId: null, role: null })
+    set({ userId: null, role: null, baseRole: null })
   },
   setOnline: (online) => set({ online }),
 }))
 
-/** Practice session (local-only) vs real yard sign-in. Only practice sessions may switch roles in place. */
+/** Practice session (local-only) vs real yard sign-in. Only assigned administrators may select a working role; live changes are server-authorized. */
 export function isPracticeSession(userId: string | null): boolean {
   return userId != null && userId.startsWith('demo-')
 }

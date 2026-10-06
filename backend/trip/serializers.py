@@ -47,6 +47,7 @@ class LoginSerializer(serializers.Serializer):
 class UserSerializer(serializers.ModelSerializer):
     is_admin = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
+    base_role = serializers.SerializerMethodField()
     driver_id = serializers.SerializerMethodField()
     organisation_id = serializers.SerializerMethodField()
     organisation = serializers.SerializerMethodField()
@@ -55,7 +56,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            "id", "username", "is_admin", "role", "driver_id",
+            "id", "username", "is_admin", "role", "base_role", "driver_id",
             "organisation_id", "organisation", "facilities", "date_joined",
         ]
 
@@ -63,6 +64,10 @@ class UserSerializer(serializers.ModelSerializer):
         from .permissions import get_user_role
         from .models import UserRole
         return get_user_role(obj) == UserRole.ADMIN
+
+    def get_base_role(self, obj):
+        profile = getattr(obj, "profile", None)
+        return profile.role if profile else None
 
     def get_role(self, obj):
         from .permissions import get_user_role

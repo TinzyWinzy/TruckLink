@@ -53,8 +53,8 @@ test('deep link ?role=dispatch signs straight into the shift', async ({ page }) 
 })
 
 test('header View-as switcher changes role without sign-out', async ({ page }) => {
-  await page.goto('/?demo=1&role=dispatch')
-  await expect(page).toHaveURL(/\/queue$/)
+  await page.goto('/?demo=1&role=admin')
+  await expect(page).toHaveURL(/\/reports$/)
   await page.getByLabel('Switch practice role').selectOption('EXECUTIVE')
   await expect(page).toHaveURL(/\/reports$/)
   await expect(page.getByText('Shift performance')).toBeVisible()
@@ -78,4 +78,19 @@ test('dispatch is gated out of docks (dead-end, no redirect loop)', async ({ pag
   })
   await expect(page.getByText('Not permitted')).toBeVisible()
   await expect(page).toHaveURL(/\/docks$/)
+})
+
+
+test('only an admin account sees role switching, including after refresh', async ({ page }) => {
+  await page.goto('/?demo=1&role=dispatch')
+  await expect(page.getByRole('heading', { name: 'Shift queue' })).toBeVisible()
+  await expect(page.getByLabel('Switch practice role')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await page.goto('/?demo=1&role=admin')
+  await page.getByLabel('Switch practice role').selectOption('DISPATCH_SUPERVISOR')
+  await expect(page.getByRole('heading', { name: 'Shift queue' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel('Switch practice role')).toBeVisible()
+  await page.getByLabel('Switch practice role').selectOption('ADMIN')
+  await expect(page).toHaveURL(/\/reports$/)
 })

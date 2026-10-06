@@ -45,7 +45,7 @@ function RoleGuard({ route, children }: { route: RouteKey; children: ReactNode }
     )
   }
   // Identity changes remount private screens before they can display old rows.
-  return <Fragment key={userId}>{children}</Fragment>
+  return <Fragment key={`${userId}:${role}`}>{children}</Fragment>
 }
 
 function Fallback() {
@@ -66,7 +66,7 @@ function AuthRestore({ onReady }: { onReady: (ready: boolean) => void }) {
         if (useSession.getState().role) return // demo tap or fresh sign-in already holds the shift
         const s = await restoreSessionLive()
         if (!s || cancelled) return
-        signInReal(s.uid, s.role, s.displayName)
+        signInReal(s.uid, s.role, s.displayName, s.baseRole)
         if (window.location.pathname === '/') navigate(landingPathForRole(s.role))
       } catch {
         // Offline boot or dead token — staffer signs in again.

@@ -64,8 +64,8 @@ test('deep link signs Tafadzwa straight into dispatch', async ({ page }) => {
 })
 
 test('View-as switches to executive reports', async ({ page }) => {
-  await page.goto('/?demo=1&role=dispatch')
-  await expect(page).toHaveURL(/\/queue$/)
+  await page.goto('/?demo=1&role=admin')
+  await expect(page).toHaveURL(/\/reports$/)
   await page.getByLabel('Switch practice role').selectOption('EXECUTIVE')
   await expect(page).toHaveURL(/\/reports$/)
   await expect(page.getByText('Shift performance')).toBeVisible()
