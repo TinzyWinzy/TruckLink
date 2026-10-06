@@ -19,7 +19,7 @@ export default function RouteMap({ trips, selectedId, onSelect }: { trips: Route
   useEffect(() => {
     if (!container.current) return
     const instance = L.map(container.current, { scrollWheelZoom: false, fadeAnimation: false }).setView([-19, 29], 5)
-    const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(instance)
+    const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, referrerPolicy: 'strict-origin-when-cross-origin', attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }).addTo(instance)
     tiles.on('tileerror', () => setTileError(true))
     layer.current = L.layerGroup().addTo(instance)
     L.control.scale({ imperial: false }).addTo(instance)

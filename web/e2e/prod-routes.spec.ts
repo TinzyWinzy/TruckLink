@@ -5,8 +5,12 @@ test('production yard routes, real provider preview and synthetic map stay separ
   test.skip(!process.env.BAK_ADMIN_PIN, 'Explicit admin credentials required')
   test.setTimeout(150000)
   const errors: string[] = []
+  const tileStatuses: number[] = []
+  const draftWrites: string[] = []
   page.on('pageerror', error => errors.push(error.message))
-  await page.route('**/api/routes/drafts/', route => route.abort())
+  // Request interception disables browser caching, which is prohibited by OSM's tile policy.
+  page.on('response', response => { if (response.url().startsWith('https://tile.openstreetmap.org/')) tileStatuses.push(response.status()) })
+  page.on('request', request => { if (request.url().endsWith('/api/routes/drafts/')) draftWrites.push(request.method()) })
   await page.goto('/')
   await page.getByLabel('Staff ID', { exact: true }).fill(process.env.BAK_ADMIN_STAFF_ID || 'TRK-BAK-ADMIN')
   await page.getByLabel('PIN', { exact: true }).fill(process.env.BAK_ADMIN_PIN!)
@@ -39,6 +43,10 @@ test('production yard routes, real provider preview and synthetic map stay separ
   await expect(page.getByText(/Stale position; current location is unknown/)).toBeVisible()
   await expect(page.locator('.route-stop-icon')).toHaveCount(3)
   await expect(page.getByRole('button', { name: 'Save draft trip' })).toHaveCount(0)
+  await expect.poll(() => page.locator('.leaflet-tile').evaluateAll(images => images.some(image => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0)), { timeout: 30000 }).toBe(true)
+  expect(tileStatuses).toContain(200)
+  expect(tileStatuses.filter(status => status >= 400)).toEqual([])
+  expect(draftWrites).toEqual([])
   for (const [name, width] of [['desktop', 1440], ['mobile', 390]] as const) {
     await page.setViewportSize({ width, height: 1000 })
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)

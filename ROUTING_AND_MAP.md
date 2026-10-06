@@ -30,4 +30,4 @@ References: [SpotterAiAssessment](https://github.com/TinzyWinzy/SpotterAiAssessm
 
 Backend regression checks: 66 tests passed for trip APIs, tenant isolation and regulatory evaluation; nine route checks passed after provider validation and command throttling changes. These cover ordered intermediate stops, audit creation, replay/conflict handling, yard isolation through old endpoints, stale positions, foreign assignments, read-only roles and malformed provider responses.
 
-Frontend: production build, lint and 63 unit tests passed. All 20 practice browser flows passed, including map selection, mobile overflow, expansion/Escape, stale/no-position evidence and tile failure. Production checks are recorded after deployment in `PRODUCTION_INTERFACE_VALIDATION.md`.
+Frontend: production build, lint and 63 unit tests passed. All 20 practice browser flows passed, including map selection, mobile overflow, expansion/Escape, stale/no-position evidence and tile failure. Production checks are recorded after deployment in `docs/PRODUCTION_INTERFACE_VALIDATION.md`.
