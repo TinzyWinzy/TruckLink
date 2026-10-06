@@ -1,0 +1,11 @@
+# Tenant workspaces and synthetic modelling
+
+Trucki is the product. BAK Operations is a tenant, not a global application identity. Sign-in returns the user's organisation and authorized yards. Live facility scope no longer comes from VITE_FACILITY_ID. The yard picker contains server-authorized sites only; preferences are revalidated against membership after sign-in. Switching site remounts private views. Server tenant and facility checks remain authoritative.
+
+Modelling is available to tenant ADMIN, EXECUTIVE and FACILITY_MANAGER roles. Its POST endpoint validates site membership and bounded integer inputs. Runs do not write queue entries, source revisions, inspections, approvals or releases. The same seed and inputs reproduce the same result digest.
+
+Seven invented evaluation cases use the existing evaluate_inspection function: clear load, internal gross policy exceedance, manufacturer rating exceedance, missing mandatory attestations, inconsistent measurements, missing ruleset, and missing required trip evidence. All model limits, sources and rating reviews are explicitly synthetic. Sources contain effective dates and version digests. The JSON export includes assumptions, inputs, context and ruleset snapshots, controls and decisions. No legal instrument or penalty is verified.
+
+The capacity model uses exponential interarrival times, uniform service times from 80% to 120% of the configured mean, and a first-available-dock queue. Only PASS vehicles enter simulated service. Quarantine, HOLD and REVIEW_REQUIRED cases remain blocked. No override is invented. Model service completion is not an operational ReleaseRecord. Scenario weights are fixed and disclosed. A changed dock count or arrival rate gives a reproducible sensitivity comparison.
+
+This proves deterministic evaluator behaviour under specified assumptions and illustrates capacity effects. It does not validate physical scales, actual documents, external corridor feeds, separate-person approval execution or operational release. Existing full-stack integration tests cover those implemented software paths separately. No synthetic movement is merged into live Reports. The unsupported fines/payback panel has been removed rather than presented as a product result.

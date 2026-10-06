@@ -8,11 +8,11 @@ import { landingPathForRole } from '../lib/gates'
 function friendlyAuthError(raw: string, pinMode = false): string {
   if (/invalid credentials/i.test(raw))
     return pinMode
-      ? '✖ Staff ID or PIN did not match. Check for typos — then try again.'
-      : '✖ Email or password did not match. Check for typos, caps lock, or a trailing space from autofill — then try again.'
+      ? '✖ Staff ID or PIN did not match. Check for typos. Then try again.'
+      : '✖ Email or password did not match. Check for typos, caps lock, or a trailing space from autofill. Then try again.'
   if (/no job assigned/i.test(raw)) return `✖ ${raw}`
   if (/Network unreachable|network/i.test(raw))
-    return '⏳ Network problem — the yard Wi-Fi may be down. Work continues offline where supported.'
+    return '⏳ Network problem. The yard Wi-Fi may be down. Work continues offline where supported.'
   return `✖ ${raw}`
 }
 
@@ -136,7 +136,7 @@ export default function Login() {
           Start shift as {role.replace(/_/g, ' ')} →
         </button>
         <p className="mt-3 text-[11px] leading-snug text-slate-500">
-          Practice sign-in — training only. Yard sign-in uses real accounts; jobs come from your supervisor.
+          Practice sign-in. Training only. Yard sign-in uses real accounts; jobs come from your supervisor.
         </p>
       </>
     )
@@ -148,7 +148,7 @@ export default function Login() {
         <div className="rounded-2xl bg-white p-6 shadow-2xl" aria-label="Gate sign-in">
           <div className="flex items-center gap-3">
             <span aria-hidden="true" className="gantry-mark flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl font-black text-slate-900">
-              B
+              T
             </span>
             <div className="min-w-0">
               <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-amber-700">Trucki · Yard Operations</p>
@@ -160,10 +160,10 @@ export default function Login() {
           <div className="tnum mt-3 flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600" role="status">
             <span className="flex items-center gap-1.5">
               <span aria-hidden="true" className={`inline-block h-2 w-2 rounded-full ${online ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-              {online ? 'Online' : 'Offline — queued work syncs on reconnect'}
+              {online ? 'Online' : 'Offline. Queued work syncs on reconnect'}
             </span>
             <span aria-hidden="true" className="text-slate-300">·</span>
-            <span>{live ? 'Shift PIN or email' : 'Practice — pick a shift role'}</span>
+            <span>{live ? 'Shift PIN or email' : 'Practice. Pick a shift role'}</span>
           </div>
 
           {live ? (
@@ -199,12 +199,12 @@ export default function Login() {
                     {busy ? 'Signing in…' : 'Sign in to shift'}
                   </button>
                   <p className="mt-3 text-[11px] leading-snug text-slate-500">
-                    Pilot-grade PIN — too many wrong tries locks briefly, and yard actions still need your assigned job. Never share PINs; lost PINs go to your supervisor.
+                    Pilot-grade PIN. Too many wrong tries locks briefly, and yard actions still need your assigned job. Never share PINs; lost PINs go to your supervisor.
                   </p>
                   {allowDemo && (
                     <div className="mt-5 border-t border-slate-200 pt-4">
                       <p className="eyebrow">Practice sign-in · training only</p>
-                      <p className="page-sub mt-1">Skip sign-in — jump in as any shift role. Nothing here touches the yard.</p>
+                      <p className="page-sub mt-1">Skip sign-in. Jump in as any shift role. Nothing here touches the yard.</p>
                       <div className="mt-3">{demoTabsBlock()}</div>
                     </div>
                   )}
@@ -226,7 +226,7 @@ export default function Login() {
                   {allowDemo && (
                     <div className="mt-5 border-t border-slate-200 pt-4">
                       <p className="eyebrow">Practice sign-in · training only</p>
-                      <p className="page-sub mt-1">Skip sign-in — jump in as any shift role. Nothing here touches the yard.</p>
+                      <p className="page-sub mt-1">Skip sign-in. Jump in as any shift role. Nothing here touches the yard.</p>
                       <div className="mt-3">{demoTabsBlock()}</div>
                     </div>
                   )}
@@ -235,12 +235,12 @@ export default function Login() {
             </>
           ) : allowDemo ? (
             <>
-              <p className="page-sub mt-3">Practice mode — pick the job you are covering this shift.</p>
+              <p className="page-sub mt-3">Practice mode. Pick the job you are covering this shift.</p>
               <div className="mt-3">{demoTabsBlock()}</div>
             </>
           ) : (
             <p role="alert" className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-800">
-              ✖ Yard system not connected — ask your supervisor to connect this tablet. Nothing is saved in this state.
+              ✖ Yard system not connected. Ask your supervisor to connect this tablet. Nothing is saved in this state.
             </p>
           )}
         </div>

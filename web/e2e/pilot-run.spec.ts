@@ -39,7 +39,7 @@ test('DISPATCH validates a load — PASS then deliberate FAIL', async ({ page })
 
   await page.getByLabel(/Axle 2/).fill('12000')
   await page.getByRole('button', { name: /Validate load/ }).click()
-  await expect(page.getByRole('status').filter({ hasText: /FAIL — quarantine/ })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: /FAIL.*quarantine/ })).toBeVisible()
 })
 
 test('OPS assigns a dock and acknowledges a critical alert', async ({ page }) => {
@@ -48,7 +48,7 @@ test('OPS assigns a dock and acknowledges a critical alert', async ({ page }) =>
   await page.goto('/docks')
   await expect(page.getByRole('heading', { name: 'Dock board' })).toBeVisible()
   await page.getByRole('button', { name: /Dock 3/ }).click()
-  await expect(page.getByText(/Practice —/)).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: /Practice.*Dock 3/ })).toBeVisible()
 
   await page.goto('/alerts')
   const critical = page.locator('li', { hasText: 'AFM 1187 quarantined' })
@@ -70,7 +70,7 @@ test('DISPATCH cannot acknowledge — read-only by design', async ({ page }) => 
   await expect(page).toHaveURL(/\/queue$/)
   await page.goto('/alerts')
   await expect(page.getByRole('heading', { name: /Alerts/ })).toBeVisible()
-  await expect(page.getByText('Read-only — yard supervisors acknowledge.').first()).toBeVisible()
+  await expect(page.getByText('Read-only. Yard supervisors acknowledge.').first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Acknowledge' })).toHaveCount(0)
 })
 

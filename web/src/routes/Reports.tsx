@@ -5,11 +5,9 @@ import { useSession } from '../store/session'
 import { computeTurnaroundStats, queueToCsv, type LiveRow } from '../lib/live'
 import {
   fetchHeatmap,
-  fetchRoi,
   fetchSurge,
   isAnalyticsLive,
   type HeatmapBucket,
-  type RoiSummary,
   type SurgeStatus,
 } from '../lib/analytics'
 import { EmptyState, PageHeader, Stat } from '../components/ui'
@@ -25,7 +23,7 @@ const SEED: LiveRow[] = [
   { id: 'q8', licensePlate: 'AFX 6640', driverName: 'D. Mutasa', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED', entryTimestamp: new Date(Date.now() - 9 * 60000).toISOString() },
 ]
 
-const fmt = (n: number | null) => (n == null ? '—' : `${Math.round(n)}m`)
+const fmt = (n: number | null) => (n == null ? 'N/A' : `${Math.round(n)}m`)
 
 export default function Reports() {
   const live = useLive()
@@ -35,7 +33,6 @@ export default function Reports() {
   const [docks, setDocks] = useState<LiveRow[]>([])
   const [heatmap, setHeatmap] = useState<HeatmapBucket[] | null>(null)
   const [surge, setSurge] = useState<SurgeStatus | null>(null)
-  const [roi, setRoi] = useState<RoiSummary | null>(null)
   const analytics = live && isAnalyticsLive()
 
   useEffect(() => {
@@ -58,15 +55,14 @@ export default function Reports() {
   useEffect(() => {
     if (!analytics) return
     let cancelled = false
-    Promise.all([fetchHeatmap(facilityId), fetchSurge(facilityId), fetchRoi(facilityId)]).then(
-      ([h, s, r]) => {
+    Promise.all([fetchHeatmap(facilityId), fetchSurge(facilityId)]).then(
+      ([h, s]) => {
         if (cancelled) return
         if (h) setHeatmap(h.buckets)
         if (s) setSurge(s)
-        if (r) setRoi(r)
       },
     ).catch(() => {
-      // Offline or server unreachable — sections below stay in empty states.
+      // Offline or server unreachable. Sections below stay in empty states.
     })
     return () => {
       cancelled = true
@@ -94,7 +90,7 @@ export default function Reports() {
     <div>
       <PageHeader
         title="Shift performance"
-        sub={live ? 'Live numbers for the SLA conversation — waiting now, cleared today, dock pressure.' : 'Practice numbers — training data only.'}
+        sub={live ? 'Live numbers for the SLA conversation. Waiting now, cleared today, dock pressure.' : 'Practice numbers. Training data only.'}
         mode={live ? 'live' : 'demo'}
         actions={
           <button type="button" onClick={downloadCsv} className="btn-primary touch-target rounded-lg px-4 text-sm">
@@ -108,7 +104,7 @@ export default function Reports() {
         <Stat label="Overdue > 60m" value={String(stats.overdueCount)} tone={stats.overdueCount > 0 ? 'alert' : 'good'} />
         <Stat label="Waiting now" value={fmt(stats.avgWaitMinutes)} tone="plain" />
         <Stat label="Turnaround avg" value={fmt(stats.avgTurnaroundMinutes)} tone="plain" />
-        <Stat label="Dock load" value={dockUtil == null ? '—' : `${dockUtil}%`} tone={dockUtil != null && dockUtil > 85 ? 'alert' : 'plain'} />
+        <Stat label="Dock load" value={dockUtil == null ? 'N/A' : `${dockUtil}%`} tone={dockUtil != null && dockUtil > 85 ? 'alert' : 'plain'} />
       </div>
       <h2 className="mb-2 mt-6 text-base font-extrabold">Queue by status · {stats.total} total</h2>
       {stats.total === 0 ? (
@@ -131,30 +127,12 @@ export default function Reports() {
         <EmptyState title="Loading pressure…" sub="Reaching the sync API." />
       ) : surge.surging ? (
         <div role="alert" className="card border-red-700 bg-red-50 px-4 py-3 text-sm font-bold text-red-900">
-          ▲ SURGE — {surge.queuedNow} queued (≥ {surge.threshold}) · {surge.arrivalsLastHour} arrivals last hour.
+          ▲ SURGE. {surge.queuedNow} queued (≥ {surge.threshold}) · {surge.arrivalsLastHour} arrivals last hour.
           Hold releases and open the overflow bay.
         </div>
       ) : (
         <div className="card px-4 py-3 text-sm font-semibold text-emerald-900">
-          ● Flow normal — {surge.queuedNow} queued · {surge.arrivalsLastHour} arrivals last hour.
-        </div>
-      )}
-
-      <h2 className="mb-2 mt-6 text-base font-extrabold">ZINARA fines intercepted · 30d</h2>
-      {!analytics ? (
-        <EmptyState title="Fines tracker unavailable" sub="Ask your supervisor to connect the fines feed." />
-      ) : !roi ? (
-        <EmptyState title="Loading ROI…" sub="Reaching the sync API." />
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Fines intercepted" value={`$${roi.finesInterceptedUsd.toLocaleString()}`} tone="good" />
-          <Stat label="Checks intercepted" value={String(roi.checksIntercepted)} tone="plain" />
-          <Stat label="Overload stopped" value={`${roi.overloadKgTotal.toLocaleString()}kg`} tone="plain" />
-          <Stat
-            label="Payback vs $6.2k pilot"
-            value={roi.paybackMultiple == null ? '—' : `${roi.paybackMultiple}×`}
-            tone={roi.paybackMultiple != null && roi.paybackMultiple >= 1 ? 'good' : 'plain'}
-          />
+          ● Flow normal. {surge.queuedNow} queued · {surge.arrivalsLastHour} arrivals last hour.
         </div>
       )}
 
@@ -171,7 +149,7 @@ export default function Reports() {
             <li key={b.hour} className="card flex items-center justify-between px-4 py-2 text-sm">
               <span className="font-semibold tabular-nums">{String(b.hour).padStart(2, '0')}:00</span>
               <span className="text-slate-600">{b.movements} moves</span>
-              <strong className="tabular-nums">{b.avgDwellMinutes == null ? '—' : `${b.avgDwellMinutes}m avg`}</strong>
+              <strong className="tabular-nums">{b.avgDwellMinutes == null ? 'N/A' : `${b.avgDwellMinutes}m avg`}</strong>
             </li>
           ))}
         </ul>

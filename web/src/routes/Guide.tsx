@@ -36,7 +36,7 @@ export default function Guide() {
     <div className="max-w-2xl">
       <PageHeader
         title={`the gatekeeper's walkthrough · ${finished}/${GUIDE_STEPS.length}`}
-        sub={live ? 'Yard walkthrough — ticks save on this tablet. Do it once here, you can do it on shift.' : 'Practice walkthrough — training shift, works offline. Ticks save on this tablet.'}
+        sub={live ? 'Yard walkthrough. Ticks save on this tablet. Do it once here, you can do it on shift.' : 'Practice walkthrough. Training shift, works offline. Ticks save on this tablet.'}
         mode={live ? 'live' : 'demo'}
       />
       <div className="mb-4 h-2.5 overflow-hidden rounded bg-slate-200" role="img" aria-label={`Progress ${finished} of ${GUIDE_STEPS.length}`}>
@@ -44,7 +44,7 @@ export default function Guide() {
       </div>
       {finished === GUIDE_STEPS.length && (
         <p role="status" className="card mb-3 border-2 border-emerald-700 bg-emerald-50 p-4 text-sm font-extrabold text-emerald-900">
-          ✔ Walkthrough complete — you can run a shift. Next: do steps 1–2 on a real truck with a supervisor watching.
+          ✔ Walkthrough complete. You can run a shift. Next: do steps 1–2 on a real truck with a supervisor watching.
         </p>
       )}
       <div className="space-y-3">

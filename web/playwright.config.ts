@@ -35,7 +35,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
       // prod-smoke targets the deployed site; e2e/live needs the Django
       // bootstrap harness (playwright.live.config.ts).
-      testIgnore: ['**/prod-smoke.spec.ts', '**/prod-admin.spec.ts', '**/live/**', '**/regulatory/**', '**/stories/**'],
+      testIgnore: ['**/prod-smoke.spec.ts', '**/prod-admin.spec.ts', '**/prod-modelling.spec.ts', '**/live/**', '**/regulatory/**', '**/stories/**'],
     },
     // Only with PW_PROD=1: the deployed site needs no local webServer.
     ...(process.env.PW_PROD
@@ -43,7 +43,7 @@ export default defineConfig({
           {
             name: 'production',
             use: { ...devices['Desktop Chrome'], baseURL: process.env.PW_PROD_URL || 'https://trucki-two.vercel.app' },
-            testMatch: ['**/prod-smoke.spec.ts', '**/prod-admin.spec.ts'],
+            testMatch: ['**/prod-smoke.spec.ts', '**/prod-admin.spec.ts', '**/prod-modelling.spec.ts'],
           },
         ]
       : []),

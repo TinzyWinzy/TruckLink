@@ -58,16 +58,16 @@ export default function DockBoard() {
   async function tap(dock: Dock) {
     setMessage(null)
     if (!live) {
-      setMessage(`Practice — ${dock.label} tap recorded on this tablet.`)
+      setMessage(`Practice. ${dock.label} tap recorded on this tablet.`)
       return
     }
     if (!isOnline()) {
-      setMessage('■ Offline — dock moves need signal. Trucks keep queueing.')
+      setMessage('■ Offline. Dock moves need signal. Trucks keep queueing.')
       return
     }
     const first = queuedIds[0]
     if (!first) {
-      setMessage('Queue is empty — register an arrival first.')
+      setMessage('Queue is empty. Register an arrival first.')
       return
     }
     try {
@@ -83,7 +83,7 @@ export default function DockBoard() {
       <PageHeader
         title="Dock board"
         eyebrow="72,000 m² · tap a free dock"
-        sub={live ? `${free} of ${docks.length} docks free · ${queuedIds.length} waiting. Tap a free dock to take the oldest truck.` : 'Practice layout — training docks only.'}
+        sub={live ? `${free} of ${docks.length} docks free · ${queuedIds.length} waiting. Tap a free dock to take the oldest truck.` : 'Practice layout. Training docks only.'}
         mode={live ? 'live' : 'demo'}
       />
       {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
@@ -107,7 +107,7 @@ export default function DockBoard() {
                   <span className="text-lg font-extrabold">{d.label}</span>
                   <StatusPill status={d.rawStatus} symbol={SYMBOL[d.rawStatus]} />
                 </div>
-                <p className="mt-1 min-h-5 text-sm font-semibold text-slate-600">{d.occupant || (free_ ? 'Tap to assign oldest truck' : '—')}</p>
+                <p className="mt-1 min-h-5 text-sm font-semibold text-slate-600">{d.occupant || (free_ ? 'Tap to assign oldest truck' : 'N/A')}</p>
                 {d.util != null ? <div className="mt-2 h-2.5 rounded bg-slate-200" role="img" aria-label={`${d.label} demo utilization ${d.util} percent`}>
                   <div className="h-2.5 rounded bg-slate-900" style={{ width: `${d.util}%` }} />
                 </div> : <p className="mt-2 text-xs text-slate-500">Utilization history unavailable</p>}

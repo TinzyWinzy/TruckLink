@@ -1,5 +1,5 @@
 /**
- * Live yard data layer — REST adapter over the Trucki Django backend.
+ * Live yard data layer. REST adapter over the Trucki Django backend.
  *
  * Export names and camelCase row shapes match the old Firestore layer, so
  * routes consume this unchanged:
@@ -10,7 +10,7 @@
  * Server is authoritative for compliance + overrides (SAD §9); the client
  * only renders. Firebase survives solely for web push (push.ts / sw.ts).
  */
-import { apiFetch, apiBase, ApiError, clearToken, facilityId, getToken, isLive, setToken } from './api'
+import { apiFetch, apiBase, ApiError, clearToken, facilityId, selectFacility, getToken, isLive, setToken } from './api'
 import { isRealLive } from './liveGate'
 import { useSession } from '../store/session'
 import {
@@ -53,13 +53,21 @@ function sessionFrom(user: {
   username?: string
   role?: string
   base_role?: string
+  organisation?: { id: number; name: string; slug: string } | null
+  facilities?: { id: number; name: string; slug: string }[]
 }): SessionUser {
   if (!hasRole(user.role)) {
     clearToken()
     throw new Error(
-      'This account has no job assigned — ask your supervisor to set up your account.',
+      'This account has no job assigned. Ask your supervisor to set up your account.',
     )
   }
+  const facilities = user.facilities ?? []
+  let previous = useSession.getState().workspace?.selectedFacility
+  try { previous = localStorage.getItem(`trucki-yard-${user.id}`) ?? previous } catch { /* storage unavailable */ }
+  const selected = facilities.find(f => String(f.id) === previous) ?? facilities[0]
+  selectFacility(selected ? String(selected.id) : '')
+  useSession.getState().setWorkspace({ organisation: user.organisation ?? null, facilities, selectedFacility: facilityId })
   return {
     baseRole: hasRole(user.base_role) ? user.base_role : user.role,
     uid: String(user.id ?? ''),
@@ -115,7 +123,7 @@ export async function signOutLive(): Promise<void> {
   try {
     if (isLive()) await apiFetch('/auth/logout/', { method: 'POST' })
   } catch {
-    // Token already dead — clearing below is what matters.
+    // Token already dead. clearing below is what matters.
   }
   clearToken()
 }
@@ -252,7 +260,7 @@ export function subscribe(
         onError?.(null)
       }
     } catch (err) {
-      if (!stopped && identity === useSession.getState().userId) onError?.('Server data unavailable — displayed records may be stale. Retry when connected.')
+      if (!stopped && identity === useSession.getState().userId) onError?.('Server data unavailable. displayed records may be stale. Retry when connected.')
       if (!warned) {
         warned = true
         console.warn(`[live] ${name} poll failed: ${(err as Error).message}`)
@@ -313,7 +321,7 @@ export async function submitComplianceLive(input: {
   key: string
 }): Promise<'PASS' | 'FAIL'> {
   // Server resolves S.I. limits from tenant config and returns the final
-  // verdict (SAD §9) — the local validateLoad copy stays demo-only.
+  // verdict (SAD §9). The local validateLoad copy stays demo-only.
   const data = await apiFetch<{ check: { overall_status: 'PASS' | 'FAIL' } }>(
     '/compliance/',
     {
@@ -357,7 +365,7 @@ const FALLBACK_CHECKLIST: ChecklistItem[] = [
 ]
 
 /** Resolve axle limits for a vehicle type with DEFAULT fallback (S.I. tables).
- * Phase 3: route-aware. `route` is optional for backwards compat — callers
+ * Phase 3: route-aware. `route` is optional for backwards compat. callers
  * that only pass vehicleType keep the legacy global behaviour. */
 export function resolveAxleLimits(
   siTables: Record<string, number[]> | undefined,
@@ -396,7 +404,7 @@ export async function getComplianceConfig(
   }
 }
 
-/** Secondary-approver rule, stable-ID form (canonical — both paths unify here). */
+/** Secondary-approver rule, stable-ID form (canonical. Both paths unify here). */
 export function isSelfApprovalById(
   requestedById: string | null | undefined,
   approverId: string,
@@ -406,7 +414,7 @@ export function isSelfApprovalById(
 }
 
 /** Legacy display-name form (pre-ID override docs). Kept for grandfathered
- * records only — new writes always carry stable IDs. */
+ * records only. new writes always carry stable IDs. */
 export function isSelfApproval(
   requestedBy: string | null | undefined,
   approver: string,
@@ -416,7 +424,7 @@ export function isSelfApproval(
 }
 
 /** The backend keys overrides on the compliance CHECK, the screens key on the
- * queue ENTRY — resolve entry -> latest check in the required status. */
+ * queue ENTRY. resolve entry -> latest check in the required status. */
 async function resolveCheckId(
   entryId: string,
   wantStatus: 'QUARANTINED' | 'PENDING_OVERRIDE',
@@ -432,7 +440,7 @@ async function resolveCheckId(
   if (!match) {
     throw new Error(
       wantStatus === 'QUARANTINED'
-        ? 'No quarantined check found for this entry — run the compliance check first.'
+        ? 'No quarantined check found for this entry. run the compliance check first.'
         : 'No override pending for this entry.',
     )
   }
@@ -505,7 +513,7 @@ export interface TurnaroundStats {
   overdueCount: number
 }
 
-/** Pure stats over queue rows — unit-tested, feeds Reports + CSV export. */
+/** Pure stats over queue rows. unit-tested, feeds Reports + CSV export. */
 export function computeTurnaroundStats(rows: LiveRow[], now = Date.now(), overdueMinutes = 60): TurnaroundStats {
   const byStatus: Record<string, number> = {}
   const waits: number[] = []

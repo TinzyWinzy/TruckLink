@@ -1,3 +1,4 @@
+import { selectFacility } from '../lib/api'
 import { Link, useLocation } from 'react-router-dom'
 import { listPendingActions, isOnline } from '../lib/offline/db'
 import { useSession, isPracticeSession, type Role, canAccess } from '../store/session'
@@ -19,6 +20,7 @@ const SECONDARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[
   { to: '/reports', label: 'Reports', route: 'reports' },
   { to: '/audit', label: 'Audit', route: 'audit' },
   { to: '/admin', label: 'Admin', route: 'admin' },
+  { to: '/modelling', label: 'Modelling', route: 'modelling' },
 ]
 
 function visible(items: typeof PRIMARY, role: Role | null) {
@@ -28,7 +30,7 @@ function visible(items: typeof PRIMARY, role: Role | null) {
 export default function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const { role, baseRole, signInReal, userId, displayName, online, setOnline, signOut, signInDemo } = useSession()
+  const { workspace, setWorkspace, role, baseRole, signInReal, userId, displayName, online, setOnline, signOut, signInDemo } = useSession()
   const practice = isPracticeSession(userId)
   const [switching, setSwitching] = useState(false)
   const [switchError, setSwitchError] = useState<string | null>(null)
@@ -56,7 +58,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         setPending(actions.filter((a) => a.state !== 'BLOCKED').length)
         setBlocked(actions.filter((a) => a.state === 'BLOCKED').length)
       } catch {
-        // IndexedDB blocked — keep last badge value.
+        // IndexedDB blocked. keep last badge value.
       }
     }
     sync()
@@ -98,13 +100,13 @@ export default function Layout({ children }: { children: ReactNode }) {
         <div className="masthead-inner flex flex-wrap items-center gap-x-4 gap-y-3">
           <Link to={role ? landingPathForRole(role) : '/queue'} className="flex items-center gap-2.5" aria-label="Trucki home">
             <span aria-hidden="true" className="gantry-mark flex h-9 w-9 items-center justify-center rounded-xl text-base font-black text-slate-900">
-              B
+              T
             </span>
             <span className="leading-none">
               <span className="block text-[10px] font-extrabold uppercase tracking-[0.18em] text-amber-400">
-                {practice ? 'Practice workspace' : 'Regulatory & yard operations'}
+                {practice ? 'Practice workspace' : workspace?.organisation?.name ?? 'Operations workspace'}
               </span>
-              <span className="block text-lg font-extrabold tracking-tight">BAK INTEL</span>
+              <span className="block text-lg font-extrabold tracking-tight">Trucki</span>
             </span>
           </Link>
           <div className="flex flex-wrap items-center gap-1.5" role="status" aria-label="Yard state">
@@ -176,10 +178,21 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
       </header>
       {switchError && <p role="alert" className="p-4 text-red-800">{switchError}</p>}
+      {workspace && <div className="flex flex-wrap items-center gap-3 border-b border-slate-300 px-6 py-3 text-sm">
+        <span className="font-semibold">{workspace.organisation?.name}</span>
+        <label>Yard <select aria-label="Selected yard" className="field ml-2 px-3" value={workspace.selectedFacility} onChange={async e => {
+          const id = e.target.value
+          if (!workspace.facilities.some(f => String(f.id) === id)) return
+          selectFacility(id)
+          try { localStorage.setItem(`trucki-yard-${userId}`, id) } catch { /* storage unavailable */ }
+          setWorkspace({ ...workspace, selectedFacility: id })
+          navigate(landingPathForRole(role!))
+        }}>{workspace.facilities.map(f => <option key={f.id} value={String(f.id)}>{f.name}</option>)}</select></label>
+      </div>}
       <div className="workbench-body">
       <aside className="workspace-rail">
         <div className="rail-heading"><span className="eyebrow">Workspace</span><p>{role?.replace(/_/g, ' ').toLowerCase()}</p></div>
-        {/* Weighted nav — 3 primary jobs, hub/guide + rest secondary (Hick's Law) */}
+        {/* Weighted nav. 3 primary jobs, hub/guide + rest secondary (Hick's Law) */}
         <nav aria-label="Primary" className="workspace-navigation">
           {visible(PRIMARY, role).map((item) => (
             <Link key={item.to} to={item.to} aria-current={pathname === item.to ? 'page' : undefined} className={linkCls(item.to)}>
@@ -203,7 +216,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <div className="workspace-content">
       <main id="main-content" tabIndex={-1} className="workspace-main">{children}</main>
       <footer className="yard-foot py-4 text-xs">
-        BAK INTEL · yard operations · {live ? 'connected' : 'training mode'} · Saved offline work is reviewed and retried on reconnect.
+        Trucki · yard operations · {live ? 'connected' : 'training mode'} · Saved offline work is reviewed and retried on reconnect.
       </footer>
       </div>
       </div>

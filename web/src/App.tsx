@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import { useSession } from './store/session'
 import { canVisit, landingPathForRole, type RouteKey } from './lib/gates'
 
+const Modelling = lazy(() => import('./routes/Modelling'))
 const Login = lazy(() => import('./routes/Login'))
 const QueueDashboard = lazy(() => import('./routes/QueueDashboard'))
 const DockBoard = lazy(() => import('./routes/DockBoard'))
@@ -18,7 +19,7 @@ const AuthReady = createContext(false)
 
 /** Role gate per ROUTE_GATES. Mismatch renders a dead-end, never a redirect loop. */
 function RoleGuard({ route, children }: { route: RouteKey; children: ReactNode }) {
-  const { role, signOut, userId } = useSession()
+  const { workspace, role, signOut, userId } = useSession()
   const authReady = useContext(AuthReady)
   if (!role && !authReady) return <Fallback />
   if (!role) return <Navigate to="/" replace />
@@ -45,7 +46,7 @@ function RoleGuard({ route, children }: { route: RouteKey; children: ReactNode }
     )
   }
   // Identity changes remount private screens before they can display old rows.
-  return <Fragment key={`${userId}:${role}`}>{children}</Fragment>
+  return <Fragment key={`${userId}:${role}:${workspace?.selectedFacility}`}>{children}</Fragment>
 }
 
 function Fallback() {
@@ -69,7 +70,7 @@ function AuthRestore({ onReady }: { onReady: (ready: boolean) => void }) {
         signInReal(s.uid, s.role, s.displayName, s.baseRole)
         if (window.location.pathname === '/') navigate(landingPathForRole(s.role))
       } catch {
-        // Offline boot or dead token — staffer signs in again.
+        // Offline boot or dead token. staffer signs in again.
       } finally {
         if (!cancelled) onReady(true)
       }
@@ -96,6 +97,7 @@ export default function App() {
         <Route path="/alerts" element={<RoleGuard route="alerts"><Layout><Alerts /></Layout></RoleGuard>} />
         <Route path="/reports" element={<RoleGuard route="reports"><Layout><Reports /></Layout></RoleGuard>} />
         <Route path="/audit" element={<RoleGuard route="audit"><Layout><AuditLog /></Layout></RoleGuard>} />
+        <Route path="/modelling" element={<RoleGuard route="modelling"><Layout><Modelling /></Layout></RoleGuard>} />
         <Route path="/admin" element={<RoleGuard route="admin"><Layout><Admin /></Layout></RoleGuard>} />
         <Route path="/hub" element={<RoleGuard route="hub"><Layout><Hub /></Layout></RoleGuard>} />
         <Route path="/guide" element={<RoleGuard route="guide"><Layout><Guide /></Layout></RoleGuard>} />

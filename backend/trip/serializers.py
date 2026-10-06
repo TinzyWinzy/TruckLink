@@ -102,7 +102,7 @@ class UserSerializer(serializers.ModelSerializer):
             return []
         return [
             {"id": f.id, "name": f.name, "slug": f.slug}
-            for f in profile.facilities.all()
+            for f in profile.facilities.filter(organisation_id=profile.organisation_id, is_deleted=False)
         ]
 
 

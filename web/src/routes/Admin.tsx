@@ -26,7 +26,7 @@ export default function Admin() {
     setMessage(null)
     try {
       await (await import('../lib/live')).seedDemoFacility()
-      setMessage('✔ Yard ready — open Queue, then Docks.')
+      setMessage('✔ Yard ready. Open Queue, then Docks.')
     } catch (e) {
       setMessage(`✖ ${(e as Error).message}`)
     } finally {
@@ -36,7 +36,7 @@ export default function Admin() {
 
   return (
     <div className="max-w-2xl">
-      <PageHeader title="Admin" sub={live ? 'Yard setup controls.' : 'Setup — works once the tablet is connected.'} mode={live ? 'live' : 'demo'} />
+      <PageHeader title="Admin" sub={live ? 'Yard setup controls.' : 'Setup. Works once the tablet is connected.'} mode={live ? 'live' : 'demo'} />
       <div className="space-y-3">
         <Section title="Yard setup" sub="One-time: docks, equipment, axle rules + the practice shift. Safe to run again.">
           <button type="button" onClick={seed} disabled={busy || !live} className="btn-primary touch-target rounded-lg px-4 text-sm disabled:opacity-60">
@@ -47,7 +47,7 @@ export default function Admin() {
             <p className="mt-2 text-sm">Next: open <a className="underline" href="/guide">/guide</a> with the gatekeeper, then <a className="underline" href="/queue">/queue</a>.</p>
           )}
         </Section>
-        <Section title="Add a person" sub="Three steps — the job travels with the account.">
+        <Section title="Add a person" sub="Three steps. The job travels with the account.">
           <ol className="list-decimal space-y-1 pl-5 text-sm">
             <li>Add the person (name + password).</li>
             <li>Give them a job + yard: <code className="rounded bg-slate-100 px-1">{'{"role":"DISPATCH_SUPERVISOR","facilities":["demo-facility"]}'}</code></li>

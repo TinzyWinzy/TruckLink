@@ -1,5 +1,5 @@
 /**
- * Trucki REST client — Django/DRF backend (SAD v2 section 11).
+ * Trucki REST client. Django/DRF backend (SAD v2 section 11).
  *
  * - `VITE_API_URL` set    -> yard system live (token auth, real facilities).
  * - `VITE_API_URL` unset  -> demo/practice mode; screens keep local seeds.
@@ -9,12 +9,13 @@
 const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? ''
 export const apiBase = BASE
 
-export const facilityId =
-  (import.meta.env.VITE_FACILITY_ID as string | undefined) ?? 'demo-facility'
+// Live yard scope comes from the authenticated server identity, never a build-wide tenant.
+export let facilityId = ''
+export function selectFacility(id: string): void { facilityId = id }
 
 const TOKEN_KEY = 'trucki-auth-token'
 
-/** Live backend available (API base configured). Cheap — safe from any chunk. */
+/** Live backend available (API base configured). Cheap. safe from any chunk. */
 export function isLive(): boolean {
   return BASE.length > 0
 }
@@ -31,11 +32,12 @@ export function setToken(token: string): void {
   try {
     localStorage.setItem(TOKEN_KEY, token)
   } catch {
-    // Private mode — session dies with the tab.
+    // Private mode. session dies with the tab.
   }
 }
 
 export function clearToken(): void {
+  selectFacility('')
   try {
     localStorage.removeItem(TOKEN_KEY)
   } catch {
@@ -92,14 +94,14 @@ export async function apiFetch<T = unknown>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new ApiError('Network unreachable — check the yard connection.', 0)
+    throw new ApiError('Network unreachable. Check the yard connection.', 0)
   }
 
   let data: unknown = null
   try {
     data = await res.json()
   } catch {
-    // Empty/non-JSON body — status still decides below.
+    // Empty/non-JSON body. status still decides below.
   }
   if (!res.ok) throw new ApiError(messageFrom(data, res.status), res.status)
   return data as T

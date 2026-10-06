@@ -102,7 +102,7 @@ export default function ComplianceCheck() {
         })
         const ok = r.overallStatus === 'PASS'
         setPassed(ok)
-        setResult(ok ? '✔ PASS — practice check. On the yard, release the truck from the Queue board.' : `✖ FAIL — quarantine: ${r.violations.join('; ')}`)
+        setResult(ok ? '✔ PASS. Practice check. On the yard, release the truck from the Queue board.' : `✖ FAIL. Quarantine: ${r.violations.join('; ')}`)
         return
       }
       if (!entryId.trim()) {
@@ -122,14 +122,14 @@ export default function ComplianceCheck() {
       }
       if (!isOnline()) {
         await enqueueOfflineAction('compliance.submit', { ...payload })
-        setResult('⏳ Offline — check queued, will validate + write on reconnect.')
+        setResult('⏳ Offline. Check queued, will validate + write on reconnect.')
         return
       }
       const key = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
       const status = await (await import('../lib/live')).submitComplianceLive({ ...payload, key })
       const ok = status === 'PASS'
       setPassed(ok)
-      setResult(ok ? '✔ PASS — demo inspection only, using unverified pilot limits. Release from the Queue board requires the current inspection.' : '✖ FAIL — vehicle QUARANTINED. Use the quarantine panel below or fix the load.')
+      setResult(ok ? '✔ PASS. Demo inspection only, using unverified pilot limits. Release from the Queue board requires the current inspection.' : '✖ FAIL. Vehicle QUARANTINED. Use the quarantine panel below or fix the load.')
     } catch (e) {
       setResult(`✖ ${(e as Error).message}`)
     } finally {
@@ -140,7 +140,7 @@ export default function ComplianceCheck() {
   async function readScale() {
     setScaleMsg(null)
     if (!isWebSerialSupported()) {
-      setScaleMsg('✖ This browser can’t talk to the scale — use Chrome on the yard tablet. Typing still works.')
+      setScaleMsg('✖ This browser can’t talk to the scale. Use Chrome on the yard tablet. Typing still works.')
       return
     }
     try {
@@ -149,9 +149,9 @@ export default function ComplianceCheck() {
         setScaleStable(r.stable)
         if (r.stable) {
           setTotal(String(r.weightKg))
-          setScaleMsg(`✔ Stable ${r.weightKg} kg captured — confirm axles below, then Validate.`)
+          setScaleMsg(`✔ Stable ${r.weightKg} kg captured. Confirm axles below, then Validate.`)
         } else {
-          setScaleMsg(`… Reading ${r.weightKg} kg — hold the vehicle still for a stable capture.`)
+          setScaleMsg(`… Reading ${r.weightKg} kg. Hold the vehicle still for a stable capture.`)
         }
       })
     } catch (e) {
@@ -162,7 +162,7 @@ export default function ComplianceCheck() {
   async function requestOverride() {
     setOverrideMsg(null)
     if (!live) {
-      setOverrideMsg('Practice — overrides need a yard entry.')
+      setOverrideMsg('Practice. Overrides need a yard entry.')
       return
     }
     if (!entryId.trim()) {
@@ -202,7 +202,7 @@ export default function ComplianceCheck() {
     <div className="max-w-2xl">
       <PageHeader
         title="Pre-departure check"
-        sub="Four short steps at the side of the vehicle. A failed check quarantines the truck — it cannot be released."
+        sub="Four short steps at the side of the vehicle. A failed check quarantines the truck. It cannot be released."
         mode={live ? 'live' : 'demo'}
       />
       <p role="note" className="mb-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
@@ -214,10 +214,10 @@ export default function ComplianceCheck() {
         <Section step="1" title="Vehicle" sub="Which truck are you standing next to?">
           <label className="block text-sm font-bold">
               Queue entry ID
-              <input value={entryId} onChange={(e) => setEntryId(e.target.value)} placeholder={live ? 'Tap Check → on the Queue board' : 'Training reference — tap Check → on the Queue board'} className="field touch-target mt-1 w-full px-3 font-data" />
+              <input value={entryId} onChange={(e) => setEntryId(e.target.value)} placeholder={live ? 'Tap Check → on the Queue board' : 'Training reference. Tap Check → on the Queue board'} className="field touch-target mt-1 w-full px-3 font-data" />
             </label>
           <label className="mt-2 block text-sm font-bold">
-            Corridor / route (S.I. table)
+            Corridor / route (S.I. Table)
             <select value={routeType} onChange={(e) => setRouteType(e.target.value)} className="field touch-target mt-1 w-full px-3">
               {SI_ROUTES.map((r) => (
                 <option key={r} value={r}>{SI_ROUTE_LABELS[r]}</option>
@@ -225,17 +225,17 @@ export default function ComplianceCheck() {
             </select>
           </label>
           <label className="mt-2 block text-sm font-bold">
-            Vehicle type (S.I. table)
+            Vehicle type (S.I. Table)
             <select value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} className="field touch-target mt-1 w-full px-3">
               {VEHICLES.map((v) => (
                 <option key={v} value={v}>{v}</option>
               ))}
             </select>
           </label>
-          <p className="mt-1 text-xs font-semibold text-slate-600">Axle limits ({routeType}): {limits.join(' / ')} kg · pilot values — confirm with VID schedule</p>
+          <p className="mt-1 text-xs font-semibold text-slate-600">Axle limits ({routeType}): {limits.join(' / ')} kg · pilot values. Confirm with VID schedule</p>
         </Section>
 
-        <Section step="2" title="Weights" sub="Capture the scale first — stable readings fill Total automatically.">
+        <Section step="2" title="Weights" sub="Capture the scale first. Stable readings fill Total automatically.">
           <button type="button" onClick={readScale} className="touch-target rounded-lg border-2 border-slate-900 px-4 text-sm font-extrabold">
             ⚖ Read from weighbridge
           </button>
@@ -280,10 +280,10 @@ export default function ComplianceCheck() {
           )}
         </Section>
 
-        <Section title="Quarantine override" sub="Separate panel, separate approver — the requester cannot approve their own override.">
+        <Section title="Quarantine override" sub="Separate panel, separate approver. The requester cannot approve their own override.">
           <label className="block text-sm font-bold">
             Reason
-            <input value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} placeholder="e.g. re-weigh confirms decant complete" className="field touch-target mt-1 w-full px-3" />
+            <input value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} placeholder="e.g. Re-weigh confirms decant complete" className="field touch-target mt-1 w-full px-3" />
           </label>
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" onClick={requestOverride} className="touch-target rounded-lg border px-4 text-sm font-bold">

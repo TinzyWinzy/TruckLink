@@ -32,7 +32,7 @@ const SYMBOL: Record<string, string> = {
 function mapLive(r: LiveRow): Row {
   const rawStatus = String(r.status ?? 'QUEUED')
   const ts = r.entryTimestamp as { toDate?: () => Date } | string | undefined
-  let enteredAt = '—'
+  let enteredAt = 'N/A'
   if (typeof ts === 'string' && ts) {
     const parsed = new Date(ts)
     enteredAt = Number.isNaN(parsed.getTime())
@@ -43,10 +43,10 @@ function mapLive(r: LiveRow): Row {
   }
   return {
     id: r.id,
-    plate: String(r.licensePlate ?? '—'),
-    driver: String(r.driverName ?? (r.driverId as string) ?? '—'),
-    cargo: String(r.cargoType ?? '—'),
-    dest: String(r.expectedDestination ?? '—'),
+    plate: String(r.licensePlate ?? 'N/A'),
+    driver: String(r.driverName ?? (r.driverId as string) ?? 'N/A'),
+    cargo: String(r.cargoType ?? 'N/A'),
+    dest: String(r.expectedDestination ?? 'N/A'),
     rawStatus,
     enteredAt,
   }
@@ -119,13 +119,13 @@ export default function QueueDashboard() {
       ])
       setPlate('')
       setDriver('')
-      setNotice('✔ Entry added — practice entry, training only.')
+      setNotice('✔ Entry added. Practice entry, training only.')
       return
     }
 
     if (!isOnline()) {
       await enqueueOfflineAction('queue.create', { ...parsed.data })
-      setNotice('⏳ Offline — entry queued, will sync on reconnect.')
+      setNotice('⏳ Offline. Entry queued, will sync on reconnect.')
       setPlate('')
       setDriver('')
       return
@@ -141,7 +141,7 @@ export default function QueueDashboard() {
   }
 
   async function copyId(id: string) {
-    const done = async () => setNotice(`✔ ID ${shortId(id)} copied — paste it in the check screen.`)
+    const done = async () => setNotice(`✔ ID ${shortId(id)} copied. Paste it in the check screen.`)
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(id)
@@ -162,7 +162,7 @@ export default function QueueDashboard() {
         document.body.removeChild(ta)
         await done()
       } catch {
-        setError(`Entry ID is ${id} — type it into the check screen.`)
+        setError(`Entry ID is ${id}. Type it into the check screen.`)
       }
     }
   }
@@ -181,7 +181,7 @@ export default function QueueDashboard() {
       <PageHeader
         title="Shift queue"
         eyebrow="Yard operations · oldest first"
-        sub={live ? 'Live yard board — oldest first. Register at the gate, release at the exit.' : 'Practice board — training entries only.'}
+        sub={live ? 'Live yard board. Oldest first. Register at the gate, release at the exit.' : 'Practice board. Training entries only.'}
         mode={live ? 'live' : 'demo'}
       />
       {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
@@ -252,7 +252,7 @@ export default function QueueDashboard() {
           ))}
         </ul>
       )}
-      <p className="mt-3 text-xs text-slate-500">Signed in as {displayName}. Every status shows a shape + words — nothing depends on colour alone.</p>
+      <p className="mt-3 text-xs text-slate-500">Signed in as {displayName}. Every status shows a shape + words. Nothing depends on colour alone.</p>
     </div>
   )
 }

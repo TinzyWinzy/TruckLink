@@ -1,9 +1,10 @@
-# BAK documentation index
+# Trucki documentation index
 
 Current direction: renewed BAK INTEL work, grounded in the existing yard application and a reusable N-ROK regulatory service. Documentation status as of 5 October 2026:
 
 | Document | Authority/status |
 | --- | --- |
+| [Tenant workspaces and synthetic modelling](TENANT_MODELLING.md) | Implemented tenant scope, reproducible evaluator fixtures and capacity model assumptions |
 | [User stories and delivery backlog](BAK_USER_STORIES.md) | Draft stories, acceptance criteria, implementation gaps, dependencies and PRD/SAD/brief traceability |
 | [User-story flow test results](USER_STORY_FLOW_TEST_RESULTS.md) | Real browser/API journeys, story coverage, production blockers and test-driven fixes |
 | [Implementation progress](BAK_IMPLEMENTATION_PROGRESS.md) | Stabilization changes, rollout constraints, remaining work and post-change tests |

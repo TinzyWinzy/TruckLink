@@ -43,10 +43,10 @@ export default function Alerts() {
     try {
       await subscribePush(userId ?? displayName, role ?? 'DISPATCH_SUPERVISOR')
       setPush('on')
-      setMessage('✔ Push alerts on — this tablet rings free on quarantine + escalation.')
+      setMessage('✔ Push alerts on. This tablet rings free on quarantine + escalation.')
     } catch (e) {
       setPush('error')
-      setMessage(`✖ Push unavailable: ${(e as Error).message} — WhatsApp/SMS fallback still covers you.`)
+      setMessage(`✖ Push unavailable: ${(e as Error).message}. WhatsApp/SMS fallback still covers you.`)
     } finally {
       setPushBusy(false)
     }
@@ -64,7 +64,7 @@ export default function Alerts() {
 
   async function ack(id: string) {
     if (!canAck) {
-      setMessage('Read-only role — a yard supervisor acknowledges this alert.')
+      setMessage('Read-only role. A yard supervisor acknowledges this alert.')
       return
     }
     if (!live) {
@@ -106,7 +106,7 @@ export default function Alerts() {
     <div>
       <PageHeader
         title={`Alerts · ${active.length} active`}
-        sub="Critical quarantine alerts first. Acknowledge when you own the problem — escalation runs at 10 and 30 minutes."
+        sub="Critical quarantine alerts first. Acknowledge when you own the problem. Escalation runs at 10 and 30 minutes."
         mode={live ? 'live' : 'demo'}
       />
       {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
@@ -176,7 +176,7 @@ export default function Alerts() {
                       </button>
                     ) : (
                       <span className="text-xs font-semibold text-slate-500">
-                        Read-only — yard supervisors acknowledge.
+                        Read-only. Yard supervisors acknowledge.
                       </span>
                     )}
                   </div>

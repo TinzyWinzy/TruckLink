@@ -1,3 +1,4 @@
+from core.modelling_views import model_workspace
 """URL routes."""
 from django.urls import path
 from compliance import views as compliance_views
@@ -42,6 +43,7 @@ urlpatterns = [
     path("auth/login/", auth_views.login_view),
     path("auth/pin/", auth_views.pin_login),
     path("auth/logout/", auth_views.logout_view),
+    path("modelling/run/", model_workspace),
     path("auth/me/", auth_views.me),
     path("auth/switch-role/", auth_views.switch_role),
     # Tenancy (core app)

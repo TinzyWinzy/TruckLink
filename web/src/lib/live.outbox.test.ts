@@ -115,7 +115,7 @@ describe('offline outbox integration (enqueue → replay → idempotent server)'
     expect(complianceBody.queue_entry).toBe('q1')
   })
 
-  it('treats a server-side replay (200 replayed) as success — action removed once', async () => {
+  it('treats a server-side replay (200 replayed) as success. action removed once', async () => {
     const { db, live } = await importOutbox('http://api.test')
     fetchMock.mockResolvedValueOnce(
       jsonResponse(200, {

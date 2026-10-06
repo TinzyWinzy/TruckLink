@@ -55,7 +55,7 @@ function saveDemoSession(role: Role, baseRole: Role): void {
   try {
     sessionStorage.setItem(DEMO_KEY, JSON.stringify({ role, baseRole } satisfies DemoSession))
   } catch {
-    // Private mode — session just won't survive refresh.
+    // Private mode. session just won't survive refresh.
   }
 }
 
@@ -71,11 +71,19 @@ function demoDisplay(role: Role): { userId: string; displayName: string } {
   return { userId: `demo-${role.toLowerCase()}`, displayName: `${role.replace(/_/g, ' ')} (practice)` }
 }
 
+export interface Workspace {
+  organisation: { id: number; name: string; slug: string } | null
+  facilities: { id: number; name: string; slug: string }[]
+  selectedFacility: string
+}
+
 interface SessionState {
   userId: string | null
   role: Role | null
   baseRole: Role | null
   displayName: string
+  workspace: Workspace | null
+  setWorkspace: (workspace: Workspace | null) => void
   online: boolean
   signInDemo: (role: Role) => void
   signInReal: (userId: string, role: Role, displayName: string, baseRole?: Role) => void
@@ -91,11 +99,13 @@ export const useSession = create<SessionState>((set, get) => ({
   role: initialDemo?.role ?? null,
   baseRole: initialDemo?.baseRole ?? initialDemo?.role ?? null,
   displayName: initialIdentity?.displayName ?? 'Practice user',
+  workspace: null,
+  setWorkspace: (workspace) => set({ workspace }),
   online: typeof navigator === 'undefined' ? true : navigator.onLine,
   signInDemo: (role) => {
     const baseRole = isPracticeSession(get().userId) && get().baseRole === 'ADMIN' ? 'ADMIN' : role
     saveDemoSession(role, baseRole)
-    set({ ...demoDisplay(role), role, baseRole })
+    set({ ...demoDisplay(role), role, baseRole, workspace: null })
   },
   signInReal: (userId, role, displayName, baseRole = role) => {
     clearDemoSession()
@@ -103,7 +113,7 @@ export const useSession = create<SessionState>((set, get) => ({
   },
   signOut: () => {
     clearDemoSession()
-    set({ userId: null, role: null, baseRole: null })
+    set({ userId: null, role: null, baseRole: null, workspace: null })
   },
   setOnline: (online) => set({ online }),
 }))
