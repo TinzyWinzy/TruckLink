@@ -30,6 +30,8 @@ test('live ADMIN PIN can switch working roles and return without changing identi
   await page.getByLabel('Switch working role').selectOption('ADMIN')
   await expect(page).toHaveURL(/\/reports$/)
   await expect(page.getByLabel('Switch working role')).toHaveValue('ADMIN')
+  await expect(page.getByText(/Last successful read/)).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(0)
   await page.screenshot({ path: '../docs/design/bak-live-admin.png', fullPage: true })
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Gate sign-in' })).toBeVisible()

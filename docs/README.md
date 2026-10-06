@@ -4,6 +4,7 @@ Current direction: renewed BAK INTEL work, grounded in the existing yard applica
 
 | Document | Authority/status |
 | --- | --- |
+| [NetOne design reference](NETONE_DESIGN_REFERENCE.md) | Reviewed source patterns and Reports adaptation with desktop/mobile validation |
 | [Tenant workspaces and synthetic modelling](TENANT_MODELLING.md) | Implemented tenant scope, reproducible evaluator fixtures and capacity model assumptions |
 | [User stories and delivery backlog](BAK_USER_STORIES.md) | Draft stories, acceptance criteria, implementation gaps, dependencies and PRD/SAD/brief traceability |
 | [User-story flow test results](USER_STORY_FLOW_TEST_RESULTS.md) | Real browser/API journeys, story coverage, production blockers and test-driven fixes |
