@@ -5,6 +5,7 @@ scoped by their UserProfile organisation/facility membership. The ADMIN role
 replaces the old is_staff shortcut for admin surfaces.
 """
 from rest_framework.permissions import BasePermission, SAFE_METHODS
+from django.db.models import Q
 
 from .models import Organisation, UserRole
 
@@ -37,7 +38,13 @@ def scope_organisation(qs, user, org_field="organisation"):
     org = get_user_organisation(user)
     if org is None:
         return qs.none()
-    return qs.filter(**{org_field: org})
+    qs = qs.filter(**{org_field: org})
+    # New yard-assigned trips retain their scope through legacy fleet APIs.
+    prefix = 'trip__' if org_field == 'trip__organisation' else ''
+    if prefix or qs.model._meta.label_lower == 'trip.trip':
+        qs = qs.filter(Q(**{f'{prefix}facility__isnull': True}) | Q(**{
+            f'{prefix}facility__in': user_facilities(user).filter(organisation=org,is_deleted=False)}))
+    return qs
 
 
 def belongs_to_organisation(obj, user):
@@ -48,7 +55,10 @@ def belongs_to_organisation(obj, user):
     obj_org = getattr(obj, "organisation", None)
     if obj_org is None:
         obj_org = getattr(obj, "organisation_id", None)
-    return obj_org == org
+    if obj_org != org:
+        return False
+    facility = getattr(obj, 'facility', None)
+    return facility is None or (facility.organisation_id == org.id and not facility.is_deleted and in_facility(user,facility))
 
 
 def user_facilities(user):

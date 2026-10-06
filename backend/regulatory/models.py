@@ -262,6 +262,8 @@ class OperationalContext(Record):
             raise ValidationError('Cross-border context requires all traversed jurisdictions')
         if self.trip.vehicle_id != self.configuration.vehicle_id or self.trip.driver_id != self.driver_id:
             raise ValidationError('Trip, driver and configured vehicle must agree')
+        if self.trip.facility_id and self.trip.facility_id != self.queue_entry.facility_id:
+            raise ValidationError('Trip and operational context must belong to the same yard')
         if self.queue_entry.reg_number.strip().upper() != self.configuration.vehicle.plate.strip().upper():
             raise ValidationError('Queue registration does not match evidenced vehicle')
 

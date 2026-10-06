@@ -5,6 +5,7 @@ import { useSession } from './store/session'
 import { canVisit, landingPathForRole, type RouteKey } from './lib/gates'
 
 const Modelling = lazy(() => import('./routes/Modelling'))
+const RoutesMap = lazy(() => import('./routes/RoutesMap'))
 const Login = lazy(() => import('./routes/Login'))
 const QueueDashboard = lazy(() => import('./routes/QueueDashboard'))
 const DockBoard = lazy(() => import('./routes/DockBoard'))
@@ -90,6 +91,7 @@ export default function App() {
       <AuthRestore onReady={setAuthReady} />
       <Suspense fallback={<Fallback />}>
       <Routes>
+        <Route path="/routes" element={<RoleGuard route="routes"><Layout><RoutesMap /></Layout></RoleGuard>} />
         <Route path="/" element={<Login />} />
         <Route path="/queue" element={<RoleGuard route="queue"><Layout><QueueDashboard /></Layout></RoleGuard>} />
         <Route path="/docks" element={<RoleGuard route="docks"><Layout><DockBoard /></Layout></RoleGuard>} />

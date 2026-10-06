@@ -5,9 +5,12 @@ from compliance import views as compliance_views
 from core import views as core_views
 from core import audit_views as core_audit_views
 from yard import views as yard_views
-from . import views, auth_views, admin_views
+from . import views, auth_views, admin_views, route_views
 
 urlpatterns = [
+    path('routes/workspace/', route_views.route_workspace),
+    path('routes/preview/', route_views.route_command),
+    path('routes/drafts/', route_views.route_command, {'save': True}),
     path("health/", views.health),
     # Admin trip planning
     path("trip/", views.trip_plan),

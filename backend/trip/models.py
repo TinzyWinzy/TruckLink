@@ -247,6 +247,9 @@ class Trip(models.Model):
       dispatched – driver en route to pickup
       ...
     """
+    facility = models.ForeignKey('core.Facility', on_delete=models.PROTECT, null=True, blank=True, related_name='trips')
+    routing_snapshot = models.JSONField(default=dict, blank=True)
+    route_client_key = models.CharField(max_length=64, blank=True, default='')
     organisation = models.ForeignKey(
         Organisation, on_delete=models.CASCADE, related_name="trips",
         null=True, blank=True,
@@ -372,6 +375,7 @@ class Trip(models.Model):
             models.Index(fields=["driver", "status"]),
             models.Index(fields=["vehicle", "status"]),
         ]
+        constraints = [models.UniqueConstraint(fields=['facility', 'route_client_key'], condition=~models.Q(route_client_key=''), name='unique_route_draft_per_yard')]
 
     def __str__(self):
         who = self.driver.name if self.driver else "anonymous"

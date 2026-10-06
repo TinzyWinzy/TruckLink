@@ -4,9 +4,10 @@
 
 import { canAccess, type Role } from '../store/session'
 
-export type RouteKey = 'queue' | 'docks' | 'compliance' | 'alerts' | 'reports' | 'audit' | 'admin' | 'hub' | 'guide' | 'modelling'
+export type RouteKey = 'queue' | 'docks' | 'compliance' | 'alerts' | 'reports' | 'audit' | 'admin' | 'hub' | 'guide' | 'modelling' | 'routes'
 
 export const ROUTE_GATES: Record<RouteKey, Role[]> = {
+  routes: ['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'EXECUTIVE', 'ADMIN', 'COMPLIANCE_OFFICER'],
   hub: ['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'EXECUTIVE', 'ADMIN', 'COMPLIANCE_OFFICER'],
   guide: ['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'EXECUTIVE', 'ADMIN', 'COMPLIANCE_OFFICER'],
   queue: ['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER'],

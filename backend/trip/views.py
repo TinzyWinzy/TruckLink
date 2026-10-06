@@ -162,7 +162,7 @@ def trip_estimate(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    coords = [(origin["lon"], origin["lat"]), (destination["lon"], destination["lat"])]
+    coords = [(origin["lon"], origin["lat"])]
     for wp_label in data.get("waypoints", []):
         wp = geocoding.geocode(wp_label)
         if not wp:
@@ -172,6 +172,7 @@ def trip_estimate(request):
             )
         coords.append((wp["lon"], wp["lat"]))
 
+    coords.append((destination["lon"], destination["lat"]))
     route_result = routing.route(coords)
     if not route_result:
         return Response(

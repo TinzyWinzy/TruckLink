@@ -8,6 +8,7 @@ import { useLive } from '../lib/liveGate'
 import { ROUTE_GATES, landingPathForRole } from '../lib/gates'
 
 const PRIMARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] = [
+  { to: '/routes', label: 'Routes & map', route: 'routes' },
   { to: '/queue', label: 'Queue', route: 'queue' },
   { to: '/compliance', label: 'Compliance', route: 'compliance' },
   { to: '/docks', label: 'Docks', route: 'docks' },
