@@ -17,7 +17,7 @@ test('production evidence, deliveries and device recovery load without operation
   for(const row of board.records){expect(row.trip.synthetic).toBe(false);expect(row.journey.integrations).toEqual({erp:'NOT_CONFIGURED',tracking:'NOT_CONFIGURED'})}
   await page.goto('/evidence');await expect(page.getByRole('heading',{name:'Document register'})).toBeVisible()
   await page.getByRole('button',{name:'Record a document revision'}).click();await expect(page.getByRole('button',{name:'Record evidence revision',exact:true})).toBeDisabled()
-  for(const type of ['vehicle','driver','trip','load']){await page.getByLabel('Record belongs to').selectOption(type);await expect(page.getByLabel(`Existing ${type}`,{exact:true})).toBeVisible()}
+  for(const type of ['vehicle','driver','trip','load']){await page.getByLabel('Record belongs to').selectOption(type);await expect(page.getByRole('combobox',{name:`Existing ${type}`,exact:true})).toBeVisible()}
   await page.getByRole('button',{name:'Close document form'}).click()
   await page.setViewportSize({width:390,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
   await page.screenshot({path:'../docs/design/evidence-production-mobile.png',fullPage:true})

@@ -35,3 +35,13 @@ Permanent server rejections, legacy failures without a known category, and offli
 - Build passed; lint has only the pre-existing shared UI Fast Refresh warning.
 
 Production verification uses only operational reads, authentication and role switches. Successful authoring and replay are demonstrated with synthetic intercepted APIs and isolated backend test records. Production absence of complete journeys is reported honestly and is not filled with invented customer data.
+
+## Production release, 7 October 2026
+
+- Application commit: `b1a39b1c42937600c763ad64f5983cdb0da9f95c`.
+- Backend deploy `dep-db36rkeq1p3s73f78q0g` confirmed live at that commit.
+- Frontend deployment `dpl_HBnqmvhFC8HESeVuDZ6spiXFXA2A` ready and promoted after backend activation.
+- Production: https://trucki-two.vercel.app/ . Immutable frontend: https://trucki-omq53knpm-brandontinozs-projects.vercel.app/ .
+- Fourteen production checks passed across admin/session/roles, protected API, practice navigation and the three new workspaces. The new workspace check was rerun after correcting a test selector to use the combobox's accessible name.
+- The first tenant's site 1 returned zero evidence revisions and zero linked journeys. Entry 1 still had VEHICLE, TRIP, RATINGS and LOAD prerequisites. No customer evidence, journey, inspection, approval, release or delivery was created or changed by these checks.
+- Production mobile screenshots for Evidence and Deliveries were captured and visually inspected. Production remains an incomplete operational demonstration until tenant master records and a properly reviewed practice case are supplied.
