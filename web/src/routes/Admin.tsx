@@ -6,6 +6,7 @@ import TenantSettings from '../components/TenantSettings'
 import PlatformConfiguration from '../components/PlatformConfiguration'
 import VehicleEvidenceDesk from '../components/VehicleEvidenceDesk'
 import FleetRegistration from '../components/FleetRegistration'
+import StaffProvisioning from '../components/StaffProvisioning'
 
 export default function Admin() {
   const { role } = useSession()
@@ -43,10 +44,11 @@ export default function Admin() {
       <PageHeader title="Admin" sub={live ? 'Yard setup controls.' : 'Setup. Works once the tablet is connected.'} mode={live ? 'live' : 'demo'} />
       <div className="space-y-3">
         {live && <FleetRegistration />}
+        {live && <StaffProvisioning />}
         {live && <VehicleEvidenceDesk />}
         {live && <TenantSettings />}
         {live && <PlatformConfiguration />}
-        <Section title="Yard setup" sub="One-time: docks, equipment, axle rules + the practice shift. Safe to run again.">
+        <Section title="Practice yard bootstrap" sub="For facilities explicitly configured in demo mode. Production sites reject this command; use actual fleet and evidence records for operational reviews.">
           <button type="button" onClick={seed} disabled={busy || !live} className="btn-primary touch-target rounded-lg px-4 text-sm disabled:opacity-60">
             {busy ? 'Setting up…' : 'Set up yard + practice shift'}
           </button>
@@ -54,13 +56,6 @@ export default function Admin() {
           {message && message.startsWith('✔') && (
             <p className="mt-2 text-sm">Next: open <a className="underline" href="/guide">/guide</a> with the gatekeeper, then <a className="underline" href="/queue">/queue</a>.</p>
           )}
-        </Section>
-        <Section title="Add a person" sub="Three steps. The job travels with the account.">
-          <ol className="list-decimal space-y-1 pl-5 text-sm">
-            <li>Add the person (name + password).</li>
-            <li>Give them a job + yard: <code className="rounded bg-slate-100 px-1">{'{"role":"DISPATCH_SUPERVISOR","facilities":["demo-facility"]}'}</code></li>
-            <li>They sign in on the gate screen.</li>
-          </ol>
         </Section>
       </div>
     </div>

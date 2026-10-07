@@ -384,7 +384,7 @@ class OverrideApproval(Record):
 
 
 class ReleaseRecord(Record):
-    queue_entry = models.OneToOneField('yard.QueueEntry', on_delete=models.PROTECT)
+    queue_entry = models.ForeignKey('yard.QueueEntry', on_delete=models.PROTECT, related_name='release_records')
     attempt = models.ForeignKey(InspectionAttempt, on_delete=models.PROTECT)
     approval = models.ForeignKey(OverrideApproval, on_delete=models.PROTECT, null=True, blank=True)
     policy_version = models.CharField(max_length=24, default='gate-1')
@@ -393,6 +393,20 @@ class ReleaseRecord(Record):
         super().clean()
         if self.attempt.queue_entry_id != self.queue_entry_id or (self.approval_id and self.approval.request.attempt_id != self.attempt_id):
             raise ValidationError('Release authority must refer to this entry and attempt')
+
+
+class ReleaseWithdrawal(Record):
+    release = models.OneToOneField(ReleaseRecord, on_delete=models.PROTECT, related_name='withdrawal')
+    reason = models.TextField()
+    client_key = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['organisation','client_key'],name='unique_release_withdrawal_key')]
+
+    def clean(self):
+        super().clean()
+        if self.release.organisation_id != self.organisation_id or not self.reason.strip():
+            raise ValidationError('Withdrawal requires a tenant-owned release and recorded reason')
 
 
 # Register platform-owned knowledge models without changing legacy app/table labels.

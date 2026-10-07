@@ -39,6 +39,10 @@ def release_entry(entry_id, actor):
         authority = {"attempt_id": attempt.pk, "approval_id": approval.pk if approval else None}
         if link and attempt.context.trip_id != link.trip_id:
             raise ReleaseBlocked('Inspection release authority belongs to another journey')
+        from regulatory.models import ReleaseWithdrawal
+        withdrawal=ReleaseWithdrawal.objects.filter(release__queue_entry=entry).order_by('-created_at','-pk').first()
+        if withdrawal and attempt.created_at <= withdrawal.created_at:
+            raise ReleaseBlocked('Record a fresh inspection after release withdrawal')
     else:
         check = validate_demo_release(entry)
         authority = {"check_id": str(check.id), "verification_status": "LEGACY_DEMO_UNVERIFIED"}

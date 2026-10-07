@@ -14,14 +14,14 @@ const journey = {id:1,visit_id:2,stage:'YARD_RELEASE_AUTHORISED',yard_status:'RE
 beforeEach(() => { cleanup(); vi.clearAllMocks(); useSession.getState().signInReal('ops','OPERATIONS_SUPERVISOR','Operations') })
 
 it('records departure separately and advances the shared timeline to arrival', async () => {
-  vi.mocked(apiFetch).mockResolvedValueOnce({journey}).mockResolvedValueOnce({journey:{...journey,stage:'DEPARTED'}})
+  vi.mocked(apiFetch).mockResolvedValueOnce({journey:{...journey,active_stop_index:0}}).mockResolvedValueOnce({journey:{...journey,stage:'DEPARTED'}})
   const changed=vi.fn()
   render(<JourneyPanel trip={trip} workspace={workspace} onChange={changed}/>)
   expect(await screen.findByText('YARD RELEASE AUTHORISED', {selector:'strong'})).toBeVisible()
   fireEvent.change(screen.getByLabelText('Observation reason'),{target:{value:'Gate departure observed'}})
   fireEvent.click(screen.getByRole('button',{name:'Record departed'}))
   await waitFor(()=>expect(apiFetch).toHaveBeenCalledTimes(2))
-  expect(vi.mocked(apiFetch).mock.calls[1]).toEqual(['/trips/3/journey/events/',expect.objectContaining({method:'POST',body:expect.objectContaining({kind:'DEPARTED',reason:'Gate departure observed',details:{}})})])
+  expect(vi.mocked(apiFetch).mock.calls[1]).toEqual(['/trips/3/journey/events/',expect.objectContaining({method:'POST',body:expect.objectContaining({kind:'DEPARTED',stop_index:null,reason:'Gate departure observed',details:{}})})])
   expect(await screen.findByRole('button',{name:'Record destination arrived'})).toBeVisible()
   expect(changed).toHaveBeenCalledOnce()
 })

@@ -10,6 +10,11 @@ test('production operations can inspect entry setup without changing evidence',a
   await expect(page).toHaveURL(/\/reports$/)
   await page.getByLabel('Switch working role').selectOption('OPERATIONS_SUPERVISOR')
   await expect(page).toHaveURL(/\/queue$/)
+  await page.goto('/guide')
+  await expect(page.getByRole('heading',{name:'Operational walkthrough'})).toBeVisible()
+  await expect(page.getByRole('heading',{name:'Current site readiness'})).toBeVisible()
+  await expect(page.getByLabel('Inspect an existing visit')).toBeVisible()
+  await expect(page.getByText(/ERP: NOT CONFIGURED/)).toBeVisible()
   const token=await page.evaluate(()=>localStorage.getItem('trucki-auth-token'))
   const headers={Authorization:`Token ${token}`}
   const api=process.env.PW_PROD_API_URL!
@@ -32,6 +37,8 @@ test('production operations can inspect entry setup without changing evidence',a
   await page.getByLabel('Switch working role').selectOption('ADMIN')
   await expect(page).toHaveURL(/\/reports$/)
   await page.getByRole('link',{name:'Admin',exact:true}).click()
+  await page.getByText('Create a staff account',{exact:true}).click()
+  await expect(page.getByRole('button',{name:'Create staff access'})).toBeDisabled()
   await page.getByText('Register a vehicle',{exact:true}).click()
   await expect(page.getByLabel('Vehicle registration',{exact:true})).toBeVisible()
   await expect(page.getByRole('button',{name:'Save fleet vehicle'})).toBeDisabled()

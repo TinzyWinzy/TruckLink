@@ -50,9 +50,9 @@ export default function Login() {
   useEffect(() => {
     if (!allowDemo) return
     const slug = roleFromSlug(new URLSearchParams(window.location.search).get('role'))
-    if (slug && slug !== activeRole) {
+    if (slug && (slug !== activeRole || new URLSearchParams(window.location.search).has('walkthrough'))) {
       signInDemo(slug)
-      navigate(landingPathForRole(slug))
+      navigate(new URLSearchParams(window.location.search).has('walkthrough') ? '/guide' : landingPathForRole(slug))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

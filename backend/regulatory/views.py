@@ -131,7 +131,7 @@ class SetupView(TenantView):
         vehicles = Vehicle.objects.filter(organisation=entry.organisation,is_deleted=False,plate__iexact=entry.reg_number.strip())
         vehicle_ids = list(vehicles.values_list('pk',flat=True))
         trips = Trip.objects.filter(organisation=entry.organisation,vehicle_id__in=vehicle_ids,
-            driver__organisation=entry.organisation,driver__is_deleted=False).exclude(status__in=['cancelled','delivered','paid'])
+            driver__organisation=entry.organisation,driver__is_deleted=False).exclude(status__in=['cancelled','delivered','returned','paid'])
         trips = trips.filter(Q(facility=entry.facility)|Q(facility__isnull=True))
         link = JourneyLink.objects.filter(visit=entry).first()
         if link: trips = trips.filter(pk=link.trip_id)

@@ -323,6 +323,7 @@ class Trip(models.Model):
             ("at_border", "At Border"),
             ("in_transit", "In Transit"),
             ("delivered", "Delivered"),
+            ("returned", "Completed with returns"),
             ("paid", "Paid"),
             ("cancelled", "Cancelled"),
         ],

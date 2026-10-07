@@ -7,10 +7,15 @@ from core import audit_views as core_audit_views
 from yard import views as yard_views
 from . import views, auth_views, admin_views, route_views
 from journeys import views as journey_views
+from core.walkthrough_views import walkthrough
 
 urlpatterns = [
+    path('walkthrough/',walkthrough),
     path('trips/<int:pk>/journey/', journey_views.journey),
     path('trips/<int:pk>/journey/events/', journey_views.journey_event),
+    path('trips/<int:pk>/journey/plan/', journey_views.journey_command,{'command':'plan'}),
+    path('trips/<int:pk>/journey/returns/', journey_views.journey_command,{'command':'returns'}),
+    path('trips/<int:pk>/journey/withdraw-release/', journey_views.journey_command,{'command':'withdraw-release'}),
     path('routes/workspace/', route_views.route_workspace),
     path('routes/preview/', route_views.route_command),
     path('routes/drafts/', route_views.route_command, {'save': True}),

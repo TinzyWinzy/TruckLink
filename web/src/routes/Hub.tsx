@@ -1,78 +1,17 @@
-import { Link } from 'react-router-dom'
-import { useLive } from '../lib/liveGate'
-import { ROLE_CARDS, SI_CARDS } from '../lib/demoData'
-import { PageHeader, Section } from '../components/ui'
-
-/** Information Hub — the yard's answer wall. Visit by every role. */
-export default function Hub() {
-  const live = useLive()
-  return (
-    <div className="max-w-2xl">
-      <PageHeader
-        title="Information hub"
-        sub="How Trucki works, how evidence informs decisions, who does what, and what to do when things break."
-        mode={live ? 'live' : 'demo'}
-      />
-      <div className="space-y-3">
-        <Section title="What is this system?" sub="Trucki in one paragraph">
-          <p className="text-[15px] leading-relaxed">
-            Trucki is a local-first overlay on the yard: it registers arrivals, assigns docks,
-            evaluates dispatch evidence against the selected versioned ruleset <strong>before</strong> the truck leaves, and keeps
-            an append-only audit trail. It complements your WMS with evidence-based evaluation and controlled release.
-          </p>
-          <Link to="/guide" className="btn-primary touch-target mt-3 inline-block rounded-lg px-4 py-2 text-sm">
-            Start the gatekeeper's walkthrough →
-          </Link>
-        </Section>
-
-        <Section title="The law that pays for this" sub="S.I. 129/2015 + S.I. 159/2022">
-          {SI_CARDS.map((c) => (
-            <div key={c.title} className="card mb-2 border-l-4 border-l-amber-500 p-4">
-              <p className="font-extrabold">{c.title}</p>
-              <p className="mt-1 text-sm leading-relaxed text-slate-700">{c.body}</p>
-            </div>
-          ))}
-        </Section>
-
-        <Section title="Who does what" sub="Available actions depend on your assigned working role">
-          <ul className="space-y-2">
-            {ROLE_CARDS.map((r) => (
-              <li key={r.role} className="card flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
-                <strong className="rounded bg-slate-900 px-2 py-0.5 text-xs text-white">{r.role.replace(/_/g, ' ')}</strong>
-                <span className="text-slate-700">{r.blurb}</span>
-              </li>
-            ))}
-          </ul>
-        </Section>
-
-        <Section title="When things break" sub="Yard-first fixes, in order">
-          <ul className="list-decimal space-y-1 pl-5 text-sm leading-relaxed">
-            <li><strong>Offline (■ OFFLINE):</strong> keep registering. Entries queue with ⏳ and sync on reconnect. Dock moves wait for signal.</li>
-            <li><strong>PIN fails:</strong> check caps on TRK-07-DEMO, 4–12 digits, no trailing space. After 3 tries, ask your supervisor. Do not share PINs.</li>
-            <li><strong>Scale won't pair:</strong> use Chrome on the yard tablet → ⚖ Read from weighbridge → pick the scale port. Typing still works.</li>
-            <li><strong>Permission error:</strong> sign out → sign in again. Still blocked → ask your supervisor to check your account.</li>
-            <li><strong>Quarantined truck at the gate:</strong> do not wave it through. Rebalance at Bay 4 or run the override path. Both are audited.</li>
-          </ul>
-        </Section>
-
-        <Section title="Module map" sub="Every screen, one line">
-          <ul className="grid gap-2 text-sm">
-            {[
-              ['Shift queue', '/queue', 'Register arrivals, release cleared trucks.'],
-              ['Pre-departure check', '/compliance', '4 steps: vehicle → weights → checks → validate.'],
-              ['Dock board', '/docks', 'Tap a free dock → oldest truck assigns.'],
-              ['Alerts', '/alerts', 'CRITICAL first; acknowledge what you own.'],
-              ['Shift performance', '/reports', 'Overdue, turnaround, CSV export for the manager.'],
-              ['Audit trail', '/audit', 'Hash-chained proof. Read-only for most.'],
-            ].map(([label, to, blurb]) => (
-              <li key={to} className="card flex items-center gap-3 px-4 py-3">
-                <Link to={to} className="font-extrabold underline">{label}</Link>
-                <span className="text-slate-600">{blurb}</span>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      </div>
-    </div>
-  )
+import {Link} from 'react-router-dom'
+import {useLive} from '../lib/liveGate'
+import {canVisit,type RouteKey} from '../lib/gates'
+import {WALKTHROUGH_ROLES} from '../lib/walkthrough'
+import {useSession} from '../store/session'
+import {PageHeader,Section} from '../components/ui'
+export default function Hub(){
+  const live=useLive();const role=useSession(s=>s.role)
+  const screens:[string,RouteKey,string][]=[['Shift queue','queue','Arrivals, inspection handoffs and authorised release.'],['Inspection','compliance','Context, observations, versioned evaluation and approval.'],['Dock board','docks','Dock assignment and occupancy.'],['Routes and journeys','routes','Trip drafts, linked visits, movement, delivery stops and returns.'],['Reports','reports','Performance and CSV export.'],['Audit','audit','Retained actions and integrity verification.'],['Administration','admin','Tenant configuration, staff, fleet and evidence.']]
+  return <div className="max-w-3xl space-y-4"><PageHeader title="Information hub" sub="Platform boundaries, responsibilities and practical help." mode={live?'live':'demo'}/>
+    <Section title="Where Trucki fits" sub="Transport operations alongside your existing systems"><p className="text-sm">Trucki connects yard visits, inspection evidence, release decisions and journey handoffs. Tenants own fleet and operational records; reusable regulatory capabilities belong to the platform. ERP/WMS and fleet tracking connections require configured adapters and agreed ownership.</p><Link to="/guide" className="btn-primary mt-3 inline-block px-4">Start the operational walkthrough</Link></Section>
+    <Section title="Evidence and authority" sub="Readiness is not permission to leave"><p className="text-sm">Decisions retain source revisions, effective dates, inputs and rule versions. Tenant procedures are internal policies, never statutory law. No instrument or monetary penalty is asserted as verified law by this walkthrough. Missing, expired or unreviewed prerequisites remain visible and can block release.</p></Section>
+    <Section title="Who does what" sub="Your working role and tenant permissions control actions"><ul className="space-y-2">{WALKTHROUGH_ROLES.map(r=><li key={r.role} className="card p-3 text-sm"><strong>{r.role.replaceAll('_',' ')}</strong><p>{r.purpose}</p></li>)}</ul></Section>
+    <Section title="When a step is blocked" sub="Resolve the cause with its responsible owner"><ul className="list-disc space-y-2 pl-5 text-sm"><li>Missing context: open the visit inspection and follow prerequisite messages. Fleet, dispatch or evidence owners must supply actual records.</li><li>Held inspection: read the recorded decision. Eligible exceptions require independent approval; approval does not erase a failed attempt.</li><li>Connection unavailable: supported arrivals can queue locally. Evidence, release and journey commands require connectivity and current server authority.</li><li>Access denied: check site and working role with your administrator. Each reviewer needs their own account and private PIN.</li><li>Instructions change before exit: Operations can withdraw unused release authority for reinspection. After departure, record actual delivery exceptions and authorised returns.</li><li>Tracker or ERP absent: manual references and staff observations do not prove an integration. Commercial reconciliation remains with the ERP owner.</li></ul></Section>
+    <Section title="Your available screens" sub="Links respect current role and tenant modules"><ul className="space-y-2">{screens.filter(([,route])=>canVisit(route,role)).map(([title,route,detail])=><li className="card p-3 text-sm" key={route}><Link className="font-bold underline" to={`/${route}`}>{title}</Link><p>{detail}</p></li>)}</ul></Section>
+  </div>
 }
