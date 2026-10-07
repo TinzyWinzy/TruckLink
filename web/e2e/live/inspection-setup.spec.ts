@@ -28,6 +28,7 @@ test('operations resolves missing context without treating setup as inspection a
   await page.getByRole('button',{name:'Sign in to shift',exact:true}).click()
   await expect(page).toHaveURL(/\/queue$/)
   await page.goto('/compliance?entry=1')
+  await page.getByRole('button',{name:'Complete operational setup'}).click()
   await expect(page.getByRole('heading',{name:'Prepare this inspection'})).toBeVisible()
   await expect(page.getByText(/Setup prevented this inspection/)).toBeVisible()
   await expect(page.getByRole('button',{name:'Record versioned inspection'})).toHaveCount(0)

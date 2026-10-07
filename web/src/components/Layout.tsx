@@ -117,17 +117,27 @@ export default function Layout({ children }: { children: ReactNode }) {
               T
             </span>
             <span className="leading-none">
-              <span className="block text-[10px] font-extrabold uppercase tracking-[0.18em] text-amber-400">
-                {practice ? 'Practice workspace' : tenantDisplayName(tenant,workspace?.organisation?.name)}
+              <span className="block text-xs font-semibold text-amber-300">
+                {practice ? 'Practice workspace' : `Tenant: ${tenantDisplayName(tenant,workspace?.organisation?.name)}`}
               </span>
               <span className="block text-lg font-extrabold tracking-tight">Trucki</span>
             </span>
           </Link>
+      {workspace && <div className="header-yard">
+        <label>Yard <select aria-label="Selected yard" className="field ml-2 px-3 text-slate-900" value={workspace.selectedFacility} onChange={async e => {
+          const id = e.target.value
+          if (!workspace.facilities.some(f => String(f.id) === id)) return
+          selectFacility(id)
+          try { localStorage.setItem(`trucki-yard-${userId}`, id) } catch { /* storage unavailable */ }
+          setWorkspace({ ...workspace, selectedFacility: id })
+          navigate(landingPathForRole(role!))
+        }}>{workspace.facilities.map(f => <option key={f.id} value={String(f.id)}>{f.name}</option>)}</select></label>
+      </div>}
           <div className="flex flex-wrap items-center gap-1.5" role="status" aria-label="Yard state">
             <span aria-label={online ? 'Online' : 'Offline'} className={online ? 'pill pill-live' : 'pill pill-warn'}>
               {online ? '● ONLINE' : '■ OFFLINE'}
             </span>
-            <span className={live ? 'pill pill-live' : 'pill pill-demo'}>{live ? '● LIVE' : '■ PRACTICE'}</span>
+            {!live&&<span className="pill pill-demo">■ PRACTICE</span>}
             {pending > 0 && (
               <span role="status" className="pill pill-queued">⏳ {pending} queued</span>
             )}
@@ -138,9 +148,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               <Link to="/alerts" className="pill pill-fail" role="alert">✖ {critical} critical</Link>
             )}
           </div>
-          <span className="ml-auto hidden text-xs font-semibold text-white/60 md:inline">
-            {displayName} · {role ? tenantLabel(tenant,role) : 'signed out'}
-          </span>
+          <div className="header-spacer"/>
           {baseRole === 'ADMIN' && (
             <label className="flex items-center gap-1.5 rounded-lg border border-amber-400/50 bg-white/5 px-2 py-1 text-xs font-bold text-amber-300">
               View as
@@ -175,6 +183,9 @@ export default function Layout({ children }: { children: ReactNode }) {
               </select>
             </label>
           )}
+          <details className="account-menu">
+            <summary>Account</summary>
+            <div className="account-menu-panel"><p className="font-bold">{displayName}</p><p className="mt-1 mb-3 text-sm">{role ? tenantLabel(tenant,role) : 'Signed out'}</p>
           <button
             type="button"
             onClick={async () => {
@@ -188,24 +199,14 @@ export default function Layout({ children }: { children: ReactNode }) {
             className="touch-target rounded-lg border border-white/25 px-3 text-sm font-semibold text-white/85 hover:bg-white/10"
           >
             Sign out
-          </button>
+          </button></div>
+          </details>
         </div>
       </header>
       {switchError && <p role="alert" className="p-4 text-red-800">{switchError}</p>}
-      {workspace && <div className="flex flex-wrap items-center gap-3 border-b border-slate-300 px-6 py-3 text-sm">
-        <span className="font-semibold">Tenant: {tenantDisplayName(tenant,workspace.organisation?.name)}</span>
-        <label>Yard <select aria-label="Selected yard" className="field ml-2 px-3" value={workspace.selectedFacility} onChange={async e => {
-          const id = e.target.value
-          if (!workspace.facilities.some(f => String(f.id) === id)) return
-          selectFacility(id)
-          try { localStorage.setItem(`trucki-yard-${userId}`, id) } catch { /* storage unavailable */ }
-          setWorkspace({ ...workspace, selectedFacility: id })
-          navigate(landingPathForRole(role!))
-        }}>{workspace.facilities.map(f => <option key={f.id} value={String(f.id)}>{f.name}</option>)}</select></label>
-      </div>}
       <div className="workbench-body">
       <aside className="workspace-rail">
-        <div className="rail-heading"><span className="eyebrow">Workspace</span><p>{role?.replace(/_/g, ' ').toLowerCase()}</p></div>
+        <div className="rail-heading"><span className="eyebrow">Workspace</span></div>
         {/* Weighted nav. 3 primary jobs, hub/guide + rest secondary (Hick's Law) */}
         <nav aria-label="Primary" className="workspace-navigation">
           {visible(PRIMARY, role).map((item) => (

@@ -30,5 +30,5 @@ test('tenant modelling runs synthetic evaluation without operational writes', as
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({ path: '../docs/design/tenant-model-mobile.png', fullPage: true })
-  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await page.getByText('Account',{exact:true}).click();await page.getByRole('button', { name: 'Sign out', exact: true }).click()
 })

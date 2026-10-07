@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { apiFetch } from '../lib/api'
 import { Section } from './ui'
 
-type Setup = {
+export type InspectionSetupData = {
   entry:{id:number;registration:string;status:string};can_record_context:boolean;can_record_load:boolean;
   blockers:{code:string;title:string;owner:string}[];
   trips:{id:number;origin:string;destination:string;driver:number;driver_name:string;vehicle:number;routing_snapshot?:{route_type?:string;jurisdictions?:string[]}}[];
@@ -12,15 +12,15 @@ type Setup = {
   evidence:{id:number;kind:string;document_ref:string;review_status:string;vehicle:number|null;driver:number|null;trip:number|null;load:number|null}[];
 }
 
-export default function InspectionSetup({entryId,onSaved}:{entryId:string;onSaved:()=>Promise<void>}) {
-  const [data,setData]=useState<Setup|null>(null)
+export default function InspectionSetup({entryId,onSaved,showBlockers=true}:{entryId:string;onSaved:()=>Promise<void>;showBlockers?:boolean}) {
+  const [data,setData]=useState<InspectionSetupData|null>(null)
   const [error,setError]=useState(''); const [busy,setBusy]=useState(false)
   const [tripId,setTripId]=useState(''); const [configuration,setConfiguration]=useState(''); const [loadId,setLoadId]=useState('')
   const [routeType,setRouteType]=useState('DOMESTIC'); const [jurisdictions,setJurisdictions]=useState('')
   const [origin,setOrigin]=useState(''); const [destination,setDestination]=useState(''); const [evidence,setEvidence]=useState<number[]>([])
   const [load,setLoad]=useState({reference:'',cargo_class:'',declared_mass_kg:''})
-  const refresh=()=>apiFetch<Setup>(`/regulatory/queue/${entryId}/setup/`).then(setData)
-  useEffect(()=>{let active=true; apiFetch<Setup>(`/regulatory/queue/${entryId}/setup/`).then(d=>{if(active)setData(d)}).catch(e=>{if(active)setError((e as Error).message)});return()=>{active=false}},[entryId])
+  const refresh=()=>apiFetch<InspectionSetupData>(`/regulatory/queue/${entryId}/setup/`).then(setData)
+  useEffect(()=>{let active=true; apiFetch<InspectionSetupData>(`/regulatory/queue/${entryId}/setup/`).then(d=>{if(active)setData(d)}).catch(e=>{if(active)setError((e as Error).message)});return()=>{active=false}},[entryId])
   const trip=data?.trips.find(t=>String(t.id)===tripId)
   const documents=data?.evidence.filter(e=>(!!trip&& (e.vehicle===trip.vehicle||e.driver===trip.driver||e.trip===trip.id))||e.load===Number(loadId))??[]
   async function saveLoad(){
@@ -37,12 +37,12 @@ export default function InspectionSetup({entryId,onSaved}:{entryId:string;onSave
       await onSaved()
     }catch(e){setError((e as Error).message)}finally{setBusy(false)}
   }
-  return <Section title="Prepare this inspection" sub="Complete the operational record first. Saving setup does not pass inspection or authorise release.">
+  return <Section title="Prepare this inspection" sub="Saving setup does not authorise release.">
     {error&&<p role="alert" className="mb-3 text-sm text-red-800">{error}</p>}
     {!data?<p role="status">Loading entry setup.</p>:<>
       <p className="text-sm font-bold">{data.entry.registration} · Visit {data.entry.id} · {data.entry.status}</p>
-      {data.blockers.length>0&&<ol className="my-4 space-y-3">{data.blockers.map(b=><li key={b.code} className="border-l-2 border-amber-600 pl-3 text-sm"><strong>{b.title}</strong><p>Responsible role: {b.owner}</p></li>)}</ol>}
-      <p className="my-3 text-sm">Dispatch can manage assigned trips in <Link className="underline" to="/routes">Routes & map</Link>. Administrators manage vehicle evidence in <Link className="underline" to="/admin">Admin</Link>. Compliance reviewers use <Link className="underline" to="/approvals">Pending approvals</Link>. A different person must approve rating evidence and configurations.</p>
+      {showBlockers&&data.blockers.length>0&&<ol className="prerequisite-list">{data.blockers.map(b=><li key={b.code}><div><strong>{b.title}</strong><p>Responsible role: {b.owner}</p></div></li>)}</ol>}
+      <details className="operational-details my-3"><summary>Setup responsibilities</summary><p>Dispatch manages trips in <Link className="underline" to="/routes">Routes & map</Link>. Admin manages vehicle evidence in <Link className="underline" to="/admin">Admin</Link>. Compliance uses <Link className="underline" to="/approvals">Pending approvals</Link>. A different person must approve rating evidence and configurations.</p></details>
       {!data.can_record_context?<p className="text-sm">An operations or dispatch supervisor must record setup. Released visits retain their historical context.</p>:<div className="grid gap-4 sm:grid-cols-2">
         <label className="text-sm font-bold">Assigned trip<select className="field mt-1 w-full" value={tripId} onChange={e=>{
           setTripId(e.target.value);setConfiguration('');setEvidence([]);const t=data.trips.find(t=>String(t.id)===e.target.value)

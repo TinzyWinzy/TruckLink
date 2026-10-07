@@ -58,5 +58,5 @@ test('production yard routes, real provider preview and synthetic map stay separ
     await page.screenshot({ path: `../docs/design/trucki-routes-production-${name}.png`, fullPage: true })
   }
   expect(errors).toEqual([])
-  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await page.getByText('Account',{exact:true}).click();await page.getByRole('button', { name: 'Sign out', exact: true }).click()
 })

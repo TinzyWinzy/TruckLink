@@ -60,7 +60,7 @@ test('BAK-19/20/21: self-approval denied; separate supervisor approves and relea
   await login(page, 'inspector')
   await inspect(page, 'exception', true)
   await expect(page.getByText(/Inspection \d+ · QUARANTINE$/)).toBeVisible()
-  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await page.getByText('Account',{exact:true}).click();await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await login(page, 'requester')
   await page.goto(`/compliance?entry=${entries.exception}`)
   await page.getByLabel('Review reason').fill('Synthetic permitted exception request')
@@ -72,7 +72,7 @@ test('BAK-19/20/21: self-approval denied; separate supervisor approves and relea
   const selfApproval = await page.request.post(`${api}/api/regulatory/override-requests/${detail.requests.at(-1).id}/approve/`,
     { headers: auth, data: { approved: true, reason: 'Self approval must fail' } })
   expect(selfApproval.ok()).toBe(false)
-  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await page.getByText('Account',{exact:true}).click();await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await login(page, 'approver')
   await page.goto(`/compliance?entry=${entries.exception}`)
   await page.getByLabel('Review reason').fill('Independent synthetic review')

@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test'
 // queue rows + 4 docks + 3 alerts.
 test('seeded yard: PIN sign-in lands dispatch on the live queue', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByText('● LIVE')).toBeVisible()
+  await expect(page.getByLabel('Online',{exact:true})).toBeVisible()
   await expect(page.getByText('■ PRACTICE')).toHaveCount(0)
 
   await page.fill('#staffId', 'TRK-CI-1')

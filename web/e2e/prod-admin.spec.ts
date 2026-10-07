@@ -31,7 +31,13 @@ test('production operations can inspect entry setup without changing evidence',a
   await page.goto('/compliance?entry=1')
   await expect(page.getByRole('heading',{name:'Operational gate inspection'})).toBeVisible()
   const context=await (await request.get(`${api}/api/regulatory/queue/1/context/`,{headers})).json()
+  await expect(page.getByRole('heading',{name:setup.entry.registration,exact:true})).toBeVisible()
+  await page.setViewportSize({width:1440,height:1000})
+  await page.screenshot({path:'../docs/design/inspection-production-desktop.png',fullPage:true})
+  await page.setViewportSize({width:390,height:1000})
+  await page.screenshot({path:'../docs/design/inspection-production-mobile.png',fullPage:true})
   if(!context.context){
+    await page.getByRole('button',{name:'Complete operational setup'}).click()
     await expect(page.getByRole('heading',{name:'Prepare this inspection'})).toBeVisible()
     await expect(page.getByRole('button',{name:'Record versioned inspection'})).toHaveCount(0)
     await expect(page.getByRole('button',{name:'Save operational setup'})).toBeDisabled()
@@ -49,7 +55,7 @@ test('production operations can inspect entry setup without changing evidence',a
   await page.getByRole('button',{name:'Open evidence register'}).click()
   await expect(page.getByText('Evidence register loaded.')).toBeVisible()
   await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0)
-  await page.getByRole('button',{name:'Sign out',exact:true}).click()
+  await page.getByText('Account',{exact:true}).click();await page.getByRole('button',{name:'Sign out',exact:true}).click()
 })
 
 test('production connected journey schema is readable without operational writes', async ({ request }) => {
@@ -126,7 +132,7 @@ test('live ADMIN PIN can switch working roles and return without changing identi
   await expect(page).toHaveURL(/\/reports$/)
   await expect(page.getByText(/Last successful read/)).toBeVisible()
   await expect(page.getByRole('region', { name: 'Review priority' })).toBeVisible()
-  await expect(page.getByRole('region', { name: 'Data availability' })).toContainText('movements loaded')
+  await expect(page.getByRole('region', { name: 'Data availability' })).toContainText(/movements? loaded/)
   const api = process.env.PW_PROD_API_URL!
   const token = await page.evaluate(() => localStorage.getItem('trucki-auth-token'))
   const headers = { Authorization: `Token ${token}` }
@@ -156,8 +162,12 @@ test('live ADMIN PIN can switch working roles and return without changing identi
   await expect(page.getByLabel('Switch working role')).toHaveValue('ADMIN')
   await expect(page.getByText(/Last successful read/)).toBeVisible()
   await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0)
-  await page.screenshot({ path: '../docs/design/bak-live-admin.png', fullPage: true })
-  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await page.setViewportSize({width:1440,height:1000})
+  await page.screenshot({ path: '../docs/design/reports-production-desktop.png', fullPage: true })
+  await page.setViewportSize({width:390,height:1000})
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+  await page.screenshot({ path: '../docs/design/reports-production-mobile.png', fullPage: true })
+  await page.getByText('Account',{exact:true}).click();await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Gate sign-in' })).toBeVisible()
 })
 
@@ -175,5 +185,5 @@ test('production guided workspace, compliance review and filtered CSV remain rea
   await page.getByLabel('Switch working role').selectOption('EXECUTIVE');await expect(page).toHaveURL(/\/reports$/);await page.goto('/routes');await expect(page.getByText(/Dispatch saves assigned trips; your role has no draft-save permission/)).toBeVisible();await expect(page.getByRole('button',{name:'Save draft trip'})).toHaveCount(0)
   await page.getByLabel('Switch working role').selectOption('ADMIN');await expect(page).toHaveURL(/\/reports$/);await page.goto('/admin');await expect(page.getByRole('heading',{name:'Site docks',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Add site dock'})).toBeDisabled()
   await page.goto('/dispatch?entry=1');await page.getByText('Assign the next handoff owner',{exact:true}).click();await expect(page.getByRole('combobox',{name:'Responsible staff member'})).toBeVisible();await expect(page.getByRole('button',{name:'Assign accountable owner'})).toBeDisabled()
-  expect(writes).toEqual([]);await page.getByRole('button',{name:'Sign out',exact:true}).click()
+  expect(writes).toEqual([]);await page.getByText('Account',{exact:true}).click();await page.getByRole('button',{name:'Sign out',exact:true}).click()
 })

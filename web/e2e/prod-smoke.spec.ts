@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 /**
  * Production smoke — https://trucki-two.vercel.app/ asserts the deployed gate,
  * the explicit practice validation path (?demo=1), and navigation.
- * Shows ● LIVE only once VITE_API_URL points at the deployed Django API.
+ * Checks the single connection indicator and the authenticated operational interface.
  * Yard writes are NOT touched.
  * Run: PW_PROD=1 npx playwright test --project=production
  */
@@ -35,7 +35,7 @@ test('versioned API is deployed and protects its registry', async ({ request }) 
 test('gate loads in live mode', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Gate sign-in' })).toBeVisible()
-  await expect(page.getByText('● LIVE')).toBeVisible()
+  await expect(page.getByLabel('Online',{exact:true})).toBeVisible()
   await expect(page.getByRole('group', { name: 'Sign-in method' })).toBeVisible()
 })
 

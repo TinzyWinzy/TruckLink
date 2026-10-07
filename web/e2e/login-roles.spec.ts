@@ -33,17 +33,17 @@ test('selecting a tab updates the CTA and lands on the role home', async ({ page
   await expect(page.getByText('Shift performance')).toBeVisible()
 })
 
-test('dispatch lands on queue; compliance lands on audit', async ({ page }) => {
+test('dispatch lands on queue', async ({ page }) => {
   await page.getByRole('button', { name: /Start shift as DISPATCH SUPERVISOR/ }).click()
   await expect(page).toHaveURL(/\/queue$/)
   await expect(page.getByText('Shift queue')).toBeVisible()
 })
 
-test('compliance officer lands on audit trail', async ({ page }) => {
+test('compliance officer lands on pending approvals', async ({ page }) => {
   await page.getByRole('radio', { name: /COMPLIANCE OFFICER/ }).click()
   await page.getByRole('button', { name: /Start shift as COMPLIANCE OFFICER/ }).click()
-  await expect(page).toHaveURL(/\/audit$/)
-  await expect(page.getByText('Audit trail')).toBeVisible()
+  await expect(page).toHaveURL(/\/approvals$/)
+  await expect(page.getByRole('heading',{name:'Pending approvals'})).toBeVisible()
 })
 
 test('deep link ?role=dispatch signs straight into the shift', async ({ page }) => {
@@ -85,7 +85,7 @@ test('only an admin account sees role switching, including after refresh', async
   await page.goto('/?demo=1&role=dispatch')
   await expect(page.getByRole('heading', { name: 'Shift queue' })).toBeVisible()
   await expect(page.getByLabel('Switch practice role')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Sign out', exact: true }).click()
+  await page.getByText('Account',{exact:true}).click();await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await page.goto('/?demo=1&role=admin')
   await page.getByLabel('Switch practice role').selectOption('DISPATCH_SUPERVISOR')
   await expect(page.getByRole('heading', { name: 'Shift queue' })).toBeVisible()

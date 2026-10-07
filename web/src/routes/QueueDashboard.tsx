@@ -195,11 +195,11 @@ export default function QueueDashboard() {
       <section className="card p-4 sm:p-5" aria-label="Register vehicle">
         <h2 className="text-base font-extrabold">Register arrival</h2>
         <div className="mt-3 grid gap-2 md:grid-cols-5">
-          <input aria-label="License plate" placeholder="Plate · AEH 4521" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} className="field touch-target px-3 md:col-span-1" autoCapitalize="characters" />
-          <input aria-label="Driver name" placeholder="Driver" value={driver} onChange={(e) => setDriver(e.target.value)} className="field touch-target px-3 md:col-span-1" />
-          <input aria-label="Cargo type" value={cargo} onChange={(e) => setCargo(e.target.value)} className="field touch-target px-3 md:col-span-1" />
-          <input aria-label="Destination" value={dest} onChange={(e) => setDest(e.target.value)} className="field touch-target px-3 md:col-span-1" />
-          <button type="button" onClick={register} className="btn-primary touch-target px-4 text-base md:col-span-1">
+          <label className="text-sm font-semibold">License plate<input placeholder="AEH 4521" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} className="field touch-target mt-1 w-full px-3" autoCapitalize="characters" /></label>
+          <label className="text-sm font-semibold">Driver name<input value={driver} onChange={(e) => setDriver(e.target.value)} className="field touch-target mt-1 w-full px-3" /></label>
+          <label className="text-sm font-semibold">Cargo type<input value={cargo} onChange={(e) => setCargo(e.target.value)} className="field touch-target mt-1 w-full px-3" /></label>
+          <label className="text-sm font-semibold">Destination<input value={dest} onChange={(e) => setDest(e.target.value)} className="field touch-target mt-1 w-full px-3" /></label>
+          <button type="button" onClick={register} className="btn-primary touch-target self-end px-4 text-base md:col-span-1">
             + Register
           </button>
         </div>
@@ -245,10 +245,10 @@ export default function QueueDashboard() {
                 </button>
                 <Link
                   to={`/compliance?entry=${encodeURIComponent(r.id)}`}
-                  aria-label={`Check ${r.plate}`}
+                  aria-label={`Open inspection ${r.plate}`}
                   className="touch-target rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white"
                 >
-                  Check →
+                  Open inspection →
                 </Link>
               </span>
               {(r.rawStatus === 'COMPLETED' || r.rawStatus === 'OVERRIDE_APPROVED') && live && canRelease && (

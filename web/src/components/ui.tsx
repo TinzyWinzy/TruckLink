@@ -20,7 +20,7 @@ export function PageHeader({
   eyebrow,
 }: {
   title: string
-  sub: string
+  sub?: string
   mode?: 'live' | 'demo'
   actions?: ReactNode
   eyebrow?: string
@@ -30,35 +30,35 @@ export function PageHeader({
       {eyebrow && <p className="eyebrow mb-1">{eyebrow}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="page-title">{title}</h1>
-        {mode && (
-          <span className={mode === 'live' ? 'pill pill-live' : 'pill pill-demo'}>
-            {mode === 'live' ? '● LIVE' : '■ PRACTICE'}
+        {mode === 'demo' && (
+          <span className="pill pill-demo">
+            ■ PRACTICE
           </span>
         )}
         {actions && <div className="ml-auto flex flex-wrap gap-2">{actions}</div>}
       </div>
-      <p className="page-sub mt-1.5">{sub}</p>
+      {sub && <p className="page-sub mt-1.5">{sub}</p>}
 
     </div>
   )
 }
 
-export function Stat({ label, value, tone, hint }: { label: string; value: string; tone?: 'alert' | 'good' | 'plain'; hint?: string }) {
+export function Stat({ label, value, tone, hint, unavailable = false }: { label: string; value: string; tone?: 'alert' | 'good' | 'plain'; hint?: string; unavailable?: boolean }) {
   const bar = tone === 'alert' ? 'bg-red-700' : tone === 'good' ? 'bg-emerald-700' : 'bg-slate-300'
   return (
-    <div className="metric-cell p-4">
-      <div className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-slate-500">{label}</div>
+    <div className={`metric-cell p-4${unavailable ? ' metric-unavailable' : ''}`}>
+      <div className="text-sm font-semibold text-slate-700">{label}</div>
       <div
-        className={`tnum mt-1 text-3xl font-extrabold tracking-tight ${
+        className={`metric-value tnum mt-1 text-3xl font-extrabold tracking-tight ${
           tone === 'alert' ? 'text-red-800' : tone === 'good' ? 'text-emerald-800' : 'text-slate-900'
         }`}
       >
         {value}
       </div>
-      {hint && <p className="mt-2 text-xs leading-relaxed text-slate-600">{hint}</p>}
-      <div aria-hidden="true" className="mt-2 h-1 w-10 rounded-full bg-slate-200">
+      {hint && <p className="mt-2 text-sm leading-relaxed text-slate-600">{hint}</p>}
+      {!unavailable && <div aria-hidden="true" className="mt-2 h-1 w-10 rounded-full bg-slate-200">
         <div className={`h-1 w-full rounded-full ${bar}`} />
-      </div>
+      </div>}
     </div>
   )
 }

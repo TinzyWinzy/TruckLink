@@ -7,7 +7,7 @@ test('BAK workbench stays usable on desktop and mobile', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Shift queue' })).toBeVisible()
   for (const [name, width] of [['desktop', 1440], ['mobile', 390]] as const) {
     await page.setViewportSize({ width, height: 1000 })
-    await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
+    await expect(page.getByText('Account',{exact:true})).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     await page.screenshot({ path: `../docs/design/bak-${name}.png`, fullPage: true })
   }
@@ -20,6 +20,7 @@ test('Reports connects status evidence to review actions on desktop and mobile',
   await expect(page.getByRole('heading', { name: 'Shift performance' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Queue distribution' })).toContainText('8 loaded')
   await expect(page.getByRole('region', { name: 'Review priority' })).toContainText('2 movements need controlled review')
+  await page.getByText('Report details and tools',{exact:true}).click()
   await expect(page.getByRole('link', { name: 'Explore synthetic modelling' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Data availability' })).toContainText('Practice dataset')
   for (const [name, width] of [['desktop', 1440], ['mobile', 390]] as const) {

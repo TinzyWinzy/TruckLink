@@ -154,11 +154,11 @@ export default function Login() {
               <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-amber-700">Trucki · Yard Operations</p>
               <h1 className="text-lg font-extrabold leading-tight tracking-tight">Gate sign-in</h1>
             </div>
-            <span className={`ml-auto shrink-0 ${live ? 'pill pill-live' : 'pill pill-demo'}`}>{live ? '● LIVE' : '■ PRACTICE'}</span>
+            {!live&&<span className="ml-auto shrink-0 pill pill-demo">■ PRACTICE</span>}
           </div>
 
           <div className="tnum mt-3 flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600" role="status">
-            <span className="flex items-center gap-1.5">
+            <span aria-label={online?'Online':'Offline'} className="flex items-center gap-1.5">
               <span aria-hidden="true" className={`inline-block h-2 w-2 rounded-full ${online ? 'bg-emerald-500' : 'bg-amber-500'}`} />
               {online ? 'Online' : 'Offline. Queued work syncs on reconnect'}
             </span>

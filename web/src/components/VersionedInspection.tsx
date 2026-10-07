@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { apiFetch } from '../lib/api'
 import { getRegulatoryContext, inspectOperational, type Attempt, type RegulatoryContext } from '../lib/regulatory'
 import { useSession } from '../store/session'
-import { PageHeader, Section } from './ui'
-import InspectionSetup from './InspectionSetup'
+import { PageHeader, Section, StatusPill } from './ui'
+import InspectionSetup, {type InspectionSetupData} from './InspectionSetup'
 import { Link } from 'react-router-dom'
 
 const ATTESTATIONS = ['driver-license', 'vehicle-reg', 'cargo-manifest', 'weight-cert', 'axle-calc']
@@ -13,7 +13,11 @@ export default function VersionedInspection({ entryId, data: initialData, change
 }) {
   const { role, workspace } = useSession()
   const [data,setData] = useState(initialData)
-  const [editing,setEditing] = useState(!initialData.context)
+  const [editing,setEditing] = useState(false)
+  const [summary,setSummary] = useState<InspectionSetupData|null>(null)
+  const [summaryError,setSummaryError] = useState('')
+  const [summaryRetry,setSummaryRetry] = useState(0)
+  useEffect(()=>{let active=true;apiFetch<InspectionSetupData>(`/regulatory/queue/${entryId}/setup/`).then(d=>{if(active){setSummary(d);setSummaryError('')}}).catch(e=>{if(active)setSummaryError((e as Error).message)});return()=>{active=false}},[entryId,summaryRetry])
   const [weights, setWeights] = useState<string[]>(() => (data.configuration?.rated_axle_kg ?? ['0']).map(() => ''))
   const [total, setTotal] = useState('')
   const [checked, setChecked] = useState<Record<string, boolean>>({})
@@ -31,6 +35,7 @@ export default function VersionedInspection({ entryId, data: initialData, change
     setData(updated);setAttempt(updated.attempt);setEditing(false)
     setWeights((updated.configuration?.rated_axle_kg??[]).map(()=>''));setTotal('');setChecked({})
     setMessage('Operational setup saved. Dispatch must record a fresh inspection; historical attempts are retained.')
+    setSummaryRetry(n=>n+1)
   }
 
   async function run() {
@@ -66,13 +71,24 @@ export default function VersionedInspection({ entryId, data: initialData, change
     finally { setBusy(false) }
   }
 
-  return <div className="max-w-3xl space-y-4">
-    <PageHeader title="Operational gate inspection" sub="Recorded vehicle evidence, effective rule versions and a separate release decision." mode="live" />
-    {readOnly&&<p className="text-sm">Read-only inspection access. Your role cannot change context, record measurements, approve operational exceptions or release this visit.</p>}
-    <label className="block text-sm font-bold">Queue entry ID
+  const trip = summary?.trips?.find(t=>t.id===data.context?.trip)
+  return <div className="inspection-workspace space-y-5">
+    <PageHeader title="Operational gate inspection" sub="Resolve missing records before recording an inspection." />
+    <section className="inspection-identity" aria-label="Movement identity">
+      <div className="flex flex-wrap items-center justify-between gap-3"><h2>{summary?.entry?.registration??`Visit ${entryId}`}</h2><StatusPill status={summary?.entry?.status??attempt?.decision??'Context pending'}/></div>
+      <dl className="inspection-facts"><div><dt>Driver</dt><dd>{trip?.driver_name??(data.context?`Recorded driver ${data.context.driver}`:'Not linked')}</dd></div><div><dt>Destination</dt><dd>{data.context?.destination??'Not linked'}</dd></div><div><dt>Trip / load</dt><dd>{data.context?`${data.context.trip} / ${data.context.load}`:'Not linked'}</dd></div></dl>
+      <p className="mt-3 text-sm text-slate-600">Visit {entryId}{readOnly?' · Read-only inspection access.':''}</p>
+    </section>
+    {summaryError&&<p role="alert" className="text-sm">Movement summary unavailable. <button className="report-text-link" onClick={()=>setSummaryRetry(n=>n+1)}>Retry summary</button></p>}
+    {!ready&&<section className="inspection-prerequisites" aria-label="Missing inspection records"><h2 className="text-lg font-bold">Complete setup before inspection</h2><p role="status" className="mt-1 text-sm">Setup required. Inspection and release remain blocked.</p>
+      {summary?.blockers?.length ? <ul className="prerequisite-list">{summary.blockers.map(b=><li key={b.code}><span aria-hidden="true">○</span><div><strong>{b.title}</strong><p>Responsible role: {b.owner}</p></div></li>)}</ul> : <p className="my-3 text-sm">Vehicle, driver, load and route evidence have not been recorded or are not ready for inspection.</p>}
+      {!readOnly&&<button className="btn-primary mt-3 px-4" onClick={()=>setEditing(v=>!v)} aria-expanded={editing}>{editing?'Close setup':'Complete operational setup'}</button>}
+    </section>}
+    <details className="operational-details inspection-context"><summary>Recorded context and rule details</summary>
+    <label className="mt-3 block max-w-xs text-sm font-bold">Queue entry ID
       <input className="field touch-target mt-1 w-full px-3" value={entryId} onChange={e => changeEntry(e.target.value)} />
     </label>
-    <Section title="Recorded context">
+    <div className="mt-4 space-y-2 text-sm">
       {data.context && data.configuration ? <>
         <p>{data.configuration.vehicle_class} · configuration revision {data.configuration.revision} · {data.configuration.review_status}</p>
         <p>{data.context.origin} → {data.context.destination} · {data.context.route_type} · {data.context.jurisdictions.join(', ')}</p>
@@ -82,10 +98,9 @@ export default function VersionedInspection({ entryId, data: initialData, change
       {data.readiness_error && <p role="alert" className="mt-2 text-amber-900">{data.readiness_error}</p>}
       {data.rulesets.map(r => <p key={r.id} className="mt-2 text-sm">{r.content.name} v{r.content.version} · {r.content.jurisdiction} · effective {r.content.effective_from} to {r.content.effective_to}</p>)}
       <p className="mt-2 text-xs text-slate-600">Published records reflect recorded human review. No instrument or monetary penalty is asserted to be verified law by this screen.</p>
-      {data.context&&!readOnly&&<button className="mt-3 min-h-12 underline" onClick={()=>setEditing(v=>!v)}>{editing?'Close setup':'Review or correct operational setup'}</button>}
-    </Section>
-    {editing&&!readOnly&&<InspectionSetup entryId={entryId} onSaved={reloadSetup}/>}
-    {!ready&&<p role="status" className="border-l-4 border-amber-600 bg-amber-50 p-4 text-sm">Setup required. Inspection and release remain blocked until the operational context, reviewed vehicle evidence and applicable rules are ready.</p>}
+    </div></details>
+    {ready&&!readOnly&&<button className="btn-secondary px-4" onClick={()=>setEditing(v=>!v)} aria-expanded={editing}>{editing?'Close setup':'Review or correct operational setup'}</button>}
+    {editing&&!readOnly&&<InspectionSetup entryId={entryId} onSaved={reloadSetup} showBlockers={false}/>}
     {ready&&!readOnly&&<>
     <Section title="Measured mass (kg)">
       <div className="grid grid-cols-2 gap-3">
@@ -108,11 +123,12 @@ export default function VersionedInspection({ entryId, data: initialData, change
     {attempt && <Section title={`Inspection ${attempt.id} · ${attempt.decision}`}>
       {readOnly&&attempt.input_snapshot&&<details><summary className="cursor-pointer font-bold">Recorded measurements and attestations</summary><pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs">{JSON.stringify(attempt.input_snapshot,null,2)}</pre></details>}
       {attempt.decision==='REVIEW_REQUIRED'?<p>Setup prevented this inspection from evaluating readiness. This recorded attempt is retained; complete setup and request a fresh inspection.</p>:<p>Readiness {attempt.result.readiness_percent}%. Readiness does not grant release.</p>}
-      <ul className="mt-3 space-y-3">{attempt.result.controls.map(c => <li key={c.id} className="rounded border p-3">
-        <strong>{c.status}</strong> · {c.reason}
-        {c.provenance && <p className="mt-1 text-xs">{c.provenance.source.title} · {c.provenance.source.kind} · {c.provenance.source.provision} · revision {c.provenance.source.revision} · ruleset {c.provenance.ruleset_id}</p>}
-        {c.expected !== undefined && <p className="mt-1 text-xs">Expected: {JSON.stringify(c.expected)} · measured: {JSON.stringify(c.measured)}</p>}
-        {c.missing && <p>Missing: {c.missing.join(', ')}</p>}
+      <ul className="inspection-control-list mt-3">{attempt.result.controls.map(c => <li key={c.id}>
+        <div className="flex flex-wrap items-center gap-2"><StatusPill status={c.status}/><span className="text-sm font-semibold">{c.reason}</span></div>
+        {(c.provenance || c.expected !== undefined || c.missing)&&<details className="operational-details mt-2"><summary>Evidence details</summary>
+        {c.provenance && <p className="mt-1 text-sm">{c.provenance.source.title} · {c.provenance.source.kind} · {c.provenance.source.provision} · revision {c.provenance.source.revision} · ruleset {c.provenance.ruleset_id}</p>}
+        {c.expected !== undefined && <p className="mt-1 break-words text-sm">Expected: {JSON.stringify(c.expected)} · measured: {JSON.stringify(c.measured)}</p>}
+        {c.missing && <p>Missing: {c.missing.join(', ')}</p>}</details>}
       </li>)}</ul>
       {attempt.result.override_eligible && operator && <div className="mt-4 space-y-2">
         <label className="block text-sm font-bold">Review reason<input className="field touch-target mt-1 w-full px-3" value={reason} onChange={e => setReason(e.target.value)} /></label>

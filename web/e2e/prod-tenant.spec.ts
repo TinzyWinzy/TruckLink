@@ -53,5 +53,5 @@ test('BAK is configured as a tenant and platform settings are readable without m
   await page.screenshot({ path:'../docs/design/tenant-configuration-production-mobile.png',fullPage:true })
   await page.reload()
   await expect(page.getByLabel('Tenant display name')).toHaveValue('BAK Logistics')
-  await page.getByRole('button', { name:'Sign out',exact:true }).click()
+  await page.getByText('Account',{exact:true}).click();await page.getByRole('button', { name:'Sign out',exact:true }).click()
 })

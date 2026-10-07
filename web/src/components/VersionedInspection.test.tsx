@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import VersionedInspection from './VersionedInspection'
 import { useSession } from '../store/session'
 import { inspectOperational, type RegulatoryContext } from '../lib/regulatory'
+import { apiFetch } from '../lib/api'
+vi.mock('../lib/api',()=>({apiFetch:vi.fn()}))
 
 vi.mock('../lib/regulatory', () => ({ inspectOperational: vi.fn(), getRegulatoryContext: vi.fn() }))
 
@@ -15,6 +17,7 @@ const data: RegulatoryContext = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(apiFetch).mockResolvedValue({entry:{registration:'TEST-123',status:'QUARANTINED'},trips:[{id:3,driver_name:'Test Driver'}],blockers:[{code:'TRIP',title:'Link the dispatched trip',owner:'Dispatch Supervisor'}]})
   useSession.getState().signInReal('inspector', 'DISPATCH_SUPERVISOR', 'Inspector')
 })
 
@@ -37,11 +40,32 @@ describe('versioned operational inspection', () => {
     expect(screen.queryByRole('button', { name: 'Approve independently' })).not.toBeInTheDocument()
   })
 
-  it('shows missing context without inserting pilot ratings', () => {
+  it('shows missing context without inserting pilot ratings', async () => {
     render(<VersionedInspection entryId="10" data={{ ...data, context: null, configuration: null }} changeEntry={() => {}} />)
-    expect(screen.getByText(/have not been recorded/)).toBeVisible()
+    expect(screen.getByRole('heading',{name:'Complete setup before inspection'})).toBeVisible()
     expect(screen.getByText(/Setup required. Inspection and release remain blocked/)).toBeVisible()
     expect(screen.queryByRole('button',{name:'Record versioned inspection'})).not.toBeInTheDocument()
     expect(screen.queryByText(/Recorded ratings/)).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading',{name:'TEST-123'})).toBeVisible()
+  })
+
+  it('leads with recorded vehicle identity and keeps context details collapsed',async()=>{
+    render(<VersionedInspection entryId="10" data={data} changeEntry={()=>{}}/>)
+    expect(await screen.findByRole('heading',{name:'TEST-123'})).toBeVisible()
+    const identity=screen.getByRole('region',{name:'Movement identity'})
+    expect(within(identity).getByText('Test Driver')).toBeVisible()
+    expect(within(identity).getByText('B')).toBeVisible()
+    expect(screen.getByLabelText('Queue entry ID')).not.toBeVisible()
+    fireEvent.click(screen.getByText('Recorded context and rule details'))
+    expect(screen.getByLabelText('Queue entry ID')).toBeVisible()
+  })
+
+  it('gives a read-only reviewer the missing records and responsible roles',async()=>{
+    useSession.getState().signInReal('reviewer','COMPLIANCE_OFFICER','Reviewer')
+    render(<VersionedInspection entryId="10" data={{...data,context:null,configuration:null}} changeEntry={()=>{}}/>)
+    expect(await screen.findByText('Responsible role: Dispatch Supervisor')).toBeVisible()
+    expect(screen.getByText(/Read-only inspection access/)).toBeVisible()
+    expect(screen.queryByRole('button',{name:'Complete operational setup'})).not.toBeInTheDocument()
+    expect(screen.queryByRole('button',{name:'Record versioned inspection'})).not.toBeInTheDocument()
   })
 })
