@@ -18,3 +18,5 @@ No new tenant, operational practice case, law verification, routing provider or 
 ## Verification
 
 86 frontend checks passed, including loading/failure/empty-state coverage and a differently named example tenant/site. Build and lint passed with existing Fast Refresh and bundle warnings. Backend code and tenant operational records are unchanged. Production release verification is recorded below after deployment.
+
+Production frontend commit `cb0cb6659e20f28b33a78c794a52f6c093f8436d` was deployed Ready at https://trucki-two.vercel.app/ (immutable https://trucki-2vshzotax-brandontinozs-projects.vercel.app/, deployment `dpl_CpgognZYsDXZNZL4CnHkStyT4apL`). All 12 serial production browser/API checks passed in 1.2 minutes, including configured tenant labelling, removal of the unconfigured area claim, walkthrough, role continuity, renewal and practice isolation/navigation. Loading/failure transitions were verified by controlled unit feeds. Operational records were unchanged; authentication and working-role session/audit effects occurred.
