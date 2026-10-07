@@ -1,6 +1,43 @@
 import { test, expect } from '@playwright/test'
 
 test.use({ trace: 'off' })
+test('production operations can inspect entry setup without changing evidence',async({page,request})=>{
+  test.skip(!process.env.BAK_ADMIN_PIN,'Explicit admin credentials required')
+  await page.goto('/')
+  await page.getByLabel('Staff ID',{exact:true}).fill(process.env.BAK_ADMIN_STAFF_ID||'TRK-BAK-ADMIN')
+  await page.getByLabel('PIN',{exact:true}).fill(process.env.BAK_ADMIN_PIN!)
+  await page.getByRole('button',{name:'Sign in to shift',exact:true}).click()
+  await expect(page).toHaveURL(/\/reports$/)
+  await page.getByLabel('Switch working role').selectOption('OPERATIONS_SUPERVISOR')
+  await expect(page).toHaveURL(/\/queue$/)
+  const token=await page.evaluate(()=>localStorage.getItem('trucki-auth-token'))
+  const headers={Authorization:`Token ${token}`}
+  const api=process.env.PW_PROD_API_URL!
+  const response=await request.get(`${api}/api/regulatory/queue/1/setup/`,{headers})
+  expect(response.ok()).toBe(true)
+  const setup=await response.json()
+  expect(setup.entry.id).toBe(1)
+  expect(setup.can_record_context).toBe(true)
+  console.log('Entry 1 setup:',JSON.stringify({trip_choices:setup.trips.length,usable_configurations:setup.configurations.filter((c:{usable:boolean})=>c.usable).length,load_choices:setup.loads.length,blockers:setup.blockers.map((b:{code:string})=>b.code)}))
+  await page.goto('/compliance?entry=1')
+  await expect(page.getByRole('heading',{name:'Operational gate inspection'})).toBeVisible()
+  const context=await (await request.get(`${api}/api/regulatory/queue/1/context/`,{headers})).json()
+  if(!context.context){
+    await expect(page.getByRole('heading',{name:'Prepare this inspection'})).toBeVisible()
+    await expect(page.getByRole('button',{name:'Record versioned inspection'})).toHaveCount(0)
+    await expect(page.getByRole('button',{name:'Save operational setup'})).toBeDisabled()
+  }
+  await page.setViewportSize({width:390,height:1000})
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+  await page.getByLabel('Switch working role').selectOption('ADMIN')
+  await expect(page).toHaveURL(/\/reports$/)
+  await page.getByRole('link',{name:'Admin',exact:true}).click()
+  await page.getByRole('button',{name:'Open evidence register'}).click()
+  await expect(page.getByText('Evidence register loaded.')).toBeVisible()
+  await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0)
+  await page.getByRole('button',{name:'Sign out',exact:true}).click()
+})
+
 test('production connected journey schema is readable without operational writes', async ({ request }) => {
   test.skip(!process.env.BAK_ADMIN_PIN, 'Explicit admin credentials required')
   const api=process.env.PW_PROD_API_URL!
