@@ -9,7 +9,7 @@ import RouteMap from '../components/RouteMap'
 import JourneyPanel from '../components/JourneyPanel'
 import { PageHeader, Section } from '../components/ui'
 
-export default function RoutesMap() {
+export default function RoutesMap({onChanged}:{onChanged?:()=>void}={}) {
   const [searchParams] = useSearchParams()
   const live = useLive()
   const role = useSession(s => s.role)
@@ -67,6 +67,7 @@ export default function RoutesMap() {
       const response = await apiFetch<{ trip: RouteTrip; replayed: boolean }>('/routes/drafts/', { method: 'POST', body: { ...body(), client_key: replayKey.current } })
       setWorkspace(old => old ? { ...old, trips: [response.trip, ...old.trips.filter(t => t.id !== response.trip.id)] } : old)
       setPreviewTrip(null); setSelectedId(response.trip.id); setNotice(`Draft trip ${response.trip.id} saved. Inspection and release have not been authorized.`); setRefresh(n => n + 1)
+      onChanged?.()
     } catch (e) { setError((e as Error).message) }
     finally { setBusy(false) }
   }
@@ -83,7 +84,7 @@ export default function RoutesMap() {
     <div className="route-workspace-grid">
       <section className="report-panel" aria-label="Trip list"><div className="report-section-heading"><h2>{mode === 'synthetic' ? 'Synthetic journeys' : 'Yard trips'}</h2><span>{trips.length} records</span></div>
         <button className="report-text-link mb-3" onClick={() => { setPreviewTrip(null); setSelectedId(null) }}>Show all trips on map</button>
-        {!trips.length && <p className="report-empty">{workspace ? 'No trips are assigned or linked to this yard. Preview a route and save a draft to begin.' : 'Loading assigned-yard trips.'}</p>}
+        {!trips.length && <p className="report-empty">{workspace ? workspace.can_save ? 'No trips are assigned or linked to this yard. Preview a route and save a draft to begin.' : 'No trips are assigned or linked to this yard. Dispatch prepares trips; your role can review their recorded progress.' : 'Loading assigned-yard trips.'}</p>}
         <ul className="route-trip-list">{trips.map(t => <li key={t.id}><button aria-pressed={selectedId === t.id} onClick={() => chooseTrip(t.id)}>
           <strong>{t.vehicle?.plate ?? `Trip ${t.id}`} <span className="text-xs font-normal">{t.status.replace(/_/g, ' ')}</span></strong><span>{t.origin} → {t.destination}</span>
           <small>{!t.position ? 'No reported position' : `${t.position.source} · ${t.position.stale ? 'Stale' : 'Recent'} · ${Math.floor(t.position.age_seconds / 60)} min old`}</small>
@@ -91,7 +92,7 @@ export default function RoutesMap() {
       </section>
       <RouteMap trips={mapTrips} selectedId={previewTrip ? null : selectedId} onSelect={chooseTrip} />
     </div>
-    {selected && mode === 'operational' && selected.id > 0 && workspace && <JourneyPanel key={`${selected.id}:${facilityId}`} trip={selected} workspace={workspace} onChange={() => setRefresh(n => n + 1)} />}
+    {selected && mode === 'operational' && selected.id > 0 && workspace && <JourneyPanel key={`${selected.id}:${facilityId}`} trip={selected} workspace={workspace} onChange={() => {setRefresh(n => n + 1);onChanged?.()}} />}
     {selected && <Section title="Trip evidence" sub={`${selected.origin} → ${selected.destination}`}>
       <div className="route-evidence-grid"><div><h3 className="font-semibold">Ordered itinerary</h3><ol className="mt-3 list-decimal space-y-2 pl-5 text-sm">{selected.routing.stops.map((s, i) => <li key={i}>{s.label} <span className="text-xs text-slate-500">{s.lat.toFixed(4)}, {s.lon.toFixed(4)}</span></li>)}</ol>{!selected.routing.stops.length && <p className="mt-3 text-sm">No recorded stop coordinates.</p>}</div>
       <div><h3 className="font-semibold">Routing source</h3><p className="mt-3 text-sm">{selected.routing.provider}</p><p className="mt-2 text-sm">{selected.routing.distance_km == null ? 'Road distance unavailable' : `${selected.routing.distance_km} km estimated`} · {selected.routing.duration_hours == null ? 'Drive time unavailable' : `${selected.routing.duration_hours} hours estimated`}</p><p className="mt-2 text-sm">Declared jurisdictions: {selected.routing.jurisdictions.join(', ') || 'Unrecorded'}. Map labels do not establish border passage.</p></div>
@@ -100,7 +101,7 @@ export default function RoutesMap() {
         {canVisit('audit', role) && <Link className="report-text-link mt-3" to="/audit">Inspect yard audit →</Link>}
       </div></div><p className="report-note">A saved route or a recorded inspection decision does not grant release permission. Independent approvals and the operational gate remain authoritative.</p>
     </Section>}
-    {mode === 'operational' && <Section title="Route planner" sub="Preview an itinerary, then save a yard-scoped draft. Stops are resolved in the order you enter them.">
+    {mode === 'operational' && <Section title="Route planner" sub={workspace?.can_save?'Preview an itinerary, then save a yard-scoped draft. Stops are resolved in the order you enter them.':'Preview an itinerary for review. Dispatch saves assigned trips; your role has no draft-save permission.'}>
       <form onSubmit={e => { e.preventDefault(); void preview() }}><fieldset disabled={busy} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm">Origin<input required className="field mt-1 w-full px-3" value={input.origin} onChange={e => change('origin',e.target.value)} /></label><label className="text-sm">Destination<input required className="field mt-1 w-full px-3" value={input.destination} onChange={e => change('destination',e.target.value)} /></label></div>
         <label className="block text-sm">Intermediate stops (one per line)<textarea className="field mt-1 w-full p-3" rows={2} value={input.waypoints} onChange={e => change('waypoints',e.target.value)} /></label>

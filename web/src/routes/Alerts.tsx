@@ -14,6 +14,8 @@ export default function Alerts() {
   const live = useLive()
   const [alerts, setAlerts] = useState<LiveRow[]>(() => live ? [] : SEED)
   const [loaded, setLoaded] = useState(!live)
+  const [retry, setRetry] = useState(0)
+  function retryFeed() { setFeedError(null); setLoaded(false); setRetry(n => n + 1) }
   const [feedError, setFeedError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [overrideTarget, setOverrideTarget] = useState<string | null>(null)
@@ -44,10 +46,10 @@ export default function Alerts() {
     try {
       await subscribePush(userId ?? displayName, role ?? 'DISPATCH_SUPERVISOR')
       setPush('on')
-      setMessage('✔ Push alerts on. This tablet rings free on quarantine + escalation.')
+      setMessage('Push subscription saved. Notification delivery still depends on configured channels and browser availability.')
     } catch (e) {
       setPush('error')
-      setMessage(`✖ Push unavailable: ${(e as Error).message}. WhatsApp/SMS fallback still covers you.`)
+      setMessage(`✖ Push unavailable: ${(e as Error).message}. Ask Admin to check configured notification channels.`)
     } finally {
       setPushBusy(false)
     }
@@ -61,7 +63,7 @@ export default function Alerts() {
       if (!cancelled) unsub = m.subscribe('alerts', rows => { setAlerts(rows); setLoaded(true) }, 100, setFeedError) ?? undefined
     })
     return () => { cancelled = true; unsub?.() }
-  }, [live, userId])
+  }, [live, userId, retry])
 
   async function ack(id: string) {
     if (!canAck) {
@@ -110,7 +112,7 @@ export default function Alerts() {
         sub="Critical quarantine alerts first. Acknowledge when you own the problem. Escalation follows the tenant workflow."
         mode={live ? 'live' : 'demo'}
       />
-      {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
+      {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError} <button className="underline" onClick={retryFeed}>Retry</button></p>}
       {message && (
         <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-800">
           {message}
@@ -118,14 +120,14 @@ export default function Alerts() {
       )}
       {live && push !== 'unsupported' && push !== 'on' && (
         <div className="card mb-3 flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
-          <span className="font-semibold">Free push alerts {push === 'denied' ? '(blocked in browser settings)' : 'are off'}.</span>
+          <span className="font-semibold">Browser push alerts {push === 'denied' ? '(blocked in browser settings)' : 'are off'}.</span>
           <button
             type="button"
             onClick={() => void enablePush()}
             disabled={pushBusy || push === 'denied'}
             className="btn-primary touch-target rounded-lg px-4 text-sm disabled:opacity-50"
           >
-            {pushBusy ? 'Enabling…' : '🔔 Enable push alerts ($0)'}
+            {pushBusy ? 'Enabling…' : 'Enable push alerts'}
           </button>
         </div>
       )}

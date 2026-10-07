@@ -49,7 +49,7 @@ def link_visit(actor, visit, trip, reason, external_system='', external_referenc
     visit.milestone_semantics = 'SEPARATE_V1'
     visit.save(update_fields=['milestone_semantics','updated_at'])
     append_audit(facility=facility,actor=actor,action='LINK_JOURNEY',
-        payload={'journey_id':row.pk,'trip_id':trip.pk,'queue_entry_id':visit.pk,
+        payload={'journey_id':row.pk,'trip_id':trip.pk,'queue_entry_id':visit.pk,'reg_number':visit.reg_number,'reason':reason,
             'assignment_digest':digest(row.assignment),'external_system':external_system,'external_reference':external_reference})
     return row
 
@@ -177,7 +177,8 @@ def record_event(actor, link, *, kind, observed_at, details, client_key, reason,
             'event_id':event.pk,'observed_at':observed_at.isoformat(),'source':'STAFF_ATTESTATION',
             'dwell_seconds':visit.dwell_duration_seconds if kind=='DEPARTED' else None})
     append_audit(facility=link.facility,actor=actor,action='RECORD_JOURNEY_EVENT',
-        payload={'journey_id':link.pk,'trip_id':trip.pk,'event_id':event.pk,'kind':kind,
+        payload={'journey_id':link.pk,'trip_id':trip.pk,'queue_entry_id':visit.pk,'reg_number':visit.reg_number,'event_id':event.pk,'kind':kind,'reason':reason,
+            'previous_state':previous.kind if previous else 'YARD_RELEASE_AUTHORISED','new_state':kind,
             'event_digest':digest({'kind':kind,'observed_at':observed_at.isoformat(),'details':details,'reason':reason,
                 'stop_index':stop_index,'return_order_id':return_order_id,'receiving_visit_id':receiving_visit_id})})
     return event

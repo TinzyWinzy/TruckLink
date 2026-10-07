@@ -9,6 +9,8 @@ import { ROUTE_GATES, canVisit, landingPathForRole } from '../lib/gates'
 import { tenantLabel, tenantDisplayName } from '../lib/tenant'
 
 const PRIMARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] = [
+  { to: '/dispatch', label: 'Dispatch flow', route: 'dispatch' },
+  { to: '/approvals', label: 'Pending approvals', route: 'approvals' },
   { to: '/routes', label: 'Routes & map', route: 'routes' },
   { to: '/queue', label: 'Queue', route: 'queue' },
   { to: '/compliance', label: 'Compliance', route: 'compliance' },
@@ -96,7 +98,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       ) ?? undefined
     })
     return () => { cancelled = true; unsub?.() }
-  }, [live, role, userId])
+  }, [live, role, userId, workspace?.selectedFacility])
 
   const linkCls = (to: string) => {
     const active = pathname === to
@@ -226,7 +228,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <p className="rail-note">Evidence before decision.<br />Approval before release.</p>
       </aside>
       <div className="workspace-content">
-      <main id="main-content" tabIndex={-1} className="workspace-main">{children}</main>
+      <main key={`${userId}:${workspace?.selectedFacility}:${role}`} id="main-content" tabIndex={-1} className="workspace-main">{children}</main>
       <footer className="yard-foot py-4 text-xs">
         Trucki · yard operations · {live ? 'connected' : 'training mode'} · Saved offline work is reviewed and retried on reconnect.
       </footer>

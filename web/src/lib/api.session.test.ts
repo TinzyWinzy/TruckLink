@@ -20,6 +20,13 @@ it('fresh login never sends an old access token', async () => {
   expect(fetcher.mock.calls[0][1].headers.Authorization).toBeUndefined()
 })
 
+it('CSV downloads renew expired sessions and preserve the response text',async()=>{
+  const {api,fetcher}=await setup()
+  fetcher.mockResolvedValueOnce(response(401)).mockResolvedValueOnce(response(200,{token:'renewed'})).mockResolvedValueOnce(new Response('id,action\n1,TEST\n',{status:200,headers:{'Content-Type':'text/csv'}}))
+  expect(await api.apiFetch('/audit/export.csv?facility=7',{responseType:'text'})).toBe('id,action\n1,TEST\n')
+  expect(fetcher.mock.calls.at(-1)?.[1].headers.Authorization).toBe('Token renewed')
+})
+
 it('concurrent expired requests share refresh and retry with the new access token', async () => {
   const { api, fetcher } = await setup()
   fetcher.mockImplementation(async (url: string, init: RequestInit) => {

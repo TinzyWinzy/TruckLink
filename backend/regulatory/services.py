@@ -239,7 +239,7 @@ def create_context(actor, entry, *, evidence_ids, **fields):
     if entry.inspection_attempts.exists():
         entry.status = 'QUARANTINED'
         entry.save(update_fields=['status', 'updated_at'])
-    append_audit(facility=entry.facility, actor=actor, action='RECORD_OPERATIONAL_CONTEXT', payload={'context_id': context.pk, 'queue_entry_id': entry.pk})
+    append_audit(facility=entry.facility, actor=actor, action='RECORD_OPERATIONAL_CONTEXT', payload={'context_id': context.pk, 'queue_entry_id': entry.pk,'trip_id':context.trip_id,'reg_number':entry.reg_number})
     return context
 
 
@@ -301,12 +301,15 @@ def inspect_entry(actor, entry, *, axle_weights, total_weight, checklist_results
         queue_entry=entry, context=context, client_key=client_key, submission_digest=submission, occurred_at=at,
         input_snapshot=inputs, context_snapshot=snapshot, ruleset_snapshot=bundles, result=result, decision=result['decision'],
         tenant_configuration_snapshot=tenant_snapshot)
+    previous_status=entry.status
     entry.status = 'COMPLETED' if attempt.decision in ('PASS', 'PASS_WITH_WARNINGS') else 'QUARANTINED'
     entry.save(update_fields=['status', 'updated_at'])
     if entry.status == 'QUARANTINED':
         Alert.objects.create(organisation=entry.organisation, facility=entry.facility, severity='CRITICAL', category='REGULATORY',
             related_queue_entry=entry, message=f'{entry.reg_number}: {attempt.decision}; inspection {attempt.pk} requires action. No monetary penalty calculated.')
     append_audit(facility=entry.facility, actor=actor, action='EVALUATE_REGULATORY', payload={'attempt_id': attempt.pk,
+        'queue_entry_id':entry.pk,'reg_number':entry.reg_number,'trip_id':context.trip_id if context else None,
+        'previous_state':previous_status,'new_state':entry.status,
         'decision': attempt.decision, 'result_digest': digest(result), 'rulesets': [{'id': b['id'], 'digest': b['digest']} for b in bundles]})
     return attempt, False
 
@@ -334,7 +337,8 @@ def request_override(actor, attempt, reason):
     request = m.OverrideRequest.objects.create(organisation=attempt.organisation, creator=actor, attempt=attempt, reason=reason)
     entry.status = 'PENDING_OVERRIDE'
     entry.save(update_fields=['status', 'updated_at'])
-    append_audit(facility=entry.facility, actor=actor, action='REQUEST_REGULATORY_OVERRIDE', payload={'request_id': request.pk, 'attempt_id': attempt.pk, 'reason': reason})
+    append_audit(facility=entry.facility, actor=actor, action='REQUEST_REGULATORY_OVERRIDE', payload={'request_id': request.pk, 'attempt_id': attempt.pk, 'reason': reason,
+        'queue_entry_id':entry.pk,'reg_number':entry.reg_number,'trip_id':attempt.context.trip_id,'previous_state':'QUARANTINED','new_state':entry.status})
     return request
 
 
@@ -348,7 +352,8 @@ def approve_override(actor, request, approved, reason):
     approval = m.OverrideApproval.objects.create(organisation=request.organisation, creator=actor, request=request, approved=approved, reason=reason)
     entry.status = 'OVERRIDE_APPROVED' if approved else 'QUARANTINED'
     entry.save(update_fields=['status', 'updated_at'])
-    append_audit(facility=entry.facility, actor=actor, action='DECIDE_REGULATORY_OVERRIDE', payload={'approval_id': approval.pk, 'attempt_id': request.attempt_id, 'approved': approved, 'reason': reason})
+    append_audit(facility=entry.facility, actor=actor, action='DECIDE_REGULATORY_OVERRIDE', payload={'approval_id': approval.pk, 'attempt_id': request.attempt_id, 'approved': approved, 'reason': reason,
+        'queue_entry_id':entry.pk,'reg_number':entry.reg_number,'trip_id':request.attempt.context.trip_id,'previous_state':'PENDING_OVERRIDE','new_state':entry.status})
     return approval
 
 

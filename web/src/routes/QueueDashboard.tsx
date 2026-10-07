@@ -7,6 +7,7 @@ import { useSession } from '../store/session'
 import { Link } from 'react-router-dom'
 import { DEMO_QUEUE } from '../lib/demoData'
 import { EmptyState, PageHeader, StatusPill, spineForStatus } from '../components/ui'
+import MovementWorklist from '../components/MovementWorklist'
 
 interface Row {
   id: string
@@ -182,6 +183,7 @@ export default function QueueDashboard() {
 
   return (
     <div>
+      <MovementWorklist />
       <PageHeader
         title="Shift queue"
         eyebrow="Yard operations · oldest first"

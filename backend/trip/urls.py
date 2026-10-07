@@ -8,8 +8,12 @@ from yard import views as yard_views
 from . import views, auth_views, admin_views, route_views
 from journeys import views as journey_views
 from core.walkthrough_views import walkthrough
+from core.operations_views import operations,pending_approvals,movement_owner
 
 urlpatterns = [
+    path('operations/',operations),
+    path('operations/<int:pk>/owner/',movement_owner),
+    path('pending-approvals/',pending_approvals),
     path('walkthrough/',walkthrough),
     path('trips/<int:pk>/journey/', journey_views.journey),
     path('trips/<int:pk>/journey/events/', journey_views.journey_event),

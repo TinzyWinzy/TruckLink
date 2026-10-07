@@ -47,6 +47,7 @@ def release_entry(entry_id, actor):
         check = validate_demo_release(entry)
         authority = {"check_id": str(check.id), "verification_status": "LEGACY_DEMO_UNVERIFIED"}
     now = timezone.now()
+    previous_status=entry.status
     entry.status = "RELEASED"
     entry.release_authorized_at = now
     separate = entry.milestone_semantics == 'SEPARATE_V1'
@@ -64,7 +65,8 @@ def release_entry(entry_id, actor):
             dock.current_entry = None
             dock.save(update_fields=["status", "current_entry", "updated_at"])
     append_audit(facility=entry.facility, action="RELEASE_VEHICLE", actor=actor,
-                 payload={"queueEntryId": str(entry.id), **authority})
+                 payload={"queueEntryId": str(entry.id), 'reg_number':entry.reg_number,
+                     'trip_id':link.trip_id if link else None,'previous_state':previous_status,'new_state':'RELEASED', **authority})
     OutboxEvent.objects.create(organisation=entry.organisation, facility=entry.facility,
                               event_type="RELEASE_AUTHORISED" if separate else "RELEASED", payload={"queue_entry_id": str(entry.id),
                               **authority, "trip_id": link.trip_id if link else None,

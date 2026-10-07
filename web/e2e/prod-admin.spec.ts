@@ -160,3 +160,19 @@ test('live ADMIN PIN can switch working roles and return without changing identi
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Gate sign-in' })).toBeVisible()
 })
+
+
+test('production guided workspace, compliance review and filtered CSV remain read-only',async({page})=>{
+  test.skip(!process.env.BAK_ADMIN_PIN,'Explicit admin credentials required')
+  const writes:string[]=[];page.on('request',req=>{const url=new URL(req.url());if(url.pathname.startsWith('/api/')&&!['GET','HEAD','OPTIONS'].includes(req.method())&&!url.pathname.startsWith('/api/auth/'))writes.push(url.pathname)})
+  await page.goto('/');await page.getByLabel('Staff ID',{exact:true}).fill(process.env.BAK_ADMIN_STAFF_ID||'TRK-BAK-ADMIN');await page.getByLabel('PIN',{exact:true}).fill(process.env.BAK_ADMIN_PIN!);await page.getByRole('button',{name:'Sign in to shift',exact:true}).click();await expect(page).toHaveURL(/\/reports$/)
+  await expect(page.getByRole('region',{name:'Role worklist'})).toBeVisible()
+  await page.getByLabel('Switch working role').selectOption('COMPLIANCE_OFFICER');await expect(page).toHaveURL(/\/approvals$/);await expect(page.getByRole('heading',{name:/Evidence and configuration reviews/})).toBeVisible()
+  await page.goto('/compliance?entry=1');await expect(page.getByText(/Read-only inspection access/)).toBeVisible();await expect(page.getByRole('button',{name:'Save operational setup'})).toHaveCount(0);await expect(page.getByRole('button',{name:'Record versioned inspection'})).toHaveCount(0)
+  await page.goto('/dispatch?entry=1');await expect(page.getByRole('heading',{name:'Guided dispatch'})).toBeVisible();await expect(page.getByText(/Assigned person: unassigned/)).toBeVisible()
+  await page.goto('/audit');await expect(page.getByText(/Display timezone:/)).toBeVisible();await page.getByLabel('Exact action code, optional').fill('CREATE_QUEUE_ENTRY');await page.getByRole('button',{name:'Apply filters'}).click();await expect(page.getByText(/Display timezone:/)).toBeVisible()
+  const downloading=page.waitForEvent('download');await page.getByRole('button',{name:'Download filtered CSV'}).click();const download=await downloading;expect(download.suggestedFilename()).toBe('trucki-audit.csv');expect(await download.failure()).toBeNull()
+  await page.getByLabel('Switch working role').selectOption('EXECUTIVE');await page.goto('/routes');await expect(page.getByText(/Dispatch saves assigned trips; your role has no draft-save permission/)).toBeVisible();await expect(page.getByRole('button',{name:'Save draft trip'})).toHaveCount(0)
+  await page.getByLabel('Switch working role').selectOption('ADMIN');await page.goto('/admin');await expect(page.getByRole('heading',{name:'Site docks',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Add site dock'})).toBeDisabled()
+  expect(writes).toEqual([]);await page.getByRole('button',{name:'Sign out',exact:true}).click()
+})

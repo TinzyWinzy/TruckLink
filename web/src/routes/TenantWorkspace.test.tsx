@@ -2,7 +2,6 @@ import {beforeEach,it,expect,vi} from 'vitest'
 import {render,screen,cleanup,act,waitFor} from '@testing-library/react'
 import {MemoryRouter} from 'react-router-dom'
 import Alerts from './Alerts'
-import AuditLog from './AuditLog'
 import DockBoard from './DockBoard'
 import {useSession} from '../store/session'
 import type {LiveRow} from '../lib/live'
@@ -14,7 +13,6 @@ vi.mock('../components/VehicleEvidenceDesk',()=>({default:()=>null}))
 beforeEach(()=>{cleanup();feeds.clear();useSession.getState().signInReal('5','OPERATIONS_SUPERVISOR','Reviewer');useSession.setState({workspace:{organisation:{id:1,name:'Example Transport',slug:'example'},facilities:[{id:7,name:'West Distribution Site',slug:'west'}],selectedFacility:'7'}})})
 it.each([
   ['alerts',Alerts,'Loading alerts…','Yard is quiet'],
-  ['auditLogs',AuditLog,'Loading audit records…','No entries yet'],
   ['docks',DockBoard,'Loading docks…','No docks configured'],
 ] as const)('%s distinguishes loading, failed and confirmed empty data',async(name,Screen,loading,empty)=>{
   render(<MemoryRouter><Screen/></MemoryRouter>)

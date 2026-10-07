@@ -8,6 +8,11 @@ from __future__ import annotations
 
 import csv
 import io
+import json
+from datetime import datetime,time,timedelta
+from zoneinfo import ZoneInfo,ZoneInfoNotFoundError
+from django.db.models import Q
+from django.utils.dateparse import parse_date
 
 from django.http import HttpResponse
 from rest_framework.permissions import IsAuthenticated
@@ -19,6 +24,40 @@ from core.models import Facility
 from core.rbac import RoleAccess
 from trip.permissions import in_facility
 from yard.models import AuditLog
+
+
+def filtered_rows(request,facility):
+    rows=AuditLog.objects.filter(facility=facility,organisation=facility.organisation).select_related('actor')
+    try: tz=ZoneInfo(facility.timezone)
+    except ZoneInfoNotFoundError: tz=ZoneInfo('UTC')
+    for key,lookup in (('from','timestamp__gte'),('to','timestamp__lt')):
+        value=request.query_params.get(key)
+        if value:
+            day=parse_date(value)
+            if day is None:raise ValueError('Dates must use YYYY-MM-DD')
+            if key=='to':day+=timedelta(days=1)
+            rows=rows.filter(**{lookup:datetime.combine(day,time.min,tzinfo=tz)})
+    if request.query_params.get('action'):rows=rows.filter(action=request.query_params['action'])
+    if request.query_params.get('q'):
+        q=request.query_params['q'][:200]
+        rows=rows.filter(Q(payload__icontains=q)|Q(actor__username__icontains=q)|Q(action__icontains=q)|Q(actor_ref__icontains=q))
+    return rows.order_by('-timestamp','-pk')
+
+
+def audit_entry(row,facility):
+    try:payload=json.loads(row.payload)
+    except (ValueError,TypeError):payload={}
+    if not isinstance(payload,dict):payload={}
+    # References and states are sourced from retained payloads, never reconstructed from today's records.
+    return {'id':str(row.pk),'action':row.action,'payload':row.payload,
+        'actor':row.actor.username if row.actor else None,'actor_ref':row.actor_ref,
+        'timestamp':row.timestamp.isoformat(),'timezone':facility.timezone,
+        'previous_hash':row.previous_hash,'hash':row.hash,
+        'references':{'visit':payload.get('queue_entry_id',payload.get('queueEntryId')),
+            'trip':payload.get('trip_id'),'vehicle':payload.get('reg_number',payload.get('licensePlate'))},
+        'reason':payload.get('reason',payload.get('notes')),
+        'previous_state':payload.get('previous_state',payload.get('from_status')),
+        'new_state':payload.get('new_state',payload.get('to_status',payload.get('status')))}
 
 
 def resolve_facility(request):
@@ -60,21 +99,15 @@ class AuditListView(APIView):
         facility, err = resolve_facility(request)
         if err is not None:
             return err
-        rows = AuditLog.objects.filter(facility=facility).select_related("actor")
-        entries = [
-            {
-                "id": str(r.id),
-                "action": r.action,
-                "payload": r.payload,
-                "actor": r.actor.username if r.actor else None,
-                "actor_ref": r.actor_ref,
-                "timestamp": r.timestamp.isoformat(),
-                "previous_hash": r.previous_hash,
-                "hash": r.hash,
-            }
-            for r in rows
-        ]
-        return Response({"ok": True, "count": len(entries), "entries": entries})
+        try:
+            rows=filtered_rows(request,facility)
+            limit=min(500,max(1,int(request.query_params.get('limit',100))))
+            offset=max(0,int(request.query_params.get('offset',0)))
+        except ValueError as exc:return Response({'error':str(exc)},status=400)
+        count=rows.count()
+        entries=[audit_entry(r,facility) for r in rows[offset:offset+limit]]
+        return Response({'ok':True,'count':count,'entries':entries,'offset':offset,'limit':limit,
+            'timezone':facility.timezone,'has_more':offset+limit<count})
 
 
 class AuditVerifyView(APIView):
@@ -103,7 +136,9 @@ class AuditExportView(APIView):
         writer = csv.writer(buf)
         writer.writerow(["id", "action", "payload", "actor", "actor_ref",
                          "timestamp", "previous_hash", "hash"])
-        for r in AuditLog.objects.filter(facility=facility).select_related("actor"):
+        try:rows=filtered_rows(request,facility)
+        except ValueError as exc:return Response({'error':str(exc)},status=400)
+        for r in rows:
             writer.writerow([
                 str(r.id), r.action, r.payload,
                 r.actor.username if r.actor else "", r.actor_ref,

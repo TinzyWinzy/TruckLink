@@ -45,7 +45,12 @@ class TenantView(APIView):
         return get_object_or_404(model.objects.filter(organisation=get_user_organisation(self.request.user)), pk=pk)
 
     def entry(self, pk):
-        return get_object_or_404(scope_facility(QueueEntry.objects.filter(organisation=get_user_organisation(self.request.user)), self.request.user), pk=pk)
+        entry=get_object_or_404(scope_facility(QueueEntry.objects.filter(organisation=get_user_organisation(self.request.user)), self.request.user), pk=pk)
+        from core.rbac import rbac_allows
+        from rest_framework.exceptions import PermissionDenied
+        if not rbac_allows(get_user_role(self.request.user),'compliance','read',entry.organisation,entry.facility):
+            raise PermissionDenied('Tenant inspection read access required')
+        return entry
 
     def validate(self, serializer, data):
         obj = serializer(data=data, context={'organisation': get_user_organisation(self.request.user)})
@@ -120,47 +125,56 @@ class ContextView(TenantView):
 class SetupView(TenantView):
     """Site-scoped choices for recording context, never invented master data."""
     def get(self, request, pk):
-        from trip.models import Vehicle, Trip
-        from core.rbac import rbac_allows
-        from journeys.models import JourneyLink
-        from django.db.models import Q
-        entry = self.entry(pk)
-        role = get_user_role(request.user)
-        if not rbac_allows(role,'compliance','read',entry.organisation,entry.facility):
-            return Response({'detail':'Inspection access is not permitted'},status=403)
-        vehicles = Vehicle.objects.filter(organisation=entry.organisation,is_deleted=False,plate__iexact=entry.reg_number.strip())
-        vehicle_ids = list(vehicles.values_list('pk',flat=True))
-        trips = Trip.objects.filter(organisation=entry.organisation,vehicle_id__in=vehicle_ids,
-            driver__organisation=entry.organisation,driver__is_deleted=False).exclude(status__in=['cancelled','delivered','returned','paid'])
-        trips = trips.filter(Q(facility=entry.facility)|Q(facility__isnull=True))
-        link = JourneyLink.objects.filter(visit=entry).first()
-        if link: trips = trips.filter(pk=link.trip_id)
-        choices=[]
-        for config in m.VehicleConfiguration.objects.filter(organisation=entry.organisation,vehicle_id__in=vehicle_ids).order_by('-revision'):
-            row=output(config); evidence=config.rating_evidence; now=s.timezone.now()
-            row['usable']=(s.reviewed(config)[0] and config.effective_from<=now.date()
-                and (not config.effective_to or config.effective_to>=now.date()) and s.reviewed(evidence)[0]
-                and evidence.issued_at<=now<evidence.expires_at
-                and not m.EvidenceRevision.objects.filter(organisation=entry.organisation,evidence_key=evidence.evidence_key,revision__gt=evidence.revision).exists())
-            choices.append(row)
-        loads=list(m.Load.objects.filter(organisation=entry.organisation).order_by('-created_at','-pk')[:200])
-        blockers=[]
-        def block(code,title,owner): blockers.append({'code':code,'title':title,'owner':owner})
-        if not vehicle_ids: block('VEHICLE','Register the vehicle with this exact registration','Fleet administrator')
-        if not trips.exists(): block('TRIP','Assign this vehicle and an active driver to a trip for this yard','Dispatcher')
-        if not any(c['usable'] for c in choices): block('RATINGS','Record current vehicle-rating evidence and obtain independent review of the evidence and configuration','Administrator and independent compliance reviewer')
-        if not loads: block('LOAD','Record the load reference, cargo class and declared mass','Operations supervisor')
-        editable=entry.status!='RELEASED'
-        can_context=editable and (rbac_allows(role,'regulatory','inspect',entry.organisation,entry.facility)
-            or rbac_allows(role,'regulatory','operate',entry.organisation,entry.facility))
-        return Response({'entry':{'id':entry.pk,'registration':entry.reg_number,'status':entry.status,'facility':entry.facility_id},
-            'can_record_context':can_context,'can_record_load':editable and rbac_allows(role,'regulatory','operate',entry.organisation,entry.facility),
-            'trips':[{'id':t.pk,'origin':t.origin,'destination':t.destination,'driver':t.driver_id,'driver_name':t.driver.name,
-                'vehicle':t.vehicle_id,'routing_snapshot':t.routing_snapshot} for t in trips.order_by('-created_at')[:200]],
-            'configurations':choices,'loads':[output(x) for x in loads],
-            'evidence':[output(x) for x in m.EvidenceRevision.objects.filter(organisation=entry.organisation).filter(
-                Q(vehicle_id__in=vehicle_ids)|Q(driver_id__in=trips.values('driver_id'))|Q(trip_id__in=trips.values('pk'))|Q(load_id__in=[x.pk for x in loads])).order_by('-created_at')[:200]],
-            'blockers':blockers})
+        try:
+            return Response(setup_data(self.entry(pk),request.user))
+        except PermissionError as exc:
+            return Response({'detail':str(exc)},status=403)
+
+
+def setup_data(entry,actor,include_choices=True):
+    from trip.models import Vehicle, Trip
+    from core.rbac import rbac_allows
+    from journeys.models import JourneyLink
+    from django.db.models import Q
+    role = get_user_role(actor)
+    if not rbac_allows(role,'compliance','read',entry.organisation,entry.facility):
+        raise PermissionError('Inspection access is not permitted')
+    vehicles = Vehicle.objects.filter(organisation=entry.organisation,is_deleted=False,plate__iexact=entry.reg_number.strip())
+    vehicle_ids = list(vehicles.values_list('pk',flat=True))
+    trips = Trip.objects.filter(organisation=entry.organisation,vehicle_id__in=vehicle_ids,
+        driver__organisation=entry.organisation,driver__is_deleted=False).exclude(status__in=['cancelled','delivered','returned','paid'])
+    trips = trips.filter(Q(facility=entry.facility)|Q(facility__isnull=True))
+    link = JourneyLink.objects.filter(visit=entry).first()
+    if link: trips = trips.filter(pk=link.trip_id)
+    choices=[]
+    for config in m.VehicleConfiguration.objects.filter(organisation=entry.organisation,vehicle_id__in=vehicle_ids).select_related('rating_evidence').order_by('-revision'):
+        row=output(config) if include_choices else {}; evidence=config.rating_evidence; now=s.timezone.now()
+        row['usable']=(s.reviewed(config)[0] and config.effective_from<=now.date()
+            and (not config.effective_to or config.effective_to>=now.date()) and s.reviewed(evidence)[0]
+            and evidence.issued_at<=now<evidence.expires_at
+            and not m.EvidenceRevision.objects.filter(organisation=entry.organisation,evidence_key=evidence.evidence_key,revision__gt=evidence.revision).exists())
+        choices.append(row)
+        if not include_choices and row['usable']:break
+    load_query=m.Load.objects.filter(organisation=entry.organisation)
+    loads=list(load_query.order_by('-created_at','-pk')[:200]) if include_choices else load_query.exists()
+    blockers=[]
+    def block(code,title,owner): blockers.append({'code':code,'title':title,'owner':owner})
+    if not vehicle_ids: block('VEHICLE','Register the vehicle with this exact registration','Fleet administrator')
+    if not trips.exists(): block('TRIP','Assign this vehicle and an active driver to a trip for this yard','Dispatcher')
+    if not any(c['usable'] for c in choices): block('RATINGS','Record current vehicle-rating evidence and obtain independent review of the evidence and configuration','Administrator and independent compliance reviewer')
+    if not loads: block('LOAD','Record the load reference, cargo class and declared mass','Operations supervisor')
+    if not include_choices:return {'blockers':blockers}
+    editable=entry.status!='RELEASED'
+    can_context=editable and (rbac_allows(role,'regulatory','inspect',entry.organisation,entry.facility)
+        or rbac_allows(role,'regulatory','operate',entry.organisation,entry.facility))
+    return {'entry':{'id':entry.pk,'registration':entry.reg_number,'status':entry.status,'facility':entry.facility_id},
+        'can_record_context':can_context,'can_record_load':editable and rbac_allows(role,'regulatory','operate',entry.organisation,entry.facility),
+        'trips':[{'id':t.pk,'origin':t.origin,'destination':t.destination,'driver':t.driver_id,'driver_name':t.driver.name,
+            'vehicle':t.vehicle_id,'routing_snapshot':t.routing_snapshot} for t in trips.order_by('-created_at')[:200]],
+        'configurations':choices,'loads':[output(x) for x in loads],
+        'evidence':[output(x) for x in m.EvidenceRevision.objects.filter(organisation=entry.organisation).filter(
+            Q(vehicle_id__in=vehicle_ids)|Q(driver_id__in=trips.values('driver_id'))|Q(trip_id__in=trips.values('pk'))|Q(load_id__in=[x.pk for x in loads])).order_by('-created_at')[:200]],
+        'blockers':blockers}
 
 
 class InspectView(TenantView):

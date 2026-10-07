@@ -13,6 +13,8 @@ import {
   type SurgeStatus,
 } from '../lib/analytics'
 import { EmptyState, PageHeader, Stat } from '../components/ui'
+import MovementWorklist from '../components/MovementWorklist'
+import {tenantDisplayName} from '../lib/tenant'
 
 const SEED: LiveRow[] = [
   { id: 'q1', licensePlate: 'AEH 4521', driverName: 'T. Moyo', cargoType: 'Container', expectedDestination: 'Beitbridge', status: 'QUEUED', entryTimestamp: new Date(Date.now() - 42 * 60000).toISOString() },
@@ -96,11 +98,12 @@ export default function Reports() {
   const reviewTitle = feedError ? 'Restore the operational feed' : awaitingData ? 'Waiting for operational evidence' : stats.total === 0 ? 'Build the first operational baseline' : blocked > 0 ? `${blocked} movements need controlled review` : stats.overdueCount > 0 ? `${stats.overdueCount} movements exceed the wait threshold` : 'Review the current shift'
 
   return <div className="reports-workspace space-y-6">
+    <MovementWorklist />
     <PageHeader title="Shift performance" eyebrow="Operations intelligence"
       sub={live ? 'Review yard pressure, exceptions and the evidence behind the current shift.' : 'Explore the review workflow with clearly labelled training records.'}
       mode={live ? 'live' : 'demo'} actions={<button type="button" onClick={downloadCsv} className="btn-primary px-4 text-sm" disabled={awaitingData || !!feedError}>Export CSV</button>} />
     <div className="report-context" aria-label="Report context">
-      <span><strong>{workspace?.organisation?.name ?? 'Practice workspace'}</strong> / {currentYard?.name ?? 'Training yard'}</span>
+      <span><strong>{live?tenantDisplayName(workspace?.configuration,workspace?.organisation?.name):'Practice workspace'}</strong> / {currentYard?.name ?? 'Training yard'}</span>
       <span>{live ? lastRead ? `Last successful read ${lastRead.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Connecting to assigned yard' : 'Synthetic practice records'}</span>
       <span>Current loaded movements</span>
     </div>
@@ -138,13 +141,13 @@ export default function Reports() {
         <div><strong>Corridor and dwell feeds</strong><span>{!analytics ? 'No analytics connection configured' : 'External analytics configured'}</span></div>
       </div>
     </section>
-    <div className="report-feed-grid">
+    {!analytics?<section className="report-panel text-sm" aria-label="Unconfigured analytics"><strong>Data source required</strong><p className="mt-1">Corridor pressure and historical dwell feeds are not configured. Current yard metrics above use the loaded operational records.</p>{canVisit('admin',role)&&<Link className="report-text-link mt-2" to="/admin">Review integration setup</Link>}</section>:<div className="report-feed-grid">
       <section className="report-panel" aria-label="Corridor pressure"><div className="report-section-heading"><h2>Corridor pressure</h2><span>External feed</span></div>
         {!analytics ? <div className="report-empty"><h3>Surge detection unavailable</h3><p>A connected corridor feed is required to assess arrival pressure.</p></div> : !surge ? <EmptyState title="Pressure data unavailable" sub="The configured feed has not returned a usable snapshot." /> : <p className={surge.surging ? 'text-red-800' : 'text-emerald-800'}>{surge.surging ? 'SURGE' : 'Flow normal'} · {surge.queuedNow} queued · {surge.arrivalsLastHour} arrivals last hour.</p>}
       </section>
       <section className="report-panel" aria-label="Dwell heatmap"><div className="report-section-heading"><h2>Dwell by entry hour</h2><span>14 day averages</span></div>
         {!analytics ? <div className="report-empty"><h3>Hourly chart unavailable</h3><p>A connected dwell feed is required to compare historical waiting times.</p></div> : !heatmap ? <EmptyState title="Dwell data unavailable" sub="The configured feed has not returned usable hourly records." /> : heatmap.every(b => b.movements === 0) ? <p className="report-empty">No movements in this window.</p> : <ul className="space-y-2">{heatmap.filter(b => b.movements > 0).map(b => <li key={b.hour} className="flex justify-between gap-3 text-sm"><span>{String(b.hour).padStart(2, '0')}:00 · {b.movements} moves</span><strong>{b.avgDwellMinutes == null ? 'N/A' : `${b.avgDwellMinutes}m avg`}</strong></li>)}</ul>}
       </section>
-    </div>
+    </div>}
   </div>
 }

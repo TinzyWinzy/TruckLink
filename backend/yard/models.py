@@ -325,3 +325,41 @@ class AuditLog(models.Model):
 
     def delete(self, using=None, keep_parents=False):
         raise ValidationError('audit_log is append-only: deletes are forbidden')
+
+
+class OwnershipQuerySet(models.QuerySet):
+    def update(self,**kwargs):raise ValidationError('Append a new movement ownership assignment')
+    def delete(self):raise ValidationError('Movement ownership history is retained')
+    def bulk_create(self,*args,**kwargs):raise ValidationError('Use validated ownership commands')
+    def bulk_update(self,*args,**kwargs):raise ValidationError('Append a new movement ownership assignment')
+
+
+class MovementOwnership(models.Model):
+    """Retained responsibility for a handoff stage. Never grants operation permissions."""
+    organisation=models.ForeignKey('trip.Organisation',on_delete=models.PROTECT)
+    facility=models.ForeignKey('core.Facility',on_delete=models.PROTECT)
+    queue_entry=models.ForeignKey(QueueEntry,on_delete=models.PROTECT,related_name='ownerships')
+    stage=models.CharField(max_length=24,choices=[(s,s) for s in ('FLEET','TRIP','EVIDENCE','SETUP','INSPECTION','APPROVAL','RELEASE','EXIT','JOURNEY')])
+    owner=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name='movement_responsibilities')
+    creator=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name='movement_assignments')
+    reason=models.TextField()
+    created_at=models.DateTimeField(default=timezone.now,editable=False)
+    objects=OwnershipQuerySet.as_manager()
+
+    class Meta:
+        ordering=['-created_at','-pk']
+        indexes=[models.Index(fields=['queue_entry','stage'],name='movement_owner_stage_idx')]
+
+    def clean(self):
+        if (self.facility.organisation_id!=self.organisation_id or self.queue_entry.organisation_id!=self.organisation_id
+                or self.queue_entry.facility_id!=self.facility_id):raise ValidationError('Movement ownership must remain in its tenant and site')
+        for actor in (self.creator,self.owner):
+            if not getattr(actor,'profile',None) or actor.profile.organisation_id!=self.organisation_id or not actor.profile.facilities.filter(pk=self.facility_id).exists():
+                raise ValidationError('Movement owner and assigner require tenant and site membership')
+        if not self.reason.strip():raise ValidationError('Assignment reason is required')
+
+    def save(self,*args,**kwargs):
+        if not self._state.adding:raise ValidationError('Append a new movement ownership assignment')
+        self.full_clean();return super().save(*args,**kwargs)
+
+    def delete(self,*args,**kwargs):raise ValidationError('Movement ownership history is retained')

@@ -42,7 +42,7 @@ export default function InspectionSetup({entryId,onSaved}:{entryId:string;onSave
     {!data?<p role="status">Loading entry setup.</p>:<>
       <p className="text-sm font-bold">{data.entry.registration} · Visit {data.entry.id} · {data.entry.status}</p>
       {data.blockers.length>0&&<ol className="my-4 space-y-3">{data.blockers.map(b=><li key={b.code} className="border-l-2 border-amber-600 pl-3 text-sm"><strong>{b.title}</strong><p>Responsible role: {b.owner}</p></li>)}</ol>}
-      <p className="my-3 text-sm">Dispatch can manage assigned trips in <Link className="underline" to="/routes">Routes & map</Link>. Administrators manage vehicle evidence in <Link className="underline" to="/admin">Admin</Link>. Compliance reviewers use the evidence register in <Link className="underline" to="/audit">Audit</Link>. A different person must approve rating evidence and configurations.</p>
+      <p className="my-3 text-sm">Dispatch can manage assigned trips in <Link className="underline" to="/routes">Routes & map</Link>. Administrators manage vehicle evidence in <Link className="underline" to="/admin">Admin</Link>. Compliance reviewers use <Link className="underline" to="/approvals">Pending approvals</Link>. A different person must approve rating evidence and configurations.</p>
       {!data.can_record_context?<p className="text-sm">An operations or dispatch supervisor must record setup. Released visits retain their historical context.</p>:<div className="grid gap-4 sm:grid-cols-2">
         <label className="text-sm font-bold">Assigned trip<select className="field mt-1 w-full" value={tripId} onChange={e=>{
           setTripId(e.target.value);setConfiguration('');setEvidence([]);const t=data.trips.find(t=>String(t.id)===e.target.value)

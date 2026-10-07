@@ -7,6 +7,8 @@ import PlatformConfiguration from '../components/PlatformConfiguration'
 import VehicleEvidenceDesk from '../components/VehicleEvidenceDesk'
 import FleetRegistration from '../components/FleetRegistration'
 import StaffProvisioning from '../components/StaffProvisioning'
+import MovementWorklist from '../components/MovementWorklist'
+import DockSetup from '../components/DockSetup'
 
 export default function Admin() {
   const { role } = useSession()
@@ -43,6 +45,8 @@ export default function Admin() {
     <div className="max-w-2xl">
       <PageHeader title="Admin" sub={live ? 'Yard setup controls.' : 'Setup. Works once the tablet is connected.'} mode={live ? 'live' : 'demo'} />
       <div className="space-y-3">
+        <MovementWorklist />
+        {live&&<DockSetup/>}
         {live && <FleetRegistration />}
         {live && <StaffProvisioning />}
         {live && <VehicleEvidenceDesk />}

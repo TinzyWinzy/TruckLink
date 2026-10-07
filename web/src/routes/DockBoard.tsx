@@ -36,6 +36,8 @@ export default function DockBoard() {
   const siteName = workspace?.facilities.find(f => String(f.id) === workspace.selectedFacility)?.name
   const [docks, setDocks] = useState<Dock[]>(() => live ? [] : SEED)
   const [loaded, setLoaded] = useState(!live)
+  const [retry, setRetry] = useState(0)
+  function retryFeed() { setFeedError(null); setLoaded(false); setRetry(n => n + 1) }
   const [feedError, setFeedError] = useState<string | null>(null)
   const [queuedIds, setQueuedIds] = useState<string[]>([])
   const [message, setMessage] = useState<string | null>(null)
@@ -56,7 +58,7 @@ export default function DockBoard() {
       u1?.()
       u2?.()
     }
-  }, [live, userId])
+  }, [live, userId, retry])
 
   async function tap(dock: Dock) {
     setMessage(null)
@@ -89,7 +91,7 @@ export default function DockBoard() {
         sub={live ? loaded ? `${free} of ${docks.length} docks free. Tap a free dock to take the oldest queued truck.` : 'Loading the selected site’s dock configuration.' : 'Practice layout. Training docks only.'}
         mode={live ? 'live' : 'demo'}
       />
-      {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
+      {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError} <button className="underline" onClick={retryFeed}>Retry</button></p>}
       {message && <p role="status" className="mb-3 rounded-lg bg-slate-900 p-3 text-sm font-bold text-white">{message}</p>}
       {!loaded && !feedError ? <p role="status">Loading docks…</p> : feedError && docks.length === 0 ? null : docks.length === 0 ? (
         <EmptyState title="No docks configured" sub="Ask your supervisor to set up the yard." />

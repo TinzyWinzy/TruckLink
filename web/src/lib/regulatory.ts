@@ -13,6 +13,7 @@ export interface Attempt {
   id: number
   decision: string
   creator: number
+  input_snapshot?:Record<string,unknown>
   result: { controls: Control[]; readiness_percent: number; override_eligible: boolean; engine_version: string; monetary_penalty: null }
 }
 export interface RegulatoryContext {

@@ -200,12 +200,12 @@ export default function ComplianceCheck() {
     return <div className="max-w-3xl space-y-4">
       <PageHeader title="Operational gate inspection" sub="Choose a registered visit to load its evidence and inspection workflow." mode="live" />
       <label className="block text-sm font-bold">Queue entry ID<input className="field mt-1 min-h-12 w-full" value={entryId} onChange={e=>setEntryId(e.target.value)}/></label>
-      <p className="text-sm">Open a registered visit using Check in the <a className="underline" href="/queue">Shift queue</a>.</p>
+      <p className="text-sm">Open a registered visit using Check in the <a className="underline" href="/dispatch">guided dispatch</a>.</p>
       {contextError?<><p role="alert" className="text-sm text-red-800">Could not load this visit: {contextError}</p><button className="btn-primary min-h-12 px-4" onClick={()=>setContextRetry(n=>n+1)}>Retry loading visit</button></>:entryId.trim()&&<p role="status">Loading the registered visit and its operational context.</p>}
     </div>
   }
 
-  if (live && regulatory?.entryId === entryId.trim() && regulatory.data.mode === 'VERSIONED') {
+  if (live && regulatory?.entryId === entryId.trim() && (regulatory.data.mode === 'VERSIONED'||['COMPLIANCE_OFFICER','EXECUTIVE','FACILITY_MANAGER'].includes(role??''))) {
     return <VersionedInspection key={`${entryId}:${regulatory.data.context?.id ?? 'missing'}`} entryId={entryId} data={regulatory.data} changeEntry={setEntryId} />
   }
 

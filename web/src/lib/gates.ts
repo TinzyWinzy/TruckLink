@@ -1,18 +1,18 @@
-// Route-level RBAC matrix (mirrors firestore.rules + session.test.ts gates).
-// Client-side only. Firestore rules and the sync-service allow-list are the
-// real enforcement. Tested here so matrix drift fails the build, not the yard.
+// Route-level affordances. Django tenant/site permissions enforce actual access.
 
 import { canAccess, useSession, type Role } from '../store/session'
 
-export type RouteKey = 'queue' | 'docks' | 'compliance' | 'alerts' | 'reports' | 'audit' | 'admin' | 'hub' | 'guide' | 'modelling' | 'routes'
+export type RouteKey = 'dispatch' | 'approvals' | 'queue' | 'docks' | 'compliance' | 'alerts' | 'reports' | 'audit' | 'admin' | 'hub' | 'guide' | 'modelling' | 'routes'
 
 export const ROUTE_GATES: Record<RouteKey, Role[]> = {
+  dispatch: ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER','COMPLIANCE_OFFICER','EXECUTIVE','ADMIN'],
+  approvals: ['COMPLIANCE_OFFICER','OPERATIONS_SUPERVISOR','FACILITY_MANAGER','ADMIN'],
   routes: ['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'EXECUTIVE', 'ADMIN', 'COMPLIANCE_OFFICER'],
   hub: ['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'EXECUTIVE', 'ADMIN', 'COMPLIANCE_OFFICER'],
   guide: ['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'EXECUTIVE', 'ADMIN', 'COMPLIANCE_OFFICER'],
   queue: ['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER'],
   docks: ['OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER'],
-  compliance: ['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER'],
+  compliance: ['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER','COMPLIANCE_OFFICER','ADMIN','EXECUTIVE'],
   alerts: [
     'DISPATCH_SUPERVISOR',
     'OPERATIONS_SUPERVISOR',
@@ -31,9 +31,9 @@ export function canVisit(route: RouteKey, role: Role | null): boolean {
   if (!canAccess(role, ROUTE_GATES[route])) return false
   const tenant = useSession.getState().workspace?.configuration
   const config = tenant?.content
-  const modules: Partial<Record<RouteKey,string>> = { queue:'yard',docks:'docks',compliance:'inspection',alerts:'yard',routes:'routing',reports:'reports',modelling:'modelling',audit:'audit' }
+  const modules: Partial<Record<RouteKey,string>> = { dispatch:'yard',approvals:'inspection',queue:'yard',docks:'docks',compliance:'inspection',alerts:'yard',routes:'routing',reports:'reports',modelling:'modelling',audit:'audit' }
   if (modules[route] && tenant?.modules?.[modules[route]!] === false) return false
-  const resource = route === 'audit' ? 'audit' : route
+  const resource = route === 'dispatch'||route === 'approvals' ? 'compliance' : route
   const allowed = config?.permissions[resource + '.read']
   return !config || (config.roles[role!]?.enabled !== false && (!allowed || allowed.includes(role!)))
 }
@@ -50,9 +50,9 @@ export function canAckAlert(role: Role | null): boolean {
 }
 
 /** Post-sign-in landing. every role must land on a route it canVisit.
- * Yard roles → /queue; EXECUTIVE/ADMIN → /reports; COMPLIANCE → /audit. */
+ * Yard roles → /queue; EXECUTIVE/ADMIN → /reports; COMPLIANCE → /approvals. */
 export function landingPathForRole(role: Role): string {
-  const preferred: RouteKey = role === 'EXECUTIVE' || role === 'ADMIN' ? 'reports' : role === 'COMPLIANCE_OFFICER' ? 'audit' : 'queue'
+  const preferred: RouteKey = role === 'EXECUTIVE' || role === 'ADMIN' ? 'reports' : role === 'COMPLIANCE_OFFICER' ? 'approvals' : 'queue'
   const route = [preferred, 'routes', 'hub'].find(key => canVisit(key as RouteKey,role)) ?? 'hub'
   return '/' + route
 }

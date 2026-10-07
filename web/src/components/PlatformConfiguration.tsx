@@ -35,6 +35,7 @@ export default function PlatformConfiguration() {
     if (current?.organisation?.id !== organisationId) return
     setRegistry(r); setRevisions(versions.revisions); setReleases(published.releases)
     setConfigId(c.configuration.id ?? r.release?.configuration_id ?? null)
+    setContent(old=>old==='{}'?JSON.stringify(Object.fromEntries(Object.keys(r.modules).map(k=>[k,k==='audit'||c.configuration.modules?.[k]!==false])),null,2):old)
     setSelected(r.release?.artifact_ids ?? [])
     if (current) useSession.getState().setWorkspace({...current,configuration:c.configuration})
   }, [])
@@ -64,6 +65,9 @@ export default function PlatformConfiguration() {
     const latest = revisions.filter(r => r.kind === kind && r.key === key).reduce((n,r) => Math.max(n,r.version),0)
     await command('/tenant/revisions/',{kind,key,content:data,facility:facility ? Number(facility) : null,expected_version:latest,reason},'Configuration revision saved. Review safety-related changes before publishing.')
   }
+  function changeContent(update:(value:Record<string,unknown>)=>Record<string,unknown>){try{setContent(JSON.stringify(update(JSON.parse(content)),null,2))}catch{setMessage('Fix the advanced configuration JSON before using guided fields.')}}
+  let draft:Record<string,unknown>={};try{draft=JSON.parse(content)}catch{ /* Advanced editor reports validation on save. */ }
+  const flow=(draft.workflow??{}) as {mandatory_checks?:string[];inspection_max_age_seconds?:number;escalation_minutes?:{FM:number;EXEC:number}}
   if (!registry) return <p role="status">{message || 'Loading platform configuration'}</p>
   return <Section title="Modules and workflow releases" sub={'Active release ' + (registry.release?.version ?? 'not yet configured') + '. Publication and activation are separate.'}>
     <div className="space-y-4">
@@ -75,7 +79,12 @@ export default function PlatformConfiguration() {
         <label className="block text-sm">Configuration type<select className="field mt-1 w-full" value={kind} onChange={e => selectKind(e.target.value)}>{kinds.map(k => <option key={k}>{k}</option>)}</select></label>
         <label className="block text-sm">Configuration key<input className="field mt-1 w-full px-3" value={key} onChange={e => setKey(e.target.value)} /></label>
         <label className="block text-sm">Configuration site<select className="field mt-1 w-full" value={facility} onChange={e => setFacility(e.target.value)}><option value="">Tenant-wide</option>{workspace?.facilities.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-        <label className="block text-sm">Revision configuration<textarea className="field mt-1 w-full p-3 font-mono text-xs" rows={10} value={content} onChange={e => setContent(e.target.value)} /></label>
+        {kind==='MODULES'&&<div className="grid gap-2 sm:grid-cols-2">{Object.entries(registry.modules).map(([module,dependencies])=><label key={module} className="text-sm"><input type="checkbox" checked={draft[module]===true} disabled={module==='audit'} onChange={e=>changeContent(v=>({...v,[module]:e.target.checked}))}/> {module}{dependencies.length?` (requires ${dependencies.join(', ')})`:''}</label>)}</div>}
+        {kind==='SITE'&&<><label className="block text-sm">Site timezone<input className="field mt-1 w-full px-3" placeholder="Africa/Harare" value={String(draft.timezone??'')} onChange={e=>changeContent(v=>({...v,timezone:e.target.value}))}/></label><p className="text-sm">Choose an existing site above. Operational sites retain operational controls. Training mode is available only for sites already provisioned as DEMO.</p></>}
+        {kind==='WORKFLOW'&&<div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Inspection validity (seconds, 1–86400)<input type="number" min="1" max="86400" className="field mt-1 w-full px-3" value={flow.inspection_max_age_seconds??''} onChange={e=>changeContent(v=>({...v,workflow:{...flow,inspection_max_age_seconds:Number(e.target.value)}}))}/></label>{(['FM','EXEC'] as const).map(owner=><label key={owner} className="text-sm">{owner==='FM'?'Facility Manager':'Executive'} escalation (minutes)<input type="number" min="1" max="10080" className="field mt-1 w-full px-3" value={flow.escalation_minutes?.[owner]??''} onChange={e=>changeContent(v=>({...v,workflow:{...flow,escalation_minutes:{...flow.escalation_minutes,[owner]:Number(e.target.value)}}}))}/></label>)}<p className="text-sm sm:col-span-2">Required checks: {flow.mandatory_checks?.join(', ')||'Choose a current workflow revision first'}. Changes require independent review and release activation.</p></div>}
+        {!['MODULES','SITE','WORKFLOW'].includes(kind)&&<p className="text-sm">This configuration requires a supported schema and a qualified configuration author. Use the advanced editor and review the full document before saving.</p>}
+        <details><summary className="cursor-pointer text-sm font-bold">Advanced configuration JSON</summary><label className="block text-sm">Revision configuration<textarea className="field mt-1 w-full p-3 font-mono text-xs" rows={10} value={content} onChange={e => setContent(e.target.value)} /></label></details>
+        <p className="text-sm">Proposed revision: {kind.toLowerCase().replaceAll('_',' ')} / {key||'key required'} / {facility?workspace?.facilities.find(s=>String(s.id)===facility)?.name:'Tenant-wide'}. Saving creates a version; publication and activation follow separately.</p>
         <button className="btn-secondary px-3" disabled={!reason.trim()} onClick={() => void saveRevision()}>Save configuration revision</button>
       </fieldset>
       <div className="space-y-2"><h3 className="font-semibold">Select exact revisions for a release</h3>{revisions.map(row => <div key={row.id} className="flex items-start gap-2 text-sm"><input type="checkbox" aria-label={'Include revision ' + row.id} checked={selected.includes(row.id)} onChange={e => setSelected(old => e.target.checked ? [...old,row.id] : old.filter(id => id !== row.id))} /><button className="text-left underline" onClick={() => edit(row)}>{row.kind} · {row.key} · v{row.version} · #{row.id}</button></div>)}</div>

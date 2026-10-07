@@ -1,53 +1,25 @@
-import { useEffect, useState } from 'react'
-import { useLive } from '../lib/liveGate'
-import type { LiveRow } from '../lib/live'
-import { EmptyState, PageHeader, StatusPill } from '../components/ui'
-import { DEMO_AUDIT } from '../lib/demoData'
-import { useSession } from '../store/session'
-import VehicleEvidenceDesk from '../components/VehicleEvidenceDesk'
+import {useEffect,useState} from 'react'
+import {apiFetch,facilityId} from '../lib/api'
+import {useLive} from '../lib/liveGate'
+import {EmptyState,PageHeader,StatusPill} from '../components/ui'
+import {DEMO_AUDIT} from '../lib/demoData'
 
-const SEED: LiveRow[] = DEMO_AUDIT as unknown as LiveRow[]
-
-export default function AuditLog() {
-  const live = useLive()
-  const userId = useSession((s) => s.userId)
-  const [logs, setLogs] = useState<LiveRow[]>(() => live ? [] : SEED)
-  const [loaded, setLoaded] = useState(!live)
-  const [feedError, setFeedError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!live) return
-    let cancelled = false
-    let unsub: (() => void) | undefined
-    import('../lib/live').then((m) => {
-      if (!cancelled) unsub = m.subscribe('auditLogs', rows => { setLogs(rows); setLoaded(true) }, 100, setFeedError) ?? undefined
-    })
-    return () => { cancelled = true; unsub?.() }
-  }, [live, userId])
-
-  return (
-    <div>
-      <PageHeader
-        title="Audit trail"
-        sub="Server audit records for releases, overrides and assignments. Chain verification has documented integrity limits."
-        mode={live ? 'live' : 'demo'}
-      />
-      {live && <VehicleEvidenceDesk />}
-      {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
-      {!loaded && !feedError ? <p role="status">Loading audit records…</p> : feedError && logs.length === 0 ? null : logs.length === 0 ? (
-        <EmptyState title="No entries yet" sub="Gate releases, overrides and assignments land here." />
-      ) : (
-        <ul className="space-y-2">
-          {logs.map((l) => (
-            <li key={l.id} className="card flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
-              <StatusPill status={String(l.action ?? '')} symbol="●" />
-              <span className="font-semibold">{String(l.entityType ?? '')} {String(l.entityId ?? '')}</span>
-              {typeof l.actor === 'string' && l.actor ? <span className="text-xs font-semibold text-slate-600">· {l.actor}</span> : null}
-              <span className="ml-auto font-mono text-xs text-slate-500">hash {String(l.currentHash ?? 'N/A').slice(0, 12)}…</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
+type Entry={id:string;action:string;actor:string|null;actor_ref:string;timestamp:string;timezone:string;references:{vehicle?:string;visit?:number;trip?:number};reason?:string;previous_state?:string;new_state?:string;payload:string;hash:string;previous_hash:string}
+type Feed={entries:Entry[];count:number;has_more:boolean;timezone:string}
+function displayTime(value:string,timezone:string){try{return new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'long',timeZone:timezone}).format(new Date(value))}catch{return value}}
+export default function AuditLog(){
+  const live=useLive();const [data,setData]=useState<Feed|null>(null);const [error,setError]=useState('');const [retry,setRetry]=useState(0);const [offset,setOffset]=useState(0)
+  const [draft,setDraft]=useState({q:'',from:'',to:'',action:''});const [filters,setFilters]=useState(draft);const [exporting,setExporting]=useState(false);const [notice,setNotice]=useState('')
+  const query=new URLSearchParams({facility:facilityId,...filters}).toString()
+  useEffect(()=>{if(!live)return;let active=true;apiFetch<Feed>(`/audit/?${query}&offset=${offset}&limit=50`).then(d=>{if(!Array.isArray(d.entries))throw Error('Audit records are unavailable.');if(active){setData(d);setError('')}}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[live,query,offset,retry])
+  async function download(){setExporting(true);setNotice('');try{const csv=await apiFetch<string>(`/audit/export.csv?${query}`,{responseType:'text'});const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const anchor=document.createElement('a');anchor.href=url;anchor.download='trucki-audit.csv';anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setNotice('Filtered audit CSV downloaded.')}catch(e){setNotice((e as Error).message)}finally{setExporting(false)}}
+  function refresh(){setError('');setData(null);setRetry(n=>n+1)}
+  return <div><PageHeader title="Audit trail" sub="Retained server actions and evidence. Historical states are shown only when recorded; chain verification has documented integrity limits." mode={live?'live':'demo'}/>
+    {!live?<><p className="mb-3 text-sm">Synthetic practice audit. These are not customer records.</p><ul>{DEMO_AUDIT.map(row=><li className="card mb-2 p-4" key={row.id}>{row.action}</li>)}</ul></>:<>
+      <form className="card mb-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4" onSubmit={e=>{e.preventDefault();setData(null);setError('');setOffset(0);setFilters({...draft});setRetry(n=>n+1)}}>{Object.entries({q:'Vehicle, trip, actor or reason',from:'From date (site timezone)',to:'Through date (site timezone)',action:'Exact action code, optional'}).map(([key,label])=><label key={key} className="text-sm">{label}<input type={key==='from'||key==='to'?'date':'text'} className="field mt-1 w-full px-3" value={draft[key as keyof typeof draft]} onChange={e=>setDraft(old=>({...old,[key]:e.target.value}))}/></label>)}<button className="btn-primary px-3">Apply filters</button><button type="button" className="btn-secondary px-3" onClick={refresh}>Refresh audit</button><button type="button" className="btn-secondary px-3" disabled={exporting} onClick={()=>void download()}>Download filtered CSV</button></form>
+      {notice&&<p role="status">{notice}</p>}{error?<p role="alert" className="mb-3">{error} <button className="underline" onClick={refresh}>Retry</button></p>:!data?<p role="status">Loading audit records…</p>:!data.entries.length?<EmptyState title="No entries yet" sub="No records match the current site and filters."/>:<>
+        <p className="mb-3 text-xs">{data.count} matching records · Display timezone: {data.timezone} · Showing {offset+1}–{offset+data.entries.length}</p><ul className="space-y-3">{data.entries.map(row=><li className="card p-4 text-sm" key={row.id}><div className="flex flex-wrap items-center justify-between gap-2"><StatusPill status={row.action.replaceAll('_',' ')} symbol="●"/><time dateTime={row.timestamp}>{displayTime(row.timestamp,data.timezone)}</time></div><p className="mt-2 font-bold">{[row.references.vehicle&&`Vehicle ${row.references.vehicle}`,row.references.visit&&`Visit ${row.references.visit}`,row.references.trip&&`Trip ${row.references.trip}`].filter(Boolean).join(' / ')||'Movement reference not recorded'}</p><p className="mt-1">Actor: {row.actor||row.actor_ref||'Not recorded'}</p><p>Reason: {row.reason||'Not recorded'}</p><p>State: {row.previous_state||'Not recorded'} → {row.new_state||'Not recorded'}</p><details className="mt-3"><summary className="cursor-pointer font-bold">Recorded evidence and chain references</summary><pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{row.payload}</pre><p className="mt-2 break-all font-mono text-xs">Previous hash: {row.previous_hash||'Chain start'}<br/>Hash: {row.hash}</p></details></li>)}</ul><div className="mt-4 flex gap-3"><button className="btn-secondary px-3" disabled={!offset} onClick={()=>{setData(null);setOffset(n=>Math.max(0,n-50))}}>Previous page</button><button className="btn-secondary px-3" disabled={!data.has_more} onClick={()=>{setData(null);setOffset(n=>n+50)}}>Next page</button></div>
+      </>}
+    </>}
+  </div>
 }

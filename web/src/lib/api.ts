@@ -124,7 +124,7 @@ function messageFrom(data: unknown, status: number): string {
  * server's message on any non-2xx. */
 export async function apiFetch<T = unknown>(
   path: string,
-  init: { method?: string; body?: unknown } = {},
+  init: { method?: string; body?: unknown; responseType?: 'json' | 'text' } = {},
   retried = false,
 ): Promise<T> {
   const { method = 'GET', body } = init
@@ -148,7 +148,7 @@ export async function apiFetch<T = unknown>(
 
   let data: unknown = null
   try {
-    data = await res.json()
+    data = res.ok && init.responseType === 'text' ? await res.text() : await res.json()
   } catch {
     // Empty/non-JSON body. status still decides below.
   }

@@ -45,7 +45,7 @@ describe('ROUTE_GATES (RBAC matrix)', () => {
       expect(canVisit(route, r)).toBe(true)
     }
     expect(landingPathForRole('EXECUTIVE')).toBe('/reports')
-    expect(landingPathForRole('COMPLIANCE_OFFICER')).toBe('/audit')
+    expect(landingPathForRole('COMPLIANCE_OFFICER')).toBe('/approvals')
     expect(landingPathForRole('DISPATCH_SUPERVISOR')).toBe('/queue')
   })
 

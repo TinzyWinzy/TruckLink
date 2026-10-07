@@ -221,6 +221,7 @@ class DockListView(APIView):
         rows = [DockSerializer(d).data for d in docks]
         return Response({"ok": True, "count": len(rows), "docks": rows})
 
+    @transaction.atomic
     def post(self, request):
         serializer = DockCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -229,17 +230,20 @@ class DockListView(APIView):
         if facility is None:
             return Response({"ok": False, "error": "not found"}, status=404)
         try:
-            dock = Dock.objects.create(
-                organisation=facility.organisation,
-                facility=facility,
-                name=validated["name"],
-                capacity_kg=validated.get("capacity_kg", 0.0),
-            )
+            with transaction.atomic():
+                dock = Dock.objects.create(
+                    organisation=facility.organisation,
+                    facility=facility,
+                    name=validated["name"],
+                    capacity_kg=validated.get("capacity_kg", 0.0),
+                )
         except IntegrityError:
             return Response(
                 {"ok": False, "error": "dock name already exists at this facility"},
                 status=409,
             )
+        append_audit(facility=facility,action='CREATE_DOCK',actor=request.user,
+            payload={'dock_id':dock.pk,'name':dock.name,'capacity_kg':dock.capacity_kg,'new_state':dock.status})
         return Response({"ok": True, "dock": DockSerializer(dock).data}, status=201)
 
 
@@ -286,6 +290,7 @@ class DockAssignView(APIView):
                  f"Cannot assign entry in status {entry.status} to a dock"},
                 status=409,
             )
+        previous_status=entry.status
         with transaction.atomic():
             dock.status = "OCCUPIED"
             dock.current_entry = entry
@@ -296,7 +301,8 @@ class DockAssignView(APIView):
             append_audit(
                 facility=entry.facility,
                 action="ASSIGN_DOCK",
-                payload={"queueEntryId": str(entry.id), "dockId": str(dock.id)},
+                payload={"queueEntryId": str(entry.id), "dockId": str(dock.id), "reg_number":entry.reg_number,
+                    "previous_state":previous_status,"new_state":entry.status},
                 actor=request.user,
             )
         return Response({
