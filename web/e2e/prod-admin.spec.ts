@@ -1,6 +1,33 @@
 import { test, expect } from '@playwright/test'
 
 test.use({ trace: 'off' })
+test('production renewal API accepts fresh credentials despite stale access and revokes on logout', async ({ request }) => {
+  test.skip(!process.env.BAK_ADMIN_PIN, 'Explicit admin credentials required')
+  const api = process.env.PW_PROD_API_URL!
+  const login = await request.post(`${api}/api/auth/pin/`, {
+    headers: { Authorization: 'Token deliberately-obsolete-access' },
+    data: { staff_id: process.env.BAK_ADMIN_STAFF_ID || 'TRK-BAK-ADMIN', pin: process.env.BAK_ADMIN_PIN },
+  })
+  expect(login.ok()).toBe(true)
+  const credentials = await login.json()
+  expect(credentials.refresh_token).toBeTruthy()
+  expect(credentials.expires_in).toBe(1800)
+  const refresh = await request.post(`${api}/api/auth/refresh/`, {
+    headers: { Authorization: 'Token deliberately-obsolete-access' },
+    data: { refresh_token: credentials.refresh_token },
+  })
+  expect(refresh.ok()).toBe(true)
+  const renewed = await refresh.json()
+  expect(renewed.token).not.toBe(credentials.token)
+  expect(renewed.user.id).toBe(credentials.user.id)
+  expect(renewed.user.organisation.id).toBe(credentials.user.organisation.id)
+  expect((await request.get(`${api}/api/auth/me/`, { headers: { Authorization: `Token ${credentials.token}` } })).status()).toBe(401)
+  const headers = { Authorization: `Token ${renewed.token}` }
+  expect((await request.get(`${api}/api/auth/me/`, { headers })).ok()).toBe(true)
+  expect((await request.post(`${api}/api/auth/logout/`, { headers })).ok()).toBe(true)
+  expect((await request.post(`${api}/api/auth/refresh/`, { data: { refresh_token: credentials.refresh_token } })).status()).toBe(401)
+})
+
 test('live ADMIN PIN can switch working roles and return without changing identity', async ({ page, request }) => {
   test.skip(!process.env.BAK_ADMIN_PIN, 'Explicit admin credentials required')
   await page.goto('/')
