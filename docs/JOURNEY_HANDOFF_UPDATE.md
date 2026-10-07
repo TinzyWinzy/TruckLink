@@ -32,3 +32,13 @@ Backend tests cover distinct authorisation/vacancy/exit effects, dock reuse and 
 Production verification is read-only for operational records. Authentication and role-selection audit effects are permitted. Deployment and final test results are recorded after release below.
 
 Local verification passed: 689 backend regression tests, one opt-in browser test skipped and eight live tests deselected; a subsequent 30-test journey/notification run includes two additional new checks. All 78 frontend unit tests passed. Build and lint passed with existing bundle-size and Fast Refresh warnings. Two Chromium contract flows passed, including desktop/mobile journey recovery and inspection setup. Django system checks and migration drift checks passed.
+
+### Production verification
+
+- Application commit: `195a8ab47dd2deb3a96291c2b4aac5980ce9073e`. Final handoff refinement passed its 16 backend journey tests, five panel unit tests and frontend build.
+- Frontend: https://trucki-two.vercel.app/; immutable deployment https://trucki-ayr4852od-brandontinozs-projects.vercel.app/ (`dpl_Cq7vVVJiVYVFEJsXuVwnmRGfSRbX`, Ready, production alias confirmed).
+- Backend: https://spotteraiassessment-khaj.onrender.com/; Render deployment `dep-db32forl550s73cd6m9g`, live at the application commit. The preceding migration deployment applied journey kind and yard milestone migrations; authenticated production board reads confirmed the new fields.
+- All 13 production browser/API checks passed in 1.6 minutes, run serially against the shared admin account with traces disabled. Checks covered inspection setup, migrated yard/journey reads, session renewal and logout revocation, working-role continuity, operational versus synthetic routes, authentication boundaries, mobile layout, practice navigation and refresh.
+- Operational records were unchanged. Authentication, renewal, role-selection and logout audit/session effects occurred. No provider dispatch, journey creation, new fleet/evidence records or release/departure commands were sent in production.
+- The new rejection/reattempt and distinct dock/exit flow was exercised with local synthetic browser contracts plus real backend API tests. Production read checks do not constitute a real customer delivery or live ERP/tracker acceptance test.
+- Entry 1 still reports `VEHICLE`, `TRIP`, `RATINGS` and `LOAD` blockers, with zero eligible trip, usable configuration and load choices. Actual operational records and independently reviewed evidence must be supplied.
