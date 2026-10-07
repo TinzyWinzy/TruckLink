@@ -6,6 +6,7 @@ import { useSession } from '../store/session'
 import { canVisit } from '../lib/gates'
 import { syntheticRoutes, type RouteTrip, type RouteWorkspace } from '../lib/routes'
 import RouteMap from '../components/RouteMap'
+import JourneyPanel from '../components/JourneyPanel'
 import { PageHeader, Section } from '../components/ui'
 
 export default function RoutesMap() {
@@ -87,6 +88,7 @@ export default function RoutesMap() {
       </section>
       <RouteMap trips={mapTrips} selectedId={previewTrip ? null : selectedId} onSelect={chooseTrip} />
     </div>
+    {selected && mode === 'operational' && selected.id > 0 && workspace && <JourneyPanel key={`${selected.id}:${facilityId}`} trip={selected} workspace={workspace} onChange={() => setRefresh(n => n + 1)} />}
     {selected && <Section title="Trip evidence" sub={`${selected.origin} → ${selected.destination}`}>
       <div className="route-evidence-grid"><div><h3 className="font-semibold">Ordered itinerary</h3><ol className="mt-3 list-decimal space-y-2 pl-5 text-sm">{selected.routing.stops.map((s, i) => <li key={i}>{s.label} <span className="text-xs text-slate-500">{s.lat.toFixed(4)}, {s.lon.toFixed(4)}</span></li>)}</ol>{!selected.routing.stops.length && <p className="mt-3 text-sm">No recorded stop coordinates.</p>}</div>
       <div><h3 className="font-semibold">Routing source</h3><p className="mt-3 text-sm">{selected.routing.provider}</p><p className="mt-2 text-sm">{selected.routing.distance_km == null ? 'Road distance unavailable' : `${selected.routing.distance_km} km estimated`} · {selected.routing.duration_hours == null ? 'Drive time unavailable' : `${selected.routing.duration_hours} hours estimated`}</p><p className="mt-2 text-sm">Declared jurisdictions: {selected.routing.jurisdictions.join(', ') || 'Unrecorded'}. Map labels do not establish border passage.</p></div>

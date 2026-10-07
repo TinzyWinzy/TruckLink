@@ -18,6 +18,7 @@ from core.rbac import rbac_allows
 from regulatory.engine.evaluator import digest
 from regulatory.models import OperationalContext, InspectionAttempt
 from trip.models import Trip, Vehicle, Driver
+from yard.models import QueueEntry
 from trip.permissions import get_user_organisation, get_user_role
 import geocoding
 import routing
@@ -89,6 +90,8 @@ def preview(data):
 
 
 def row(trip, context=None):
+    from journeys.models import JourneyLink
+    link = JourneyLink.objects.filter(trip=trip).first()
     position = trip.positions.order_by('-timestamp','-pk').first()
     latest = InspectionAttempt.objects.filter(context=context).order_by('-created_at','-pk').first() if context else None
     now = timezone.now()
@@ -98,6 +101,7 @@ def row(trip, context=None):
         pos = {'lat':position.lat,'lon':position.lon,'timestamp':position.timestamp.isoformat(),
                'source':position.source,'accuracy':position.accuracy,'age_seconds':age,'stale':age > 300}
     return {'id':trip.id,'origin':trip.origin,'destination':trip.destination,'status':trip.status,
+            'journey_id':link.pk if link else None,
             'vehicle':{'id':trip.vehicle_id,'plate':trip.vehicle.plate} if trip.vehicle else None,
             'driver':{'id':trip.driver_id,'name':trip.driver.name} if trip.driver else None,
             'routing':trip.routing_snapshot or {'geometry':trip.route_geometry,'stops':[],
@@ -121,12 +125,16 @@ def route_workspace(request):
     by_trip = {}
     for ctx in contexts:
         by_trip.setdefault(ctx.trip_id,ctx)
-    trips = Trip.objects.filter(organisation=yard.organisation).filter(Q(facility=yard) | Q(facility__isnull=True,pk__in=by_trip)).select_related('vehicle','driver').order_by('-created_at')[:100]
+    from journeys.models import JourneyLink
+    links = JourneyLink.objects.filter(facility=yard,organisation=yard.organisation)
+    linked_trips = list(links.values_list('trip_id',flat=True))
+    trips = Trip.objects.filter(organisation=yard.organisation).filter(Q(facility=yard) | Q(facility__isnull=True,pk__in=[*by_trip,*linked_trips])).select_related('vehicle','driver').order_by('-created_at')[:100]
     return Response({'organisation':{'id':yard.organisation_id,'name':yard.organisation.name},
         'facility':{'id':yard.id,'name':yard.name},'trips':[row(t,by_trip.get(t.id)) for t in trips],
         'vehicles':list(Vehicle.objects.filter(organisation=yard.organisation,is_deleted=False).values('id','plate')),
         'drivers':list(Driver.objects.filter(organisation=yard.organisation,is_deleted=False).values('id','name')),
-        'can_save':rbac_allows(get_user_role(request.user),'routes','create',yard.organisation)})
+        'visits':list(QueueEntry.objects.filter(facility=yard).exclude(pk__in=links.values_list('visit_id',flat=True)).exclude(status='RELEASED').values('id','reg_number','status')),
+        'can_save':rbac_allows(get_user_role(request.user),'routes','create',yard.organisation,yard)})
 
 
 @api_view(['POST'])

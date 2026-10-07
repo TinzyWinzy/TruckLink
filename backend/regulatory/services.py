@@ -225,6 +225,10 @@ def create_context(actor, entry, *, evidence_ids, **fields):
     entry = QueueEntry.objects.select_for_update().get(pk=entry.pk)
     if entry.status == 'RELEASED':
         raise ValidationError('Released context is historical')
+    from journeys.models import JourneyLink
+    link = JourneyLink.objects.filter(visit=entry).first()
+    if link and link.trip_id != fields['trip'].pk:
+        raise ValidationError('Inspection context must use the linked journey trip')
     context = m.OperationalContext.objects.create(organisation=entry.organisation, creator=actor, queue_entry=entry, **fields)
     evidence = list(m.EvidenceRevision.objects.filter(organisation=entry.organisation, pk__in=evidence_ids))
     if len(evidence) != len(evidence_ids):
@@ -307,12 +311,14 @@ def inspect_entry(actor, entry, *, axle_weights, total_weight, checklist_results
     return attempt, False
 
 
-def lock_current_attempt(actor, attempt):
+def lock_current_attempt(actor, attempt, *, departure_release=None):
     entry = QueueEntry.objects.select_for_update().get(pk=attempt.queue_entry_id)
     assert_site(actor, entry)
     current = entry.inspection_attempts.first()
     context = entry.regulatory_contexts.order_by('-created_at', '-pk').first()
-    if entry.status == 'RELEASED' or not current or current.pk != attempt.pk or not context or attempt.context_id != context.pk:
+    released_authority = (departure_release is not None and entry.status == 'RELEASED'
+        and departure_release.queue_entry_id == entry.pk and departure_release.attempt_id == attempt.pk)
+    if (entry.status == 'RELEASED' and not released_authority) or not current or current.pk != attempt.pk or not context or attempt.context_id != context.pk:
         raise ValidationError('Only the current attempt and context can authorize gate commands')
     return entry
 
@@ -346,7 +352,7 @@ def approve_override(actor, request, approved, reason):
     return approval
 
 
-def release_authority(entry, actor):
+def release_authority(entry, actor, *, departure_release=None):
     """Caller holds queue lock; revalidate effective policy and evidence at exit."""
     require_role(actor, (UserRole.DISPATCH_SUPERVISOR, UserRole.OPERATIONS_SUPERVISOR, UserRole.FACILITY_MANAGER))
     from core.rbac import rbac_allows
@@ -357,11 +363,15 @@ def release_authority(entry, actor):
     from trip.models import Organisation
     Organisation.objects.select_for_update().get(pk=entry.organisation_id)
     attempt = entry.inspection_attempts.first()
+    if departure_release is not None:
+        if (entry.status != 'RELEASED' or departure_release.queue_entry_id != entry.pk
+                or not attempt or departure_release.attempt_id != attempt.pk):
+            raise ValidationError('Departure must retain the current recorded release authority')
     if not attempt:
         raise ValidationError('CONFIGURATION_REQUIRED: current versioned inspection required')
     if attempt.engine_version != 'nrok-1':
         raise ValidationError('Unsupported historical engine; re-evaluate under the current version')
-    lock_current_attempt(actor, attempt)
+    lock_current_attempt(actor, attempt, departure_release=departure_release)
     now = timezone.now()
     snapshot = context_snapshot(attempt.context, now)
     bundles = bundles_for(attempt.context, now)
@@ -391,8 +401,10 @@ def release_authority(entry, actor):
     if attempt.decision not in ('PASS', 'PASS_WITH_WARNINGS'):
         request = attempt.override_requests.order_by('-created_at', '-pk').first()
         approval = m.OverrideApproval.objects.filter(request=request, approved=True).first() if request else None
-        if not attempt.result.get('override_eligible') or not approval or entry.status != 'OVERRIDE_APPROVED':
+        if (not attempt.result.get('override_eligible') or not approval
+                or (departure_release is None and entry.status != 'OVERRIDE_APPROVED')
+                or (departure_release is not None and departure_release.approval_id != approval.pk)):
             raise ValidationError('Held attempt requires permitted independent approval')
-    elif entry.status != 'COMPLETED':
+    elif departure_release is None and entry.status != 'COMPLETED':
         raise ValidationError('Queue state is inconsistent with current inspection')
     return attempt, approval

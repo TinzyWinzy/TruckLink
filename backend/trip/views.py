@@ -450,6 +450,9 @@ def trip_detail(request, pk):
 
     if request.method == "GET":
         return Response({"ok": True, "trip": TripSerializer(trip).data})
+    from journeys.models import JourneyLink
+    if JourneyLink.objects.filter(trip=trip).exists():
+        return Response({'detail':'Linked journey assignment is retained. Resolve changes through the journey workflow.'},status=409)
     s = TripUpdateSerializer(trip, data=request.data, partial=True)
     if not s.is_valid():
         return Response({"ok": False, "errors": s.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -471,6 +474,9 @@ def trip_update_status(request, pk):
         return Response({"ok": False, "error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
     new_status = request.data.get("status")
+    from journeys.models import JourneyLink
+    if JourneyLink.objects.filter(trip=trip).exists():
+        return Response({'detail':'Use journey observations; yard release, departure and delivery are distinct.'},status=409)
     if not new_status:
         return Response({"ok": False, "error": "status is required"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -979,6 +985,9 @@ def public_booking_confirm(request, ref):
     if str(trip.customer_token) != token:
         return Response({"ok": False, "error": "Invalid token"}, status=status.HTTP_403_FORBIDDEN)
 
+    from journeys.models import JourneyLink
+    if JourneyLink.objects.filter(trip=trip).exists():
+        return Response({'detail':'This booking is linked to an operational journey. Contact operations.'},status=409)
     if trip.status != "quoted":
         return Response({"ok": False, "error": f"Cannot confirm booking in status '{trip.status}'"},
                         status=status.HTTP_400_BAD_REQUEST)
@@ -1099,6 +1108,9 @@ def booking_assign(request, pk):
     if not belongs_to_organisation(trip, request.user):
         return Response({"ok": False, "error": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
 
+    from journeys.models import JourneyLink
+    if JourneyLink.objects.filter(trip=trip).exists():
+        return Response({'detail':'Linked journey assignment is retained. Contact operations to resolve changes.'},status=409)
     if trip.status not in ("confirmed", "assigned"):
         return Response({"ok": False, "error": f"Cannot assign in status '{trip.status}'"},
                         status=status.HTTP_400_BAD_REQUEST)

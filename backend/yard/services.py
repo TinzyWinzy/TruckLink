@@ -19,6 +19,16 @@ def release_entry(entry_id, actor):
     entry = QueueEntry.objects.select_for_update().get(pk=entry_id)
     from core.models import Facility
     Facility.objects.select_for_update().get(pk=entry.facility_id)
+    from journeys.models import JourneyLink
+    link = JourneyLink.objects.filter(visit=entry).first()
+    if link:
+        from trip.models import Trip
+        from journeys.services import check_assignment
+        link.trip = Trip.objects.select_for_update().get(pk=link.trip_id)
+        try:
+            check_assignment(link)
+        except ValidationError as exc:
+            raise ReleaseBlocked('; '.join(exc.messages)) from exc
     attempt = approval = None
     if entry.facility.yard_config.get("mode") != "DEMO" or entry.inspection_attempts.exists():
         from regulatory.services import release_authority
@@ -27,6 +37,8 @@ def release_entry(entry_id, actor):
         except (ValidationError, PermissionError) as exc:
             raise ReleaseBlocked('; '.join(exc.messages) if isinstance(exc, ValidationError) else str(exc)) from exc
         authority = {"attempt_id": attempt.pk, "approval_id": approval.pk if approval else None}
+        if link and attempt.context.trip_id != link.trip_id:
+            raise ReleaseBlocked('Inspection release authority belongs to another journey')
     else:
         check = validate_demo_release(entry)
         authority = {"check_id": str(check.id), "verification_status": "LEGACY_DEMO_UNVERIFIED"}
@@ -48,7 +60,8 @@ def release_entry(entry_id, actor):
                  payload={"queueEntryId": str(entry.id), **authority})
     OutboxEvent.objects.create(organisation=entry.organisation, facility=entry.facility,
                               event_type="RELEASED", payload={"queue_entry_id": str(entry.id),
-                              **authority, "reg_number": entry.reg_number,
+                              **authority, "trip_id": link.trip_id if link else None,
+                              "journey_id": link.pk if link else None, "reg_number": entry.reg_number,
                               "dwell_seconds": entry.dwell_duration_seconds})
     return entry
 

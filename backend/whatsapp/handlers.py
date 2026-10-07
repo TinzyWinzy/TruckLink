@@ -114,6 +114,9 @@ def handle_accept(phone: str, driver: Driver | None, session: WhatsAppSession, r
     except Trip.DoesNotExist:
         return "Trip not found."
 
+    from journeys.models import JourneyLink
+    if JourneyLink.objects.filter(trip=trip).exists():
+        return 'This trip uses a linked journey. Contact operations to record departure or a delivery exception.'
     if trip.status != "dispatched":
         return f"Trip #{trip_id} cannot be accepted (status: {trip.status})."
 
@@ -148,6 +151,9 @@ def handle_reject(phone: str, driver: Driver | None, session: WhatsAppSession, r
     except Trip.DoesNotExist:
         return "Trip not found."
 
+    from journeys.models import JourneyLink
+    if JourneyLink.objects.filter(trip=trip).exists():
+        return 'This trip uses a linked journey. Contact operations to resolve the assignment; history is retained.'
     # Set trip back to unassigned
     trip.driver = None
     trip.status = "cancelled"
@@ -200,6 +206,9 @@ def handle_status_update(phone: str, new_status: str, driver: Driver | None, ses
         session.save(update_fields=["state"])
         return messages.no_active_trip()
 
+    from journeys.models import JourneyLink
+    if JourneyLink.objects.filter(trip=trip).exists():
+        return 'Delivery and departure need recorded journey evidence. Contact operations; a chat status cannot confirm delivery.'
     next_statuses = VALID_STATUS_TRANSITIONS.get(trip.status, [])
     if new_status not in next_statuses:
         return f"Invalid status. Choose from: {', '.join(next_statuses)}"

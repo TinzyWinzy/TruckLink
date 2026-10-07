@@ -378,6 +378,24 @@ class Trip(models.Model):
         ]
         constraints = [models.UniqueConstraint(fields=['facility', 'route_client_key'], condition=~models.Q(route_client_key=''), name='unique_route_draft_per_yard')]
 
+    def save(self, *args, **kwargs):
+        from django.db import transaction
+        from django.core.exceptions import ValidationError
+        with transaction.atomic():
+            if self.pk:
+                old = type(self).objects.select_for_update().filter(pk=self.pk).first()
+                from journeys.models import JourneyLink
+                if old and JourneyLink.objects.filter(trip_id=self.pk).exists():
+                    written = set(kwargs.get('update_fields') or ('vehicle','driver','organisation','facility','origin','destination','waypoints','status','actual_start','actual_end'))
+                    identity = ('vehicle','driver','organisation','facility','origin','destination','waypoints')
+                    for name in identity:
+                        field = self._meta.get_field(name).attname
+                        if (name in written or field in written) and getattr(self,field) != getattr(old,field):
+                            raise ValidationError('Linked journey assignment is retained; historical identity cannot be overwritten')
+                    if not getattr(self,'_journey_command',False) and any(name in written and getattr(self,name) != getattr(old,name) for name in ('status','actual_start','actual_end')):
+                        raise ValidationError('Use the authoritative journey event command')
+            return super().save(*args,**kwargs)
+
     def __str__(self):
         who = self.driver.name if self.driver else "anonymous"
         return f"{who}: {self.origin} -> {self.destination} ({self.distance_km:.0f}km)"
