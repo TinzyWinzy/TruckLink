@@ -47,4 +47,4 @@ Screenshots use intercepted synthetic API fixtures, not customer performance:
 
 ## Remaining intelligence work
 
-Configure actual integration providers after customer discovery. Record hold/handoff episodes before presenting time-by-cause charts. Calibrate ETA and capacity forecasts against real outcomes before adding predictive graphs. Configure agreed tenant service targets before labelling age-band breaches as operational SLA failures. Production load testing and deployment verification remain outstanding.
+Configure actual integration providers after customer discovery. Record hold/handoff episodes before presenting time-by-cause charts. Calibrate ETA and capacity forecasts against real outcomes before adding predictive graphs. Configure agreed tenant service targets before labelling age-band breaches as operational SLA failures. Production load testing and signed-in verification remain outstanding. The deployed release and read-only smoke results are recorded in [DEPLOYMENT_2026-10-07_DASHBOARD.md](DEPLOYMENT_2026-10-07_DASHBOARD.md).
