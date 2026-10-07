@@ -72,8 +72,10 @@ test('View-as switches to executive reports', async ({ page }) => {
 })
 
 test('Hub and Guide load for the walkthrough', async ({ page }) => {
-  await page.goto('/?demo=1&role=dispatch')
-  await expect(page).toHaveURL(/\/queue$/)
+  await page.goto('/?demo=1&role=admin&walkthrough=1')
+  await expect(page).toHaveURL(/\/guide$/)
+  await expect(page.getByRole('heading',{name:'Platform practice review'})).toBeVisible()
+  await expect(page.getByRole('heading',{name:'Current site readiness'})).toHaveCount(0)
   await page.goto('/hub')
   await expect(page.getByRole('heading', { name: 'Information hub' })).toBeVisible()
   await page.goto('/guide')
