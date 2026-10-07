@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { apiFetch, facilityId } from '../lib/api'
 import { useLive } from '../lib/liveGate'
 import { useSession } from '../store/session'
@@ -10,11 +10,14 @@ import JourneyPanel from '../components/JourneyPanel'
 import { PageHeader, Section } from '../components/ui'
 
 export default function RoutesMap() {
+  const [searchParams] = useSearchParams()
   const live = useLive()
   const role = useSession(s => s.role)
   const [mode, setMode] = useState<'operational' | 'synthetic'>(live ? 'operational' : 'synthetic')
   const [workspace, setWorkspace] = useState<RouteWorkspace | null>(null)
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [selectedId, setSelectedId] = useState<number | null>(() => {
+    const id = Number(searchParams.get('trip')); return Number.isInteger(id) && id > 0 ? id : null
+  })
   const [previewTrip, setPreviewTrip] = useState<RouteTrip | null>(null)
   const [feedError, setFeedError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { apiFetch, ApiError, facilityId } from '../lib/api'
 import { useSession } from '../store/session'
 import type { RouteTrip, RouteWorkspace } from '../lib/routes'
@@ -8,6 +9,9 @@ type Journey = {
   id: number; trip_id: number; visit_id: number; stage: string; yard_status: string; dock: string | null;
   integrations: { erp: string; tracking: string };
   external_reference: { system: string; reference: string } | null;
+  milestone_semantics?: string; dock_occupied?: boolean;
+  next_action?: { kind: string | null; label: string; owner_roles: string[]; href: string | null; scope: string | null };
+  closure?: { physical_delivery: string; evidence: string; erp: string; commercial: string };
   events: { id: string; kind: string; at: string; actor_id: number | null; decision?: string; reason?: string }[];
 }
 const localNow = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,19)
@@ -39,11 +43,13 @@ export default function JourneyPanel({ trip, workspace, onChange }: { trip: Rout
     const timer = window.setInterval(() => void load(),10000)
     return () => { active = false; clearInterval(timer) }
   },[trip.id])
-  const next = journey?.stage === 'AT_ORIGIN' || journey?.stage === 'YARD_RELEASE_AUTHORISED' ? 'DEPARTED'
+  const legacyNext = journey?.stage === 'AT_ORIGIN' || journey?.stage === 'YARD_RELEASE_AUTHORISED' ? 'DEPARTED'
     : journey?.stage === 'DEPARTED' ? 'DESTINATION_ARRIVED' : journey?.stage === 'DESTINATION_ARRIVED' ? outcome : null
-  const canObserve = next === 'DEPARTED' ? ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER'].includes(role ?? '')
+  const next = journey?.next_action ? journey.next_action.kind === 'DELIVERY_OUTCOME' ? outcome : journey.next_action.kind : legacyNext
+  const canObserve = journey?.next_action ? journey.next_action.owner_roles.includes(role ?? '')
+    : next === 'DEPARTED' ? ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER'].includes(role ?? '')
     : ['OPERATIONS_SUPERVISOR','FACILITY_MANAGER'].includes(role ?? '')
-  const delivery = next?.startsWith('DELIVERY_')
+  const delivery = next === 'DELIVERY_ACCEPTED' || next === 'DELIVERY_REJECTED'
   async function link() {
     setBusy(true); setError('')
     try {
@@ -60,7 +66,9 @@ export default function JourneyPanel({ trip, workspace, onChange }: { trip: Rout
         kind:next,observed_at:new Date(observed).toISOString(),client_key:replayKey,reason,
         details:delivery ? {receiver,evidence_reference:document,evidence_sha256:sha} : {},
       }})
-      setJourney(result.journey); setReplayKey(crypto.randomUUID()); setReason(''); setObserved(localNow()); onChange()
+      setJourney(result.journey); setReplayKey(crypto.randomUUID()); setReason(''); setObserved(localNow())
+      if (delivery) { setReceiver(''); setDocument(''); setSha(''); setOutcome('DELIVERY_ACCEPTED') }
+      onChange()
     } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
   return <section className="report-panel mt-4" aria-label="Connected journey">
@@ -83,13 +91,21 @@ export default function JourneyPanel({ trip, workspace, onChange }: { trip: Rout
     </>}
     {journey && <>
       <p className="mt-3 text-sm font-semibold">Journey {journey.id} / Trip {trip.id} / Visit {journey.visit_id}</p>
-      <p className="mt-1 text-sm">{journey.stage.replaceAll('_',' ')} · Yard: {journey.yard_status}{journey.dock ? ` · Dock: ${journey.dock}` : ''}</p>
+      <p className="mt-1 text-sm">{journey.stage.replaceAll('_',' ')} · Yard: {journey.yard_status}{journey.dock ? ` · Assigned dock: ${journey.dock}${journey.dock_occupied === false ? ' (no longer occupied by this visit)' : ''}` : ''}</p>
       {journey.external_reference && <p className="mt-1 break-words text-sm">Recorded reference: {journey.external_reference.system} / {journey.external_reference.reference}</p>}
+      {journey.milestone_semantics === 'LEGACY_COMBINED' && <p className="mt-2 text-sm text-amber-800">Historical release combines yard milestones. Its exit timestamp does not independently prove physical departure.</p>}
+      {journey.next_action && <div className="mt-3 rounded-lg border border-slate-200 p-3" aria-label="Next journey task">
+        <p className="font-semibold">Next: {journey.next_action.label}</p>
+        <p className="mt-1 text-sm">Responsible roles: {journey.next_action.owner_roles.map(r=>r.replaceAll('_',' ').toLowerCase()).join(', ')}.</p>
+        {journey.next_action.scope && <p className="mt-2 text-sm">{journey.next_action.scope}</p>}
+        {journey.next_action.href && <div className="mt-2 flex flex-wrap gap-4"><Link className="report-text-link" to={journey.next_action.href}>Open inspection →</Link><Link className="report-text-link" to="/queue">Open release queue →</Link></div>}
+      </div>}
+      {journey.stage === 'DELIVERY_ACCEPTED' && <p className="mt-3 text-sm">Physical delivery accepted by staff attestation. Evidence reference and fingerprint recorded; reconciliation remains outstanding. ERP acknowledgement and commercial closure are not confirmed.</p>}
       <ol className="mt-4 space-y-3">{journey.events.map(event=><li key={event.id} className="border-l-2 border-slate-200 pl-3 text-sm">
         <strong>{event.kind.replaceAll('_',' ')}</strong>{event.decision && `: ${event.decision}`}<p>{new Date(event.at).toLocaleString()} · {event.actor_id ? `Staff ${event.actor_id}` : 'Actor unrecorded'}</p>{event.reason && <p>{event.reason}</p>}
       </li>)}</ol>
       {next && canObserve && <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <p className="text-sm sm:col-span-2">Record a staff observation. Yard release does not prove physical departure; arrival does not prove accepted delivery.</p>
+        <p className="text-sm sm:col-span-2">{next === 'DELIVERY_REATTEMPT_PLANNED' ? 'Record the agreed reason and plan for another attempt at the existing destination. The trip and its rejected receipt remain unchanged.' : 'Record a staff observation. Yard release does not prove physical departure; arrival does not prove accepted delivery.'}</p>
         <label className="text-sm">Observation time<input type="datetime-local" step="1" className="field mt-1 w-full" value={observed} onChange={e=>setObserved(e.target.value)}/><button type="button" className="report-text-link mt-1" onClick={()=>setObserved(localNow())}>Use current time</button></label>
         <label className="text-sm">Observation reason<input className="field mt-1 w-full" value={reason} onChange={e=>setReason(e.target.value)}/></label>
         {delivery && <>

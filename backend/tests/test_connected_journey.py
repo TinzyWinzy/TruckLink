@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework.test import APIClient
 from tests.test_regulatory import domain, inspect
-from journeys.services import link_visit, record_event
+from journeys.services import link_visit, record_event, assignment
 from journeys.models import JourneyLink
 from journeys.views import timeline
 from yard.services import release_entry, ReleaseBlocked
@@ -101,3 +101,108 @@ def test_departure_rechecks_authority_after_release(domain, monkeypatch):
     with pytest.raises(ValidationError): event(d,link,'DEPARTED','expired')
     assert not link.events.exists()
     d['trip'].refresh_from_db(); assert d['trip'].status=='inquiry'
+
+
+def test_release_vacancy_and_exit_are_distinct_and_replay_safe(domain):
+    from yard.models import Dock
+    from yard.reports import compute_turnaround_stats
+    from core.models import OutboxEvent
+    d=domain
+    dock=Dock.objects.create(organisation=d['org'],facility=d['default_facility'],name='Test dock',
+        status='OCCUPIED',current_entry=d['entry'])
+    d['entry'].assigned_dock=dock; d['entry'].save()
+    link=link_visit(d['inspector'],d['entry'],d['trip'],'Synthetic')
+    inspect(d); release_entry(d['entry'].pk,d['ops'])
+    d['entry'].refresh_from_db(); dock.refresh_from_db(); link.refresh_from_db()
+    assert d['entry'].milestone_semantics=='SEPARATE_V1'
+    assert d['entry'].release_authorized_at and d['entry'].exit_timestamp is None
+    assert d['entry'].dwell_duration_seconds is None and dock.current_entry_id==d['entry'].pk
+    assert timeline(link)['next_action']['kind']=='DOCK_VACATED'
+    stats=compute_turnaround_stats([d['entry']],now=timezone.now())
+    assert stats['avgTurnaroundMinutes'] is None and stats['avgWaitMinutes'] is not None
+    with pytest.raises(ValidationError,match='dock vacancy'): event(d,link,'DEPARTED','skip-vacancy')
+    with pytest.raises(PermissionError): event(d,link,'DOCK_VACATED','dispatch-vacancy',d['inspector'])
+    vacancy=event(d,link,'DOCK_VACATED','vacancy')
+    dock.refresh_from_db(); d['entry'].refresh_from_db()
+    assert dock.status=='AVAILABLE' and dock.current_entry is None
+    assert d['entry'].dock_vacated_at==vacancy.observed_at and d['entry'].exit_timestamp is None
+    assert timeline(link)['next_action']['kind']=='DEPARTED'
+    assert timeline(link)['dock_occupied'] is False
+    # Reusing the dock must not be disturbed by retries of the old observation.
+    from yard.models import QueueEntry
+    other=QueueEntry.objects.create(organisation=d['org'],facility=d['default_facility'],reg_number='OTHER')
+    dock.current_entry=other; dock.status='OCCUPIED'; dock.save()
+    assert record_event(d['ops'],link,kind=vacancy.kind,observed_at=vacancy.observed_at,
+        details={},client_key=vacancy.client_key,reason=vacancy.reason).pk==vacancy.pk
+    departed=event(d,link,'DEPARTED','exit')
+    d['entry'].refresh_from_db(); dock.refresh_from_db()
+    assert d['entry'].exit_timestamp==departed.observed_at and dock.current_entry_id==other.pk
+    assert d['entry'].dwell_duration_seconds==int((departed.observed_at-d['entry'].entry_timestamp).total_seconds())
+    assert OutboxEvent.objects.filter(event_type='RELEASE_AUTHORISED').count()==1
+    assert OutboxEvent.objects.filter(event_type='DOCK_VACATED').count()==1
+    assert OutboxEvent.objects.filter(event_type='DEPARTED').count()==1
+
+
+def test_rejected_delivery_reattempt_preserves_history_and_needs_new_receipt(domain):
+    d=domain; link=link_visit(d['inspector'],d['entry'],d['trip'],'Synthetic')
+    inspect(d); release_entry(d['entry'].pk,d['ops']); event(d,link,'DEPARTED','d'); event(d,link,'DESTINATION_ARRIVED','a')
+    rejected={'receiver':'Test receiver','evidence_reference':'test://reject','evidence_sha256':'b'*64}
+    event(d,link,'DELIVERY_REJECTED','reject',details=rejected)
+    assert timeline(link)['next_action']['kind']=='DELIVERY_REATTEMPT_PLANNED'
+    with pytest.raises(ValidationError): event(d,link,'DESTINATION_ARRIVED','skip-plan')
+    with pytest.raises(PermissionError): event(d,link,'DELIVERY_REATTEMPT_PLANNED','dispatch-plan',d['inspector'])
+    event(d,link,'DELIVERY_REATTEMPT_PLANNED','plan')
+    with pytest.raises(ValidationError): event(d,link,'DELIVERY_ACCEPTED','skip-arrival',details=rejected)
+    event(d,link,'DESTINATION_ARRIVED','a2')
+    with pytest.raises(ValidationError): event(d,link,'DELIVERY_ACCEPTED','no-receipt')
+    event(d,link,'DELIVERY_ACCEPTED','accept',details={**rejected,'evidence_reference':'test://accept','evidence_sha256':'c'*64})
+    assert link.events.filter(kind='DELIVERY_REJECTED').get().details==rejected
+    assert link.events.filter(kind='DESTINATION_ARRIVED').count()==2
+    data=timeline(link)
+    assert data['closure']['physical_delivery']=='ACCEPTED'
+    assert data['closure']['commercial']=='NOT_CONFIRMED' and data['closure']['erp']=='NOT_CONFIGURED'
+    with pytest.raises(ValidationError): event(d,link,'DELIVERY_REATTEMPT_PLANNED','after-success')
+
+
+def test_legacy_link_keeps_combined_history_and_can_depart(domain):
+    d=domain
+    # Emulate a link retained before separate-milestone semantics were introduced.
+    link=JourneyLink.objects.create(organisation=d['org'],facility=d['default_facility'],
+        trip=d['trip'],visit=d['entry'],assignment=assignment(d['trip']),
+        creator=d['inspector'],reason='Historical synthetic link')
+    inspect(d); release_entry(d['entry'].pk,d['ops'])
+    d['entry'].refresh_from_db(); old_exit=d['entry'].exit_timestamp
+    assert old_exit and d['entry'].milestone_semantics=='LEGACY_COMBINED'
+    departure=event(d,link,'DEPARTED','legacy-departure')
+    d['entry'].refresh_from_db()
+    assert d['entry'].exit_timestamp==old_exit
+    assert timeline(link)['physical_exit_at']==departure.observed_at
+
+
+def test_journey_api_returns_current_handoff_after_each_origin_command(domain):
+    from yard.models import Dock
+    d=domain
+    dock=Dock.objects.create(organisation=d['org'],facility=d['default_facility'],name='API dock',status='OCCUPIED',current_entry=d['entry'])
+    d['entry'].assigned_dock=dock; d['entry'].save()
+    c=APIClient(); c.force_authenticate(d['ops'])
+    url=f'/api/trips/{d["trip"].pk}/journey/'
+    response=c.post(url,{'facility':str(d['default_facility'].pk),'visit_id':d['entry'].pk,'reason':'Synthetic API link'},format='json')
+    assert response.status_code==200 and response.data['journey']['next_action']['href']==f'/compliance?entry={d["entry"].pk}'
+    inspect(d); release_entry(d['entry'].pk,d['ops'])
+    for kind,next_kind in [('DOCK_VACATED','DEPARTED'),('DEPARTED','DESTINATION_ARRIVED')]:
+        response=c.post(url+'events/',{'kind':kind,'observed_at':timezone.now().isoformat(),
+            'reason':'Synthetic observation','client_key':kind,'details':{}},format='json')
+        assert response.status_code==200
+        data=response.data['journey']
+        assert data['next_action']['kind']==next_kind and data['dock_occupied'] is False
+        assert bool(data['physical_exit_at'])==(kind=='DEPARTED')
+    from yard.serializers import QueueEntrySerializer
+    d['entry'].refresh_from_db()
+    assert QueueEntrySerializer(d['entry']).data['journey_trip_id']==d['trip'].pk
+
+
+def test_authorisation_notification_does_not_claim_truck_has_departed():
+    from core.notify import message_for
+    from core.models import OutboxEvent
+    text=message_for(OutboxEvent(event_type='RELEASE_AUTHORISED',payload={'reg_number':'TEST-1'}),'Test yard')
+    assert 'Physical gate exit remains unconfirmed' in text and 'left Test yard' not in text

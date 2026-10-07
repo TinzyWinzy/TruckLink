@@ -54,6 +54,14 @@ test('production connected journey schema is readable without operational writes
     const data=await workspace.json()
     expect(Array.isArray(data.visits)).toBe(true)
     expect(data.organisation.id).toBe(credentials.user.organisation.id)
+    const board=await request.get(`${api}/api/yard/board/?facility=${credentials.user.facilities[0].id}`,{headers})
+    expect(board.ok()).toBe(true)
+    for(const visit of (await board.json()).queue){
+      expect(['LEGACY_COMBINED','SEPARATE_V1']).toContain(visit.milestone_semantics)
+      expect(visit).toHaveProperty('release_authorized_at')
+      expect(visit).toHaveProperty('dock_vacated_at')
+      expect(visit).toHaveProperty('journey_trip_id')
+    }
     // A non-existent identity exercises the migrated journey table without creating records.
     const missing=await request.get(`${api}/api/trips/2147483647/journey/`,{headers})
     expect(missing.status()).toBe(404)
@@ -61,7 +69,12 @@ test('production connected journey schema is readable without operational writes
     for(const trip of data.trips){
       const response=await request.get(`${api}/api/trips/${trip.id}/journey/`,{headers})
       expect([200,404]).toContain(response.status())
-      if(response.ok()) expect((await response.json()).journey.trip_id).toBe(trip.id)
+      if(response.ok()) {
+        const journey=(await response.json()).journey
+        expect(journey.trip_id).toBe(trip.id)
+        expect(journey.next_action.owner_roles.length).toBeGreaterThan(0)
+        expect(journey.closure.commercial).toBe('NOT_CONFIRMED')
+      }
     }
   } finally { await request.post(`${api}/api/auth/logout/`,{headers}) }
 })

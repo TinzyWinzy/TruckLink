@@ -16,6 +16,8 @@ interface Row {
   dest: string
   rawStatus: string
   enteredAt: string
+  awaitingExit?: boolean
+  journeyTripId?: number
 }
 
 const SYMBOL: Record<string, string> = {
@@ -49,6 +51,8 @@ function mapLive(r: LiveRow): Row {
     dest: String(r.expectedDestination ?? 'N/A'),
     rawStatus,
     enteredAt,
+    awaitingExit: r.milestoneSemantics === 'SEPARATE_V1' && rawStatus === 'RELEASED' && !r.exitTimestamp,
+    journeyTripId: r.journeyTripId ? Number(r.journeyTripId) : undefined,
   }
 }
 
@@ -181,7 +185,7 @@ export default function QueueDashboard() {
       <PageHeader
         title="Shift queue"
         eyebrow="Yard operations · oldest first"
-        sub={live ? 'Live yard board. Oldest first. Register at the gate, release at the exit.' : 'Practice board. Training entries only.'}
+        sub={live ? 'Live yard board. Oldest first. Authorise release, then confirm dock vacancy and gate exit in the linked journey.' : 'Practice board. Training entries only.'}
         mode={live ? 'live' : 'demo'}
       />
       {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
@@ -224,8 +228,10 @@ export default function QueueDashboard() {
             <li key={r.id} className={`card spine ${spineForStatus(r.rawStatus)} flex flex-wrap items-center gap-x-3 gap-y-1 py-3 pl-5 pr-4`}>
               <strong className="tnum text-lg tracking-tight">{r.plate}</strong>
               <StatusPill status={r.rawStatus} symbol={SYMBOL[r.rawStatus]} />
+              {r.awaitingExit && <span className="text-sm font-semibold text-amber-800">Release authorised. Awaiting gate exit.</span>}
               <span className="w-full text-sm text-slate-600 sm:w-auto">{r.driver} · {r.cargo} → {r.dest} · in {r.enteredAt}</span>
               <span className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:ml-auto">
+                {r.journeyTripId && <Link to={`/routes?trip=${r.journeyTripId}`} className="report-text-link touch-target py-2">Journey {r.journeyTripId} →</Link>}
                 <button
                   type="button"
                   onClick={() => void copyId(r.id)}
@@ -245,7 +251,7 @@ export default function QueueDashboard() {
               </span>
               {(r.rawStatus === 'COMPLETED' || r.rawStatus === 'OVERRIDE_APPROVED') && live && canRelease && (
                 <button type="button" onClick={() => void release(r.id)} className="btn-accent touch-target rounded-lg px-4 text-sm" aria-label={`Release ${r.plate}`}>
-                  Release {r.plate} →
+                  Authorise release {r.plate} →
                 </button>
               )}
             </li>

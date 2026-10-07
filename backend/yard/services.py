@@ -44,13 +44,16 @@ def release_entry(entry_id, actor):
         authority = {"check_id": str(check.id), "verification_status": "LEGACY_DEMO_UNVERIFIED"}
     now = timezone.now()
     entry.status = "RELEASED"
-    entry.exit_timestamp = now
-    entry.dwell_duration_seconds = max(0, int((now - entry.entry_timestamp).total_seconds()))
-    entry.save(update_fields=["status", "exit_timestamp", "dwell_duration_seconds", "updated_at"])
+    entry.release_authorized_at = now
+    separate = entry.milestone_semantics == 'SEPARATE_V1'
+    if not separate:
+        entry.exit_timestamp = now
+        entry.dwell_duration_seconds = max(0, int((now - entry.entry_timestamp).total_seconds()))
+    entry.save(update_fields=["status", "release_authorized_at", "exit_timestamp", "dwell_duration_seconds", "updated_at"])
     if attempt:
         from regulatory.models import ReleaseRecord
         ReleaseRecord.objects.create(organisation=entry.organisation, creator=actor, queue_entry=entry, attempt=attempt, approval=approval)
-    if entry.assigned_dock_id:
+    if entry.assigned_dock_id and not separate:
         dock = Dock.objects.select_for_update().get(pk=entry.assigned_dock_id)
         if dock.current_entry_id == entry.pk:
             dock.status = "AVAILABLE"
@@ -59,9 +62,11 @@ def release_entry(entry_id, actor):
     append_audit(facility=entry.facility, action="RELEASE_VEHICLE", actor=actor,
                  payload={"queueEntryId": str(entry.id), **authority})
     OutboxEvent.objects.create(organisation=entry.organisation, facility=entry.facility,
-                              event_type="RELEASED", payload={"queue_entry_id": str(entry.id),
+                              event_type="RELEASE_AUTHORISED" if separate else "RELEASED", payload={"queue_entry_id": str(entry.id),
                               **authority, "trip_id": link.trip_id if link else None,
                               "journey_id": link.pk if link else None, "reg_number": entry.reg_number,
+                              "milestone_semantics": entry.milestone_semantics,
+                              "release_authorized_at": now.isoformat(),
                               "dwell_seconds": entry.dwell_duration_seconds})
     return entry
 

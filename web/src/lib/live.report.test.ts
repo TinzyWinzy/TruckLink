@@ -42,6 +42,15 @@ describe('queueToCsv', () => {
 })
 
 describe('toMillis', () => {
+  it('keeps new release authorisations and passed inspections in waiting time until observed exit', () => {
+    const now=Date.parse('2026-10-07T10:00:00Z')
+    const base={id:'1',milestoneSemantics:'SEPARATE_V1',entryTimestamp:'2026-10-07T08:00:00Z',updatedAt:'2026-10-07T09:00:00Z'}
+    const waiting=computeTurnaroundStats([{...base,status:'RELEASED'},{...base,id:'2',status:'COMPLETED'}],now)
+    expect(waiting.avgTurnaroundMinutes).toBeNull()
+    expect(waiting.avgWaitMinutes).toBe(120)
+    expect(waiting.overdueCount).toBe(2)
+    expect(computeTurnaroundStats([{...base,status:'RELEASED',exitTimestamp:'2026-10-07T09:30:00Z'}],now).avgTurnaroundMinutes).toBe(90)
+  })
   it('parses ISO and epoch', () => {
     expect(toMillis(new Date('2026-09-01T00:00:00Z').toISOString())).toBe(Date.parse('2026-09-01T00:00:00Z'))
     expect(toMillis(123)).toBe(123)

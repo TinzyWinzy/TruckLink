@@ -58,7 +58,7 @@ class YardBoardView(APIView):
         if err is not None:
             return err
         entries = QueueEntry.objects.filter(facility=facility).select_related(
-            "assigned_dock",
+            "assigned_dock", "journey_link",
         )
         docks = Dock.objects.filter(facility=facility).select_related("current_entry")
         alerts = Alert.objects.filter(facility=facility)
@@ -84,7 +84,7 @@ class QueueListView(APIView):
         facility, err = resolve_facility(request)
         if err is not None:
             return err
-        entries = QueueEntry.objects.filter(facility=facility)
+        entries = QueueEntry.objects.filter(facility=facility).select_related('journey_link')
         rows = [QueueEntrySerializer(e).data for e in entries]
         return Response({"ok": True, "count": len(rows), "queue": rows})
 
@@ -400,6 +400,7 @@ class ReportExportView(APIView):
             "id", "reg_number", "driver_name", "haulier", "vehicle_type",
             "cargo_type", "status", "entry_timestamp", "exit_timestamp",
             "dwell_duration_seconds",
+            "milestone_semantics", "release_authorized_at", "dock_vacated_at",
         ])
         for row in rows:
             writer.writerow([
@@ -408,6 +409,9 @@ class ReportExportView(APIView):
                 row.entry_timestamp.isoformat(),
                 row.exit_timestamp.isoformat() if row.exit_timestamp else "",
                 row.dwell_duration_seconds if row.dwell_duration_seconds is not None else "",
+                row.milestone_semantics,
+                row.release_authorized_at.isoformat() if row.release_authorized_at else "",
+                row.dock_vacated_at.isoformat() if row.dock_vacated_at else "",
             ])
         resp = HttpResponse(buf.getvalue(), content_type="text/csv")
         resp["Content-Disposition"] = f'attachment; filename="turnaround-{facility.slug}.csv"'

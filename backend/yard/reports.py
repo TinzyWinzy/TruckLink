@@ -1,7 +1,8 @@
 """Turnaround report math (SAD v2 section 11) - port of live.ts.
 
 Ports computeTurnaroundStats(): pure over queue rows, unit-tested.
-  - released/completed rows: turnaround = exit - entry
+  - observed exits: turnaround = exit - entry (legacy fallback retained)
+  - new release authorisations/inspection completion: still waiting until gate exit
   - waiting rows: wait = now - entry; overdue when wait > threshold (60 min)
 """
 from __future__ import annotations
@@ -23,7 +24,7 @@ def compute_turnaround_stats(rows, now, overdue_minutes=DEFAULT_OVERDUE_MINUTES)
 
         entered = getattr(row, "entry_timestamp", None) or getattr(row, "created_at", None)
         exited = getattr(row, "exit_timestamp", None)
-        if exited is None and status in ("RELEASED", "COMPLETED"):
+        if exited is None and getattr(row, 'milestone_semantics', 'LEGACY_COMBINED') != 'SEPARATE_V1' and status in ("RELEASED", "COMPLETED"):
             exited = getattr(row, "updated_at", None)
         if entered is None:
             continue

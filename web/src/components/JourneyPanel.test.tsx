@@ -43,3 +43,22 @@ it('requires receiver and document evidence before recording delivery', async ()
   expect(screen.getByText(/File stays on this device/)).toBeVisible()
   expect(screen.getByText(/connectors are not configured/)).toBeVisible()
 })
+
+it('uses the server handoff to vacate a dock before departure', async () => {
+  vi.mocked(apiFetch).mockResolvedValue({journey:{...journey,milestone_semantics:'SEPARATE_V1',dock_occupied:true,
+    next_action:{kind:'DOCK_VACATED',label:'Confirm dock vacated',owner_roles:['OPERATIONS_SUPERVISOR','FACILITY_MANAGER'],href:null,scope:null}}})
+  render(<JourneyPanel trip={trip} workspace={workspace} onChange={()=>{}}/>)
+  expect(await screen.findByRole('button',{name:'Record dock vacated'})).toBeVisible()
+  expect(screen.queryByRole('button',{name:'Record departed'})).not.toBeInTheDocument()
+  expect(screen.getByText('Next: Confirm dock vacated')).toBeVisible()
+})
+
+it('offers a same-destination reattempt without treating the plan as a delivery receipt', async () => {
+  vi.mocked(apiFetch).mockResolvedValue({journey:{...journey,stage:'DELIVERY_REJECTED',
+    next_action:{kind:'DELIVERY_REATTEMPT_PLANNED',label:'Plan a reattempt at the same destination',owner_roles:['OPERATIONS_SUPERVISOR'],href:null,scope:'Same trip and destination'}}})
+  render(<JourneyPanel trip={trip} workspace={workspace} onChange={()=>{}}/>)
+  const button=await screen.findByRole('button',{name:'Record delivery reattempt planned'})
+  expect(screen.queryByLabelText('Receiver name')).not.toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Observation reason'),{target:{value:'Agreed same-destination retry'}})
+  expect(button).toBeEnabled()
+})

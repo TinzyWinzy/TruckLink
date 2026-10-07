@@ -8,6 +8,7 @@ from yard.models import Alert, Dock, QueueEntry
 
 class QueueEntrySerializer(serializers.ModelSerializer):
     assigned_dock = serializers.PrimaryKeyRelatedField(read_only=True)
+    journey_trip_id = serializers.IntegerField(source='journey_link.trip_id', read_only=True, default=None)
 
     class Meta:
         model = QueueEntry
@@ -16,11 +17,11 @@ class QueueEntrySerializer(serializers.ModelSerializer):
             "vehicle_type", "cargo_type", "expected_destination", "status",
             "assigned_dock", "entry_timestamp", "exit_timestamp",
             "dwell_duration_seconds", "idempotency_key", "created_at",
-            "updated_at",
+            "updated_at", "milestone_semantics", "release_authorized_at", "dock_vacated_at", "journey_trip_id",
         ]
         read_only_fields = [
             "id", "facility", "entry_timestamp", "exit_timestamp",
-            "dwell_duration_seconds", "created_at", "updated_at",
+            "dwell_duration_seconds", "created_at", "updated_at", "milestone_semantics", "release_authorized_at", "dock_vacated_at",
         ]
 
 

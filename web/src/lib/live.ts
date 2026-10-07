@@ -165,6 +165,10 @@ function mapQueue(r: Record<string, unknown>): LiveRow {
     assignedDockId: r.assigned_dock ?? null,
     entryTimestamp: r.entry_timestamp,
     exitTimestamp: r.exit_timestamp,
+    milestoneSemantics: r.milestone_semantics,
+    releaseAuthorizedAt: r.release_authorized_at,
+    dockVacatedAt: r.dock_vacated_at,
+    journeyTripId: r.journey_trip_id,
     dwellDurationSeconds: r.dwell_duration_seconds,
     updatedAt: r.updated_at,
   }
@@ -533,7 +537,7 @@ export function computeTurnaroundStats(rows: LiveRow[], now = Date.now(), overdu
     const status = String(r.status ?? 'UNKNOWN')
     byStatus[status] = (byStatus[status] ?? 0) + 1
     const entered = toMillis(r.entryTimestamp ?? r.createdAt)
-    const exited = toMillis(r.exitTimestamp ?? (status === 'RELEASED' || status === 'COMPLETED' ? r.updatedAt : null))
+    const exited = toMillis(r.exitTimestamp ?? (r.milestoneSemantics !== 'SEPARATE_V1' && (status === 'RELEASED' || status === 'COMPLETED') ? r.updatedAt : null))
     if (entered != null) {
       const end = exited ?? now
       if (end >= entered) {
@@ -551,14 +555,14 @@ export function computeTurnaroundStats(rows: LiveRow[], now = Date.now(), overdu
 }
 
 export function queueToCsv(rows: LiveRow[]): string {
-  const head = 'id,licensePlate,driver,cargoType,expectedDestination,status,entryTimestamp,exitTimestamp'
+  const head = 'id,licensePlate,driver,cargoType,expectedDestination,status,entryTimestamp,exitTimestamp,milestoneSemantics,releaseAuthorizedAt,dockVacatedAt'
   const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
   const fmt = (ts: unknown) => {
     const ms = toMillis(ts)
     return ms == null ? '' : new Date(ms).toISOString()
   }
   const lines = rows.map((r) =>
-    [r.id, r.licensePlate, r.driverName ?? r.driverId, r.cargoType, r.expectedDestination, r.status, fmt(r.entryTimestamp), fmt(r.exitTimestamp)].map(esc).join(','),
+    [r.id, r.licensePlate, r.driverName ?? r.driverId, r.cargoType, r.expectedDestination, r.status, fmt(r.entryTimestamp), fmt(r.exitTimestamp), r.milestoneSemantics, fmt(r.releaseAuthorizedAt), fmt(r.dockVacatedAt)].map(esc).join(','),
   )
   return [head, ...lines].join('\n')
 }

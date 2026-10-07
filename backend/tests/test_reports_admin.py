@@ -87,6 +87,14 @@ class TestTurnaroundStats:
         assert stats["avgTurnaroundMinutes"] == pytest.approx(30.0)
         assert stats["avgWaitMinutes"] is None
 
+    def test_separate_milestones_require_observed_exit(self):
+        now=timezone.now()
+        rows=[_Row(status,now-timedelta(minutes=90),updated=now-timedelta(minutes=30)) for status in ('COMPLETED','RELEASED')]
+        for row in rows: row.milestone_semantics='SEPARATE_V1'
+        stats=compute_turnaround_stats(rows,now=now)
+        assert stats['avgTurnaroundMinutes'] is None
+        assert stats['avgWaitMinutes']==90 and stats['overdueCount']==2
+
     def test_empty(self):
         stats = compute_turnaround_stats([], now=timezone.now())
         assert stats == {

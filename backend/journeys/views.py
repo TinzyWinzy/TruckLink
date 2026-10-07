@@ -23,7 +23,8 @@ class LinkInput(serializers.Serializer):
 
 
 class EventInput(serializers.Serializer):
-    kind = serializers.ChoiceField(choices=['DEPARTED','DESTINATION_ARRIVED','DELIVERY_ACCEPTED','DELIVERY_REJECTED'])
+    kind = serializers.ChoiceField(choices=['DOCK_VACATED','DEPARTED','DESTINATION_ARRIVED',
+        'DELIVERY_ACCEPTED','DELIVERY_REJECTED','DELIVERY_REATTEMPT_PLANNED'])
     observed_at = serializers.DateTimeField()
     client_key = serializers.CharField(max_length=64)
     reason = serializers.CharField(max_length=1000)
@@ -61,15 +62,25 @@ def timeline(link):
         events.append({'id':f'release:{release.pk}','kind':'YARD_RELEASE_AUTHORISED','at':release.created_at,
             'actor_id':release.creator_id,'attempt_id':release.attempt_id,'approval_id':release.approval_id})
     elif visit.status == 'RELEASED':
-        events.append({'id':f'demo-release:{visit.pk}','kind':'LEGACY_DEMO_RELEASE_UNVERIFIED','at':visit.exit_timestamp,'actor_id':None})
+        events.append({'id':f'demo-release:{visit.pk}','kind':'LEGACY_DEMO_RELEASE_UNVERIFIED',
+            'at':visit.release_authorized_at or visit.exit_timestamp,'actor_id':None})
     for event in link.events.order_by('observed_at','pk'):
         events.append({'id':f'journey:{event.pk}','kind':event.kind,'at':event.observed_at,
             'recorded_at':event.created_at,'actor_id':event.creator_id,'reason':event.reason,
             'details':event.details,'source':'Staff attestation; external evidence not independently verified'})
     latest = link.events.order_by('-observed_at','-pk').first()
+    stage = latest.kind if latest else 'YARD_RELEASE_AUTHORISED' if visit.status=='RELEASED' else 'AT_ORIGIN'
+    dock_occupied = bool(visit.assigned_dock_id and visit.assigned_dock.current_entry_id == visit.pk)
     position = trip.positions.order_by('-timestamp','-pk').first()
+    departure = link.events.filter(kind='DEPARTED').first()
     return {'id':link.pk,'trip_id':trip.pk,'visit_id':visit.pk,'facility_id':link.facility_id,
-        'stage':latest.kind if latest else 'YARD_RELEASE_AUTHORISED' if visit.status=='RELEASED' else 'AT_ORIGIN',
+        'stage':stage,'milestone_semantics':visit.milestone_semantics,'dock_occupied':dock_occupied,
+        'release_authorized_at':visit.release_authorized_at,'dock_vacated_at':visit.dock_vacated_at,
+        'physical_exit_at':departure.observed_at if departure else None,
+        'next_action':next_action(link,stage,dock_occupied),
+        'closure':{'physical_delivery':'ACCEPTED' if stage=='DELIVERY_ACCEPTED' else 'OPEN',
+            'evidence':'REFERENCE_RECORDED_NOT_RECONCILED' if stage in ('DELIVERY_ACCEPTED','DELIVERY_REJECTED','DELIVERY_REATTEMPT_PLANNED') else 'AWAITING_DELIVERY',
+            'erp':'NOT_CONFIGURED','commercial':'NOT_CONFIRMED'},
         'yard_status':visit.status,'dock':visit.assigned_dock.name if visit.assigned_dock_id else None,
         'assignment':link.assignment,'external_reference':{'system':link.external_system,'reference':link.external_reference,
             'verification':'MANUALLY_RECORDED'} if link.external_reference else None,
@@ -77,6 +88,26 @@ def timeline(link):
         'position':{'lat':position.lat,'lon':position.lon,'at':position.timestamp,'source':position.source,
             'stale':(timezone.now()-position.timestamp).total_seconds()>300,'verification':'UNVERIFIED_REPORT'} if position else None,
         'events':sorted(events,key=lambda e:(e['at'],e['id']))}
+
+
+def next_action(link, stage, dock_occupied):
+    origin_roles = ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER']
+    destination_roles = ['OPERATIONS_SUPERVISOR','FACILITY_MANAGER']
+    actions = {
+        'AT_ORIGIN':(None,'Complete inspection and release approval',origin_roles,f'/compliance?entry={link.visit_id}'),
+        'YARD_RELEASE_AUTHORISED':('DOCK_VACATED' if dock_occupied and link.visit.milestone_semantics=='SEPARATE_V1' else 'DEPARTED',
+            'Confirm dock vacated' if dock_occupied and link.visit.milestone_semantics=='SEPARATE_V1' else 'Confirm physical gate exit',
+            destination_roles if dock_occupied and link.visit.milestone_semantics=='SEPARATE_V1' else origin_roles,None),
+        'DOCK_VACATED':('DEPARTED','Confirm physical gate exit',origin_roles,None),
+        'DEPARTED':('DESTINATION_ARRIVED','Confirm destination arrival',destination_roles,None),
+        'DESTINATION_ARRIVED':('DELIVERY_OUTCOME','Record receiver and delivery evidence',destination_roles,None),
+        'DELIVERY_REJECTED':('DELIVERY_REATTEMPT_PLANNED','Plan a reattempt at the same destination',destination_roles,None),
+        'DELIVERY_REATTEMPT_PLANNED':('DESTINATION_ARRIVED','Confirm arrival for the next delivery attempt',destination_roles,None),
+        'DELIVERY_ACCEPTED':(None,'Reconcile retained evidence and ERP closure outside Trucki',destination_roles,None),
+    }
+    kind,label,roles,href = actions[stage]
+    return {'kind':kind,'label':label,'owner_roles':roles,'href':href,
+        'scope':'Same trip and destination; returns and destination changes require a separate operational plan' if stage=='DELIVERY_REJECTED' else None}
 
 
 @api_view(['GET','POST'])

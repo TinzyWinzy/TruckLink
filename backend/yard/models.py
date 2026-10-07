@@ -69,6 +69,11 @@ class QueueEntry(models.Model):
     )
     entry_timestamp = models.DateTimeField(default=timezone.now)
     exit_timestamp = models.DateTimeField(null=True, blank=True)
+    # Legacy timestamps retain their original meaning; new linked visits separate observations.
+    milestone_semantics = models.CharField(max_length=24, default='LEGACY_COMBINED',
+        choices=[('LEGACY_COMBINED', 'Legacy combined release'), ('SEPARATE_V1', 'Separate yard milestones')])
+    release_authorized_at = models.DateTimeField(null=True, blank=True)
+    dock_vacated_at = models.DateTimeField(null=True, blank=True)
     dwell_duration_seconds = models.BigIntegerField(null=True, blank=True)
     idempotency_key = models.CharField(max_length=64, blank=True, default='')
     created_by = models.ForeignKey(

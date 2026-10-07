@@ -37,7 +37,8 @@ class JourneyEvent(Retained):
     organisation = models.ForeignKey('trip.Organisation', on_delete=models.PROTECT)
     journey = models.ForeignKey(JourneyLink, on_delete=models.PROTECT, related_name='events')
     kind = models.CharField(max_length=30, choices=[(v,v) for v in (
-        'DEPARTED','DESTINATION_ARRIVED','DELIVERY_ACCEPTED','DELIVERY_REJECTED')])
+        'DOCK_VACATED','DEPARTED','DESTINATION_ARRIVED','DELIVERY_ACCEPTED','DELIVERY_REJECTED',
+        'DELIVERY_REATTEMPT_PLANNED')])
     observed_at = models.DateTimeField()
     details = models.JSONField(default=dict, blank=True)
     client_key = models.CharField(max_length=64)

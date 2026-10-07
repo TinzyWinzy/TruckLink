@@ -34,6 +34,15 @@ def message_for(event: OutboxEvent, facility_name: str) -> str:
         dwell = p.get("dwell_seconds")
         extra = f" (dwell {int(dwell) // 60} min)" if dwell else ""
         return f"RELEASED: {p.get('reg_number', '?')} left {facility_name}{extra}."
+    if event.event_type == 'RELEASE_AUTHORISED':
+        return f"Release authorised for {p.get('reg_number', '?')} at {facility_name}. Physical gate exit remains unconfirmed."
+    observations = {
+        'DOCK_VACATED':'dock vacancy', 'DEPARTED':'physical gate exit',
+        'DESTINATION_ARRIVED':'destination arrival', 'DELIVERY_ACCEPTED':'accepted delivery',
+        'DELIVERY_REJECTED':'rejected delivery', 'DELIVERY_REATTEMPT_PLANNED':'a same-destination reattempt plan',
+    }
+    if event.event_type in observations:
+        return f"Trip {p.get('trip_id', '?')}: staff recorded {observations[event.event_type]}. Observation: {p.get('observed_at', '?')}."
     return f"{event.event_type}: {json.dumps(p, default=str)}"
 
 
