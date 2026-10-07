@@ -12,7 +12,8 @@ test('tenant modelling runs synthetic evaluation without operational writes', as
   await page.getByRole('link', { name: 'Modelling', exact: true }).click()
   await page.getByRole('button', { name: 'Run synthetic model', exact: true }).click()
   await expect(page.getByText('7 of 7 expected decisions matched', { exact: false })).toBeVisible()
-  await expect(page.getByRole('alert')).toHaveCount(0)
+  // Existing critical yard alerts in the header are independent of model errors.
+  await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0)
   const downloaded = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export model evidence' }).click()
   const download = await downloaded

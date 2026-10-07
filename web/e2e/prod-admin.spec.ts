@@ -1,6 +1,31 @@
 import { test, expect } from '@playwright/test'
 
 test.use({ trace: 'off' })
+test('production connected journey schema is readable without operational writes', async ({ request }) => {
+  test.skip(!process.env.BAK_ADMIN_PIN, 'Explicit admin credentials required')
+  const api=process.env.PW_PROD_API_URL!
+  const login=await request.post(`${api}/api/auth/pin/`,{data:{staff_id:process.env.BAK_ADMIN_STAFF_ID || 'TRK-BAK-ADMIN',pin:process.env.BAK_ADMIN_PIN}})
+  expect(login.ok()).toBe(true)
+  const credentials=await login.json()
+  const headers={Authorization:`Token ${credentials.token}`}
+  try {
+    const workspace=await request.get(`${api}/api/routes/workspace/?facility=${credentials.user.facilities[0].id}`,{headers})
+    expect(workspace.ok()).toBe(true)
+    const data=await workspace.json()
+    expect(Array.isArray(data.visits)).toBe(true)
+    expect(data.organisation.id).toBe(credentials.user.organisation.id)
+    // A non-existent identity exercises the migrated journey table without creating records.
+    const missing=await request.get(`${api}/api/trips/2147483647/journey/`,{headers})
+    expect(missing.status()).toBe(404)
+    expect((await missing.json()).detail).toBe('No linked origin visit')
+    for(const trip of data.trips){
+      const response=await request.get(`${api}/api/trips/${trip.id}/journey/`,{headers})
+      expect([200,404]).toContain(response.status())
+      if(response.ok()) expect((await response.json()).journey.trip_id).toBe(trip.id)
+    }
+  } finally { await request.post(`${api}/api/auth/logout/`,{headers}) }
+})
+
 test('production renewal API accepts fresh credentials despite stale access and revokes on logout', async ({ request }) => {
   test.skip(!process.env.BAK_ADMIN_PIN, 'Explicit admin credentials required')
   const api = process.env.PW_PROD_API_URL!
@@ -45,7 +70,7 @@ test('live ADMIN PIN can switch working roles and return without changing identi
   expect(original.role).toBe('ADMIN')
   await page.getByLabel('Switch working role').selectOption('DISPATCH_SUPERVISOR')
   await expect(page.getByRole('heading', { name: 'Shift queue' })).toBeVisible()
-  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0)
   const switched = (await (await request.get(`${api}/api/auth/me/`, { headers })).json()).user
   expect(switched.id).toBe(original.id)
   expect(switched.role).toBe('DISPATCH_SUPERVISOR')
@@ -66,7 +91,7 @@ test('live ADMIN PIN can switch working roles and return without changing identi
   await expect(page).toHaveURL(/\/reports$/)
   await expect(page.getByLabel('Switch working role')).toHaveValue('ADMIN')
   await expect(page.getByText(/Last successful read/)).toBeVisible()
-  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0)
   await page.screenshot({ path: '../docs/design/bak-live-admin.png', fullPage: true })
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Gate sign-in' })).toBeVisible()
