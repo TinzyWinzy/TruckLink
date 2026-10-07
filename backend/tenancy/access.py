@@ -13,7 +13,7 @@ def enforce_request(user,request):
         return
     path = request.path
     module = None
-    if '/api/routes/' in path or '/route-plan' in path:
+    if '/api/routes/' in path or '/route-plan' in path or '/api/consignments/' in path:
         module = 'routing'
     elif '/api/regulatory/' in path and not any(x in path for x in ('knowledge','governance-audit','platform-catalogue','tenant-selections')):
         module = 'release' if 'override' in path else 'inspection'

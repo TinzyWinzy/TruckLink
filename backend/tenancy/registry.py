@@ -11,7 +11,7 @@ MODULES = {
 RESOURCE_MODULE = {'queue':'yard', 'docks':'docks', 'equipment':'docks',
     'compliance':'inspection', 'compliance_config':'inspection', 'regulatory':'inspection',
     'routes':'routing', 'reports':'reports', 'audit':'audit', 'alerts':'yard'}
-ACTION_MODULE = {'CREATE_QUEUE_ENTRY':'yard', 'ASSIGN_DOCK':'docks',
+ACTION_MODULE = {'CREATE_CONSIGNMENT':'routing', 'ALLOCATE_CONSIGNMENT':'routing', 'CREATE_QUEUE_ENTRY':'yard', 'ASSIGN_DOCK':'docks',
     'SUBMIT_COMPLIANCE':'inspection', 'EVALUATE_REGULATORY':'inspection',
     'REQUEST_OVERRIDE':'release', 'REQUEST_REGULATORY_OVERRIDE':'release',
     'DECIDE_REGULATORY_OVERRIDE':'release', 'APPROVE_OVERRIDE':'release',

@@ -86,6 +86,8 @@ class DeliveryPlan(Retained):
             raise ValidationError('Delivery plan belongs to another tenant')
         from .execution import validate_stops
         validate_stops(self.journey, self.stops)
+        if self._state.adding and self.journey.delivery_plans.filter(consignment_allocations__isnull=False).exists():
+            raise ValidationError('Retain the delivery plan that owns customer allocations')
 
 
 class ReturnOrder(Retained):
@@ -113,3 +115,71 @@ class ReturnOrder(Retained):
                 or any(not isinstance(j,str) or not j.strip() or len(j)>20 for j in self.jurisdictions)
                 or len(set(self.jurisdictions)) != len(self.jurisdictions)):
             raise ValidationError('Return route reference, fingerprint and unique declared jurisdictions required')
+
+
+class Consignment(Retained):
+    """Customer order context, separate from statutory rules and ERP acknowledgement."""
+    organisation = models.ForeignKey('trip.Organisation', on_delete=models.PROTECT)
+    facility = models.ForeignKey('core.Facility', on_delete=models.PROTECT)
+    reference = models.CharField(max_length=120)
+    customer_name = models.CharField(max_length=200)
+    customer_reference = models.CharField(max_length=120, blank=True)
+    commodity = models.CharField(max_length=200)
+    target_quantity = models.DecimalField(max_digits=13, decimal_places=3)
+    unit = models.CharField(max_length=120)
+    deadline = models.DateField(null=True, blank=True)
+    external_system = models.CharField(max_length=80, blank=True)
+    external_reference = models.CharField(max_length=120, blank=True)
+    client_key = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['organisation', 'reference'], name='unique_tenant_consignment_reference'),
+            models.UniqueConstraint(fields=['organisation', 'client_key'], name='unique_consignment_replay'),
+            models.CheckConstraint(condition=models.Q(target_quantity__gt=0), name='positive_consignment_target'),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.facility.organisation_id != self.organisation_id:
+            raise ValidationError('Consignment site belongs to another tenant')
+        if bool(self.external_system) != bool(self.external_reference):
+            raise ValidationError('External system and reference must be supplied together')
+        if self.target_quantity is not None and not 0 < self.target_quantity <= 1000000000:
+            raise ValidationError('Target quantity must be positive and at most one billion')
+        if any(not getattr(self, name).strip() for name in ('reference', 'customer_name', 'commodity', 'unit', 'client_key')):
+            raise ValidationError('Consignment identity, customer, commodity, unit and replay key are required')
+
+
+class ConsignmentAllocation(Retained):
+    """A retained delivery-plan line allocates quantity once, without changing the load."""
+    organisation = models.ForeignKey('trip.Organisation', on_delete=models.PROTECT)
+    consignment = models.ForeignKey(Consignment, on_delete=models.PROTECT, related_name='allocations')
+    plan = models.ForeignKey(DeliveryPlan, on_delete=models.PROTECT, related_name='consignment_allocations')
+    stop_index = models.PositiveSmallIntegerField()
+    reference = models.CharField(max_length=120)
+    quantity = models.DecimalField(max_digits=13, decimal_places=3)
+    client_key = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['plan', 'reference'], name='unique_allocated_plan_line'),
+            models.UniqueConstraint(fields=['consignment', 'client_key'], name='unique_allocation_replay'),
+            models.CheckConstraint(condition=models.Q(quantity__gt=0), name='positive_consignment_allocation'),
+        ]
+
+    def clean(self):
+        super().clean()
+        from decimal import Decimal
+        if (self.consignment.organisation_id != self.organisation_id or self.plan.organisation_id != self.organisation_id
+                or self.plan.journey.facility_id != self.consignment.facility_id):
+            raise ValidationError('Allocation must belong to the same tenant and origin site')
+        if self.stop_index >= len(self.plan.stops):
+            raise ValidationError('Choose a delivery stop in the retained plan')
+        line = next((item for item in self.plan.stops[self.stop_index]['consignments'] if item['reference'] == self.reference), None)
+        if not line or line['unit'] != self.consignment.unit or Decimal(str(line['quantity'])) != self.quantity:
+            raise ValidationError('Allocation quantity and unit must exactly match the retained delivery-plan line')
+        from django.db.models import Sum
+        allocated = self.consignment.allocations.exclude(pk=self.pk).aggregate(total=Sum('quantity'))['total'] or Decimal('0')
+        if allocated + self.quantity > self.consignment.target_quantity:
+            raise ValidationError('Allocation exceeds the remaining consignment quantity')

@@ -124,7 +124,7 @@ function messageFrom(data: unknown, status: number): string {
  * server's message on any non-2xx. */
 export async function apiFetch<T = unknown>(
   path: string,
-  init: { method?: string; body?: unknown; responseType?: 'json' | 'text' } = {},
+  init: { method?: string; body?: unknown; responseType?: 'json' | 'text'; signal?: AbortSignal } = {},
   retried = false,
 ): Promise<T> {
   const { method = 'GET', body } = init
@@ -140,6 +140,7 @@ export async function apiFetch<T = unknown>(
     res = await fetch(`${BASE}/api${path}`, {
       method,
       headers,
+      signal: init.signal,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {

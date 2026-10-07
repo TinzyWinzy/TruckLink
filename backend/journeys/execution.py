@@ -91,6 +91,8 @@ def record_plan(actor,link,*,stops,reason,client_key,expected_version):
         if (old.stops,old.reason,old.creator_id)!=(stops,reason,actor.pk):
             raise ValidationError('Delivery plan replay conflicts with retained data')
         return old
+    if link.delivery_plans.filter(consignment_allocations__isnull=False).exists():
+        raise ValidationError('This delivery plan has customer allocations. Retain it; plan revisions cannot replace allocated lines.')
     if link.visit.status=='RELEASED' or link.events.filter(kind='DEPARTED').exists():
         raise ValidationError('Record or revise the delivery plan before release')
     latest=current_plan(link)

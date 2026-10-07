@@ -30,7 +30,8 @@ export default function Guide() {
   function toggle(id:string){setDone(old=>{const next={...old,[id]:!old[id]};try{localStorage.setItem(key,JSON.stringify(next))}catch{/* Optional learning progress. */}return next})}
   const label=(r:Role)=>workspace?.configuration?.content.roles[r]?.label??r.replaceAll('_',' ')
   return <div className="max-w-4xl space-y-4">
-    <PageHeader title="Operational walkthrough" sub="Follow a truck from setup and yard arrival through release, delivery and exceptions. Each step names its owner and expected result." mode={live?'live':'demo'}/>
+    <PageHeader title="Operational walkthrough" sub="Follow a customer consignment and its trucks from setup through release, delivery and exceptions. Each step names its owner and expected result." mode={live?'live':'demo'}/>
+    {canVisit('consignments',role)&&<Link className="report-text-link inline-flex min-h-11 items-center" to="/consignments">Customer consignments and fulfilment →</Link>}
     <Section title={live?`${tenantDisplayName(workspace?.configuration,workspace?.organisation?.name)} review`:'Platform practice review'} sub={live?'You are viewing your assigned tenant and site. Operational actions affect live records.':'Practice uses synthetic local data. It does not write tenant records or demonstrate a connected ERP or tracker.'}>
       <p className="text-sm">Authorised tenant reviewers use individual staff accounts. External reviewers can explore the platform in practice; access to a company's operational records requires that company's authorisation.</p>
       <p className="mt-2 text-sm">Use the working-role selector if you are an Admin. Other staff stay within their assigned role. Independent approvals require a different person.</p>

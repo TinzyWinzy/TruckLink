@@ -85,6 +85,7 @@ export default function JourneyPanel({ trip, workspace, onChange }: { trip: Rout
     </>}
     {journey && <>
       <p className="mt-3 text-sm font-semibold">Journey {journey.id} / Trip {trip.id} / Visit {journey.visit_id}</p>
+      {!!journey.customer_consignments?.length && <div className="mt-3 border-l-2 border-amber-500 pl-3"><p className="font-semibold">Customer consignments</p><ul>{journey.customer_consignments.map(item=><li key={item.id} className="mt-1 text-sm"><Link className="report-text-link" to={`/consignments?order=${item.consignment_id}`}>{item.consignment__reference} · {item.consignment__customer_name}</Link> · {item.quantity} {item.consignment__unit} · Stop {item.stop_index+1}</li>)}</ul></div>}
       <p className="mt-1 text-sm">{journey.stage.replaceAll('_',' ')} · Yard: {journey.yard_status}{journey.dock ? ` · Assigned dock: ${journey.dock}${journey.dock_occupied === false ? ' (no longer occupied by this visit)' : ''}` : ''}</p>
       {journey.external_reference && <p className="mt-1 break-words text-sm">Recorded reference: {journey.external_reference.system} / {journey.external_reference.reference}</p>}
       {journey.milestone_semantics === 'LEGACY_COMBINED' && <p className="mt-2 text-sm text-amber-800">Historical release combines yard milestones. Its exit timestamp does not independently prove physical departure.</p>}

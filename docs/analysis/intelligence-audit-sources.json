@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "id": "operational-intelligence-foundation",
+      "title": "Trucki has a rule-based intelligence foundation",
+      "queries": [{
+        "id": "local-source-review",
+        "summary": "Recorded blockers, ownership, versioned evaluations, delivery outcomes and consignment quantities support explainable operational decisions.",
+        "source": {
+          "label": "Trucki working tree",
+          "files": [{"label": "backend/core/operations_views.py"}, {"label": "backend/regulatory/engine/evaluator.py"}, {"label": "backend/journeys/views.py"}, {"label": "backend/journeys/consignments.py"}],
+          "filters": ["Scope: local working tree reviewed on 7 October 2026"],
+          "caveats": ["Consignment changes are local and have not been deployed.", "This audit did not perform a fresh production walkthrough or measure customer operating performance."]
+        }
+      }]
+    },
+    {
+      "id": "intelligence-gaps",
+      "title": "Analytics lineage and metric semantics need repair",
+      "queries": [{
+        "id": "analytics-source-review",
+        "summary": "The legacy analytics client requires Firebase identity while staff operations use Django tokens. Report calculations use fixed thresholds, mix legacy completion proxies with physical exits, and omit duration sample counts. The handoff API selects the latest 100 visits.",
+        "source": {
+          "label": "Trucki analytics and handoff code",
+          "files": [{"label": "web/src/lib/analytics.ts"}, {"label": "web/src/lib/api.ts"}, {"label": "web/src/routes/Reports.tsx"}, {"label": "backend/yard/reports.py"}, {"label": "backend/core/operations_views.py"}],
+          "caveats": ["These are source-level findings; no production load benchmark or adapter connectivity test was performed."]
+        }
+      }]
+    },
+    {
+      "id": "opportunity-fit",
+      "title": "Handoff, readiness and bottleneck opportunities fit existing records",
+      "assumptions": ["Priorities reflect technical fit and dependency cost, not validated willingness to pay."],
+      "queries": [{
+        "id": "opportunity-evidence",
+        "summary": "Existing blockers, evidence expiry, journey events, ownership and consignment deadlines support investigating exception resolution, departure readiness, historical handoffs and customer obligation visibility. ERP/tracker reconciliation and reliable ETA prediction require configured feeds and outcome validation.",
+        "source": {
+          "label": "Trucki decision inputs",
+          "files": [{"label": "backend/core/operations_views.py"}, {"label": "backend/journeys/models.py"}, {"label": "backend/journeys/consignments.py"}, {"label": "backend/trip/models.py"}],
+          "caveats": ["ERP and tracking are explicitly NOT_CONFIGURED in the journey response.", "Current visit age is not current handoff or blocker age.", "Returned consignment reservations still need correction and replacement-dispatch support."]
+        }
+      }]
+    },
+    {
+      "id": "synthetic-validation",
+      "title": "Sixty synthetic scenarios validate bounded calculation behaviour",
+      "queries": [{
+        "id": "audit-computation",
+        "summary": "Twenty paired seeds across two, three and four docks produced 60 runs. Seven invented evaluator cases matched expected decisions in every run. Added docks reduced simulated mean waiting without changing blocked counts. Separate invented rows demonstrated duration-denominator and threshold sensitivity.",
+        "source": {
+          "label": "Executed synthetic audit",
+          "files": [{"label": "docs/analysis/run_intelligence_audit.py"}, {"label": "docs/analysis/intelligence-audit-results.json"}, {"label": "docs/analysis/trucki_intelligence_audit.ipynb"}],
+          "filters": ["Population: invented records only", "Capacity inputs: 72 arrivals per run", "Arrival rate: 36 per hour", "Mean service: 20 minutes", "Seeds: 0 through 19"],
+          "caveats": ["These checks do not establish real-world forecast accuracy, customer savings or verified law.", "Only PASS cases consume simulated docks.", "Notebook code executed sequentially with a standard-library runner; full Jupyter format validation and rendered presentation inspection were not performed."],
+          "evidenceFlow": [{"kind": "validation", "title": "Observed checks", "text": "All 60 scenario runs completed. Repeated seed 42 produced the same digest. Blocked counts matched for each paired dock comparison. A five-row invented report counted five total rows but only three valid durations. The same 75-minute movement breached 60 minutes and did not breach 90 minutes."}]
+        }
+      }]
+    },
+    {
+      "id": "competitive-category",
+      "title": "The category exists and established products overlap",
+      "queries": [{
+        "id": "primary-vendor-documents",
+        "summary": "project44 describes disconnected handoffs between planning, transit and site operations. SAP documents transport event monitoring, proactive alerting and exception resolution. These support category relevance and competitive overlap, not either prospect's unmet need.",
+        "source": {
+          "label": "Primary vendor sources",
+          "links": [{"label": "project44 decision handoffs", "href": "https://www.project44.com/blog/fixing-the-decision-handoff-problem-why-execution-breaks-between-planning-and-the-yard/"}, {"label": "SAP transport execution", "href": "https://learning.sap.com/courses/business-processes-in-sap-s-4hana-transportation-management/monitoring-the-execution-of-the-freight-documents_dc3c1a53-b3d0-4cfa-aa57-5cc76ee06c74"}],
+          "caveats": ["Vendor descriptions do not independently establish Trucki's ROI or superiority.", "Neither prospect's ERP or tracker vendor is known."]
+        }
+      }]
+    },
+    {
+      "id": "customer-validation-status",
+      "title": "Customer pain and financial value remain unconfirmed",
+      "queries": [{
+        "id": "user-confirmation",
+        "summary": "The user selected: No specific problem confirmed yet. The proposed next step is to trace actual difficult movements with Samuel and Tariro and test incremental actionable decisions alongside existing systems.",
+        "source": {
+          "label": "User clarification, 7 October 2026",
+          "caveats": ["Tariro's reported ERP capabilities concern Trinitas, not BAK.", "The discovery and shadow-pilot sequence is a recommendation, not completed validation.", "No statutory instrument or monetary penalty is asserted to be verified law."]
+        }
+      }]
+    }
+  ]
+}

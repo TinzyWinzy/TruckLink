@@ -1,5 +1,6 @@
 export type Consignment = { reference:string; quantity:string|number; unit:string }
 export type Journey = {
+  customer_consignments?:{id:number;reference:string;consignment_id:number;consignment__reference:string;consignment__customer_name:string;quantity:string;consignment__unit:string;stop_index:number}[];
   id:number; trip_id:number; visit_id:number; stage:string; yard_status:string; dock:string|null;
   integrations:{erp:string;tracking:string}; external_reference:{system:string;reference:string}|null;
   milestone_semantics?:string; dock_occupied?:boolean; can_withdraw_release?:boolean;

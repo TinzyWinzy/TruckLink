@@ -1,6 +1,8 @@
 from core.modelling_views import model_workspace
+from yard.dashboard import DashboardView
 """URL routes."""
 from django.urls import path
+from journeys import consignments
 from compliance import views as compliance_views
 from core import views as core_views
 from core import audit_views as core_audit_views
@@ -11,6 +13,8 @@ from core.walkthrough_views import walkthrough
 from core.operations_views import operations,pending_approvals,movement_owner
 
 urlpatterns = [
+    path('consignments/', consignments.workspace),
+    path('consignments/<int:pk>/', consignments.workspace),
     path('operations/',operations),
     path('operations/<int:pk>/owner/',movement_owner),
     path('pending-approvals/',pending_approvals),
@@ -99,6 +103,7 @@ urlpatterns = [
     path("alerts/<int:pk>/ack/", yard_views.AlertAckView.as_view()),
     # Reports + admin demo yard (yard app)
     path("reports/turnaround/", yard_views.TurnaroundReportView.as_view()),
+    path("reports/dashboard/", DashboardView.as_view()),
     path("reports/export.csv", yard_views.ReportExportView.as_view()),
     path("admin/seed/", yard_views.AdminSeedView.as_view()),
     path("admin/reset/", yard_views.AdminResetView.as_view()),

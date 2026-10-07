@@ -54,7 +54,8 @@ def audit_entry(row,facility):
         'timestamp':row.timestamp.isoformat(),'timezone':facility.timezone,
         'previous_hash':row.previous_hash,'hash':row.hash,
         'references':{'visit':payload.get('queue_entry_id',payload.get('queueEntryId')),
-            'trip':payload.get('trip_id'),'vehicle':payload.get('reg_number',payload.get('licensePlate'))},
+            'trip':payload.get('trip_id'),'vehicle':payload.get('reg_number',payload.get('licensePlate')),
+            'consignment':payload.get('consignment_id'),'order_reference':payload.get('consignment_reference',payload.get('reference') if row.action=='CREATE_CONSIGNMENT' else None)},
         'reason':payload.get('reason',payload.get('notes')),
         'previous_state':payload.get('previous_state',payload.get('from_status')),
         'new_state':payload.get('new_state',payload.get('to_status',payload.get('status')))}

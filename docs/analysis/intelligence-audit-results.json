@@ -1,0 +1,71 @@
+{
+  "synthetic": true,
+  "customer_data": false,
+  "verified_law": false,
+  "source_sha256": {
+    "backend/regulatory/modelling.py": "4cbd88017fe2484e61aa38f9aa86674b57c507a164ed47c1158dcb8a2e8b7e25",
+    "backend/yard/reports.py": "1774a4ac34d783a68c6fbebaba82787d8a03bf354ee7904b74951c0b5924b945",
+    "backend/regulatory/services.py": "6d4058251183341674df9dc77457ae41cf22ef798e380fd3cc3226520ba2c2b8",
+    "backend/regulatory/engine/evaluator.py": "a299dc963024f109147e70321e30f7c3731a150fcedcbb370d5f1d9ae18434ac",
+    "backend/compliance/policy.py": "c94a90609c363d43e54cc06602482ea6456a3b3847b12c66507472cb93f872a1"
+  },
+  "capacity_stress_test": [
+    {
+      "docks": 2,
+      "mean_of_run_mean_wait_minutes": 151.08,
+      "min_run_mean_wait_minutes": 114.5,
+      "max_run_mean_wait_minutes": 192.1,
+      "mean_blocked": 28.75
+    },
+    {
+      "docks": 3,
+      "mean_of_run_mean_wait_minutes": 80.42,
+      "min_run_mean_wait_minutes": 55.17,
+      "max_run_mean_wait_minutes": 111.38,
+      "mean_blocked": 28.75
+    },
+    {
+      "docks": 4,
+      "mean_of_run_mean_wait_minutes": 46.33,
+      "min_run_mean_wait_minutes": 25.37,
+      "max_run_mean_wait_minutes": 71.16,
+      "mean_blocked": 28.75
+    }
+  ],
+  "capacity_checks": {
+    "paired_seeds": 20,
+    "runs": 60,
+    "seven_cases_match_all_runs": true,
+    "blocked_counts_unchanged_by_dock_count": true,
+    "repeatable_digest": true
+  },
+  "duration_coverage": {
+    "reported": {
+      "total": 5,
+      "byStatus": {
+        "RELEASED": 2,
+        "COMPLETED": 1,
+        "QUEUED": 2
+      },
+      "avgWaitMinutes": 75.0,
+      "avgTurnaroundMinutes": 60.0,
+      "overdueCount": 1
+    },
+    "physical_exit_only": {
+      "total": 1,
+      "byStatus": {
+        "RELEASED": 1
+      },
+      "avgWaitMinutes": null,
+      "avgTurnaroundMinutes": 100.0,
+      "overdueCount": 0
+    },
+    "valid_duration_rows": 3,
+    "excluded_duration_rows": 2,
+    "legacy_proxy_completed_rows": 1
+  },
+  "threshold_sensitivity": {
+    "60": 1,
+    "90": 0
+  }
+}

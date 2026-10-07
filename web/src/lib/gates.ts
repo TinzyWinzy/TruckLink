@@ -2,9 +2,10 @@
 
 import { canAccess, useSession, type Role } from '../store/session'
 
-export type RouteKey = 'dispatch' | 'approvals' | 'queue' | 'docks' | 'compliance' | 'alerts' | 'reports' | 'audit' | 'admin' | 'hub' | 'guide' | 'modelling' | 'routes' | 'evidence' | 'deliveries' | 'recovery'
+export type RouteKey = 'consignments' | 'dispatch' | 'approvals' | 'queue' | 'docks' | 'compliance' | 'alerts' | 'reports' | 'audit' | 'admin' | 'hub' | 'guide' | 'modelling' | 'routes' | 'evidence' | 'deliveries' | 'recovery'
 
 export const ROUTE_GATES: Record<RouteKey, Role[]> = {
+  consignments: ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER','COMPLIANCE_OFFICER','EXECUTIVE','ADMIN'],
   evidence: ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER','COMPLIANCE_OFFICER','EXECUTIVE','ADMIN'],
   deliveries: ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER','COMPLIANCE_OFFICER','EXECUTIVE','ADMIN'],
   recovery: ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER','COMPLIANCE_OFFICER','EXECUTIVE','ADMIN'],
@@ -34,9 +35,9 @@ export function canVisit(route: RouteKey, role: Role | null): boolean {
   if (!canAccess(role, ROUTE_GATES[route])) return false
   const tenant = useSession.getState().workspace?.configuration
   const config = tenant?.content
-  const modules: Partial<Record<RouteKey,string>> = { evidence:'inspection',deliveries:'routing',recovery:'yard',dispatch:'yard',approvals:'inspection',queue:'yard',docks:'docks',compliance:'inspection',alerts:'yard',routes:'routing',reports:'reports',modelling:'modelling',audit:'audit' }
+  const modules: Partial<Record<RouteKey,string>> = { consignments:'routing',evidence:'inspection',deliveries:'routing',recovery:'yard',dispatch:'yard',approvals:'inspection',queue:'yard',docks:'docks',compliance:'inspection',alerts:'yard',routes:'routing',reports:'reports',modelling:'modelling',audit:'audit' }
   if (modules[route] && tenant?.modules?.[modules[route]!] === false) return false
-  const resource = route === 'dispatch'||route === 'approvals'||route === 'evidence' ? 'compliance' : route === 'deliveries' ? 'routes' : route === 'recovery' ? 'queue' : route
+  const resource = route === 'dispatch'||route === 'approvals'||route === 'evidence' ? 'compliance' : route === 'deliveries'||route === 'consignments' ? 'routes' : route === 'recovery' ? 'queue' : route
   const allowed = config?.permissions[resource + '.read']
   return !config || (config.roles[role!]?.enabled !== false && (!allowed || allowed.includes(role!)))
 }

@@ -35,7 +35,9 @@ def delivery_workspace(request):
     if query:
         from django.db.models import Q
         links = links.filter(Q(visit__reg_number__icontains=query) | Q(trip__destination__icontains=query)
-                             | Q(trip__driver__name__icontains=query) | Q(external_reference__icontains=query))
+                             | Q(trip__driver__name__icontains=query) | Q(external_reference__icontains=query)
+                             | Q(delivery_plans__consignment_allocations__consignment__reference__icontains=query)
+                             | Q(delivery_plans__consignment_allocations__consignment__customer_name__icontains=query)).distinct()
     total = links.count()
     from trip.route_views import row
     records = []
@@ -43,7 +45,7 @@ def delivery_workspace(request):
         journey = timeline(link, request.user, include_history=False)
         records.append({'trip': row(link.trip), 'journey': {key: journey[key] for key in (
             'trip_id', 'visit_id', 'stage', 'next_action', 'delivery_stops', 'returns', 'closure',
-            'integrations', 'physical_exit_at', 'position')}})
+            'integrations', 'physical_exit_at', 'position', 'customer_consignments')}})
     return Response({'records': records, 'total': total, 'page': page, 'page_size': 20,
         'as_of': timezone.now(), 'facility': {'id': facility.pk, 'name': facility.name},
         'organisation': {'id': facility.organisation_id, 'name': facility.organisation.name},
@@ -148,7 +150,12 @@ def timeline(link,actor=None,include_history=True):
             reg_number__iexact=visit.reg_number).exclude(pk=visit.pk).exclude(status='RELEASED').order_by('-entry_timestamp')[:100]:
         if departure and row.entry_timestamp>=departure.observed_at:
             receiving.append({'id':row.pk,'facility_id':row.facility_id,'reg_number':row.reg_number})
+    from .models import ConsignmentAllocation
+    customer_consignments = list(ConsignmentAllocation.objects.filter(plan__journey=link,
+        organisation=link.organisation, consignment__facility=link.facility).values(
+            'id','reference','consignment_id','consignment__reference','consignment__customer_name','quantity','consignment__unit','stop_index'))
     return {'id':link.pk,'trip_id':trip.pk,'visit_id':visit.pk,'facility_id':link.facility_id,
+        'customer_consignments':customer_consignments,
         'stage':stage,'milestone_semantics':visit.milestone_semantics,'dock_occupied':dock_occupied,
         'release_authorized_at':visit.release_authorized_at,'dock_vacated_at':visit.dock_vacated_at,
         'physical_exit_at':departure.observed_at if departure else None,

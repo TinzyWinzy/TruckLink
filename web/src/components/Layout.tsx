@@ -9,6 +9,7 @@ import { ROUTE_GATES, canVisit, landingPathForRole } from '../lib/gates'
 import { tenantLabel, tenantDisplayName } from '../lib/tenant'
 
 const PRIMARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] = [
+  { to: '/consignments', label: 'Consignments', route: 'consignments' },
   { to: '/dispatch', label: 'Dispatch flow', route: 'dispatch' },
   { to: '/approvals', label: 'Pending approvals', route: 'approvals' },
   { to: '/evidence', label: 'Evidence', route: 'evidence' },
