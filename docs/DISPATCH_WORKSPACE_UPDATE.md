@@ -35,3 +35,14 @@ Results and deployment IDs are appended after the production checks. One migrati
 - Seven local Chromium contracts passed across desktop/mobile: guided setup to physical exit, offline arrival/reconnection/reload, existing connected journey and rejected-delivery recovery, inspection setup, return receiving/receipt, site walkthrough and API-free external practice.
 - Synthetic desktop/mobile guided-dispatch screenshots are retained under `docs/design/`. All operation-changing browser responses in these tests are intercepted; backend tests independently execute the real services and permission checks.
 - Django system and migration drift checks passed. Production verification is read-only for operational records; authentication/session/working-role audit effects are permitted.
+
+### Production release
+
+- Application commit: `89d883be88e1850024e21d935a4f7899ad82a322`.
+- Backend deployment: `dep-db33ua3rjlhs738304f0`, live on Render at that commit. Startup applies `yard.0007_movementownership`; successful operations and owner workspace reads exercise the new table.
+- Frontend deployment: `dpl_2m9PxBUcegHkX3jDNyBUzcnMcs7t`, Ready. Immutable URL: https://trucki-hartl5tkn-brandontinozs-projects.vercel.app/ . Promoted to https://trucki-two.vercel.app/ after the backend became live.
+- All 13 production browser/API checks passed serially: sign-in, working-role continuity, session renewal/logout, assigned-site walkthrough/setup, read-only journey schema, Compliance landing and inspection, guided dispatch, filtered audit CSV download, Executive route permissions, disabled dock creation, mobile gate and synthetic practice navigation/refresh. Authenticated traces were disabled.
+- Entry 1 retains `VEHICLE`, `TRIP`, `RATINGS`, `LOAD` blockers and zero eligible trip, reviewed configuration and load choices. No customer records, docks, staff accounts, approvals, ownership assignments or operational movements were created by production verification.
+- Final ownership suite: six backend operations checks passed, including independent review, named-owner scoping, stale assignment rejection, immutable history and full synthetic dispatch. Frontend ownership controls are included in the 90 passed unit checks.
+
+- A subsequent focused production check also confirmed the named-owner form loads eligible staff and requires a reason, without submitting an assignment. Explicit navigation waits were added to the test so full-page navigation cannot interrupt an in-flight working-role change.

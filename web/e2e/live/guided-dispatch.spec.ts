@@ -37,7 +37,7 @@ test('guided dispatch connects setup, inspection, release and physical exit',asy
   await page.getByLabel('Axle 1',{exact:true}).fill('1000');await page.getByLabel('Axle 2',{exact:true}).fill('1000');await page.getByLabel('Total',{exact:true}).fill('2000');for(const box of await page.getByRole('checkbox').all())await box.check()
   await page.getByRole('button',{name:'Record versioned inspection'}).click();await expect(page.getByRole('heading',{name:'Separate release decision'})).toBeVisible()
   await page.getByRole('button',{name:'Authorise yard release'}).click();await expect(page.getByRole('region',{name:'Connected journey'})).toBeVisible()
-  await page.setViewportSize({width:390,height:1000});await page.getByLabel('Observation reason').fill('Synthetic physical exit observed');await page.screenshot({path:'../docs/design/guided-dispatch-mobile.png',fullPage:true})
+  await page.setViewportSize({width:390,height:1000});await page.getByLabel('Observation reason').fill('Synthetic physical exit observed');await page.evaluate(()=>{(document.activeElement as HTMLElement)?.blur();window.scrollTo({top:0,behavior:"instant"})});await page.screenshot({path:'../docs/design/guided-dispatch-mobile.png',fullPage:true})
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
   await page.getByRole('button',{name:'Record departed',exact:true}).click();await expect(page.getByText('DEPARTED · Yard: RELEASED')).toBeVisible();expect(saved&&departed).toBe(true);expect(errors).toEqual([])
 })
