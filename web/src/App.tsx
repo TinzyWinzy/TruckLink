@@ -18,6 +18,9 @@ const Hub = lazy(() => import('./routes/Hub'))
 const Guide = lazy(() => import('./routes/Guide'))
 const DispatchFlow = lazy(() => import('./routes/DispatchFlow'))
 const PendingApprovals = lazy(() => import('./routes/PendingApprovals'))
+const Evidence = lazy(() => import('./routes/Evidence'))
+const Deliveries = lazy(() => import('./routes/Deliveries'))
+const Recovery = lazy(() => import('./routes/Recovery'))
 const AuthReady = createContext(false)
 
 /** Role gate per ROUTE_GATES. Mismatch renders a dead-end, never a redirect loop. */
@@ -99,6 +102,9 @@ export default function App() {
       </div> : !authReady ? <Fallback /> : <>
       <Suspense fallback={<Fallback />}>
       <Routes>
+        <Route path="/evidence" element={<RoleGuard route="evidence"><Layout><Evidence /></Layout></RoleGuard>} />
+        <Route path="/deliveries" element={<RoleGuard route="deliveries"><Layout><Deliveries /></Layout></RoleGuard>} />
+        <Route path="/recovery" element={<RoleGuard route="recovery"><Layout><Recovery /></Layout></RoleGuard>} />
         <Route path="/dispatch" element={<RoleGuard route="dispatch"><Layout><DispatchFlow /></Layout></RoleGuard>} />
         <Route path="/approvals" element={<RoleGuard route="approvals"><Layout><PendingApprovals /></Layout></RoleGuard>} />
         <Route path="/routes" element={<RoleGuard route="routes"><Layout><RoutesMap /></Layout></RoleGuard>} />

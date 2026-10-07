@@ -79,6 +79,44 @@ class RegistryView(TenantView):
         return command(create)
 
 
+class EvidenceWorkspaceView(TenantView):
+    """Tenant-owned evidence register and labelled choices; no review or expiry inference."""
+    def get(self, request):
+        from core.rbac import rbac_allows
+        from trip.models import Vehicle, Driver, Trip
+        from django.utils import timezone
+        org = get_user_organisation(request.user)
+        role = get_user_role(request.user)
+        if not rbac_allows(role, 'compliance', 'read', org):
+            return Response({'detail': 'Tenant inspection read access required'}, status=403)
+        rows = m.EvidenceRevision.objects.filter(organisation=org).select_related('vehicle', 'driver', 'trip', 'load').order_by('-created_at', '-pk')
+        query = request.query_params.get('q', '').strip()[:100]
+        if query:
+            from django.db.models import Q
+            rows = rows.filter(Q(evidence_key__icontains=query) | Q(kind__icontains=query)
+                | Q(vehicle__plate__icontains=query) | Q(driver__name__icontains=query)
+                | Q(trip__destination__icontains=query) | Q(load__reference__icontains=query))
+        records = []
+        for record in rows[:200]:
+            data = output(record)
+            entity = next(key for key in ('vehicle', 'driver', 'trip', 'load') if getattr(record, key+'_id'))
+            obj = getattr(record, entity)
+            data.update(entity_type=entity, entity_label= str(getattr(obj, 'plate', None)
+                or getattr(obj, 'name', None) or getattr(obj, 'reference', None) or f'Trip {obj.pk}: {obj.origin} to {obj.destination}'))
+            records.append(data)
+        def choices(model, field):
+            return [{'id': obj.pk, 'label': getattr(obj, field)} for obj in model.objects.filter(
+                organisation=org, is_deleted=False).order_by('-pk')[:200]]
+        return Response({'records': records, 'total': rows.count(), 'limit': 200,
+            'as_of': timezone.now(), 'scope': 'Tenant-wide master evidence; operational movements remain site-scoped.',
+            'can_create': role in s.REVIEWERS and rbac_allows(role, 'regulatory', 'review', org),
+            'choices': {'vehicle': choices(Vehicle, 'plate'), 'driver': choices(Driver, 'name'),
+                'trip': [{'id': obj.pk, 'label': f'Trip {obj.pk}: {obj.origin} to {obj.destination}'}
+                    for obj in Trip.objects.filter(organisation=org).order_by('-pk')[:200]],
+                'load': [{'id': obj.pk, 'label': obj.reference} for obj in m.Load.objects.filter(organisation=org).order_by('-pk')[:200]]},
+            'choices_limit': 200})
+
+
 class ReviewView(TenantView):
     def post(self, request):
         data = self.validate(z.ReviewSerializer, request.data)

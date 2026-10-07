@@ -14,6 +14,42 @@ import json
 from yard.models import AuditLog
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def delivery_workspace(request):
+    """Origin-site board. Reuses authoritative journey state; GET never records events."""
+    facility = find_facility(str(request.query_params.get('facility', '')), request.user)
+    if not facility:
+        return Response({'detail': 'Site not found'}, status=404)
+    try:
+        authorize(request.user, facility, 'read')
+    except PermissionError as exc:
+        return Response({'detail': str(exc)}, status=403)
+    try:
+        page = max(1, int(request.query_params.get('page', '1')))
+    except ValueError:
+        return Response({'detail': 'Page must be an integer'}, status=400)
+    links = JourneyLink.objects.filter(organisation=facility.organisation, facility=facility).select_related(
+        'trip__vehicle', 'trip__driver', 'visit__assigned_dock', 'facility').order_by('-pk')
+    query = request.query_params.get('q', '').strip()[:100]
+    if query:
+        from django.db.models import Q
+        links = links.filter(Q(visit__reg_number__icontains=query) | Q(trip__destination__icontains=query)
+                             | Q(trip__driver__name__icontains=query) | Q(external_reference__icontains=query))
+    total = links.count()
+    from trip.route_views import row
+    records = []
+    for link in links[(page-1)*20:page*20]:
+        journey = timeline(link, request.user, include_history=False)
+        records.append({'trip': row(link.trip), 'journey': {key: journey[key] for key in (
+            'trip_id', 'visit_id', 'stage', 'next_action', 'delivery_stops', 'returns', 'closure',
+            'integrations', 'physical_exit_at', 'position')}})
+    return Response({'records': records, 'total': total, 'page': page, 'page_size': 20,
+        'as_of': timezone.now(), 'facility': {'id': facility.pk, 'name': facility.name},
+        'organisation': {'id': facility.organisation_id, 'name': facility.organisation.name},
+        'scope': 'Linked journeys originating at the selected yard. ERP and commercial closure are separate.'})
+
+
 class LinkInput(serializers.Serializer):
     facility = serializers.CharField()
     visit_id = serializers.IntegerField(min_value=1)
@@ -47,7 +83,7 @@ class EventInput(serializers.Serializer):
         return data
 
 
-def timeline(link,actor=None):
+def journey_history(link):
     visit, trip = link.visit, link.trip
     events = [{'id':f'visit:{visit.pk}','kind':'REGISTERED','at':visit.entry_timestamp,'actor_id':visit.created_by_id}]
     for audit in AuditLog.objects.filter(organisation=link.organisation,facility=link.facility,action='ASSIGN_DOCK').order_by('timestamp'):
@@ -81,8 +117,13 @@ def timeline(link,actor=None):
     for order in link.returns.order_by('pk'):
         events.append({'id':f'return:{order.pk}','kind':'RETURN_AUTHORISED','at':order.created_at,
             'actor_id':order.creator_id,'reason':order.reason,'return_order_id':order.pk,'stop_index':order.rejection.stop_index})
-    latest = link.events.order_by('-observed_at','-pk').first()
-    stage = latest.kind if latest else 'YARD_RELEASE_AUTHORISED' if visit.status=='RELEASED' else 'AT_ORIGIN'
+    return events
+
+
+def timeline(link,actor=None,include_history=True):
+    visit, trip = link.visit, link.trip
+    events = journey_history(link) if include_history else []
+    releases = ReleaseRecord.objects.filter(queue_entry=visit)
     dock_occupied = bool(visit.assigned_dock_id and visit.assigned_dock.current_entry_id == visit.pk)
     position = trip.positions.order_by('-timestamp','-pk').first()
     departure = link.events.filter(kind='DEPARTED').first()

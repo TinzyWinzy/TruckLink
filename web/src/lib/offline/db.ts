@@ -19,7 +19,10 @@ export interface PendingAction {
   apiBase?: string
   state?: 'PENDING' | 'BLOCKED'
   nextAttemptAt?: number
+  retryable?: boolean
 }
+
+export interface RecoveryRecord { id:string; actionId:string; actorId:string; facilityId:string; apiBase:string; at:number; reason:string; priorError:string; priorRetryCount:number }
 
 export interface GateInspection {
   id?: number
@@ -50,6 +53,7 @@ export class LocalAppDatabase extends Dexie {
   pendingActions!: Table<PendingAction, string>
   inspections!: Table<GateInspection, number>
   syncQueue!: Table<SyncQueueItem, number>
+  recoveryRecords!: Table<RecoveryRecord, string>
 
   constructor(name = 'OperationalLocalDB') {
     super(name)
@@ -80,6 +84,12 @@ export class LocalAppDatabase extends Dexie {
       for (let i = 0; i < rows.length; i++) {
         await tx.table('pendingActions').update(rows[i].id, { sequence: i + 1 })
       }
+    })
+    this.version(4).stores({
+      pendingActions: 'id, actionType, timestamp, sequence, actorId, facilityId, state',
+      inspections: '++id, vehicleReg, status, timestamp, synced',
+      syncQueue: '++id, action, timestamp',
+      recoveryRecords: 'id, actionId, actorId, facilityId, at',
     })
   }
 }
@@ -194,6 +204,7 @@ export async function recordActionFailure(id: string, error: string, permanent =
     if (!found) return null
     found.retryCount += 1
     found.lastError = error
+    found.retryable = !permanent
     found.state = permanent || found.retryCount >= MAX_RETRIES ? 'BLOCKED' : 'PENDING'
     found.nextAttemptAt = Date.now() + Math.min(300000, 5000 * 2 ** (found.retryCount - 1))
     await db.pendingActions.put(found)
@@ -204,6 +215,7 @@ export async function recordActionFailure(id: string, error: string, permanent =
     if (!found) return null
     found.retryCount += 1
     found.lastError = error
+    found.retryable = !permanent
     found.state = permanent || found.retryCount >= MAX_RETRIES ? 'BLOCKED' : 'PENDING'
     found.nextAttemptAt = Date.now() + Math.min(300000, 5000 * 2 ** (found.retryCount - 1))
     try {
@@ -217,6 +229,34 @@ export async function recordActionFailure(id: string, error: string, permanent =
 
 export async function pendingActionCount(): Promise<number> {
   return (await listPendingActions()).length
+}
+
+/** A submission stays with its original staff identity, site and backend. */
+export function ownsPendingAction(action: Pick<PendingAction,'actorId'|'facilityId'|'apiBase'>): boolean {
+  const actor = useSession.getState().userId
+  return !!actor && !isPracticeSession(actor) && !!apiBase && !!facilityId
+    && action.actorId === actor && action.facilityId === facilityId && action.apiBase === apiBase
+}
+
+export function canRetryPendingAction(action: PendingAction): boolean {
+  return ownsPendingAction(action) && action.actionType === 'queue.create' && action.state === 'BLOCKED' && action.retryable === true
+}
+
+/** Retry exhausted transient arrivals without changing payload or idempotency key.
+ * Rejected requests and unknown historical failures require manual reconciliation. */
+export async function retryPendingAction(id:string, reason:string): Promise<void> {
+  if (!reason.trim() || reason.length > 1000) throw new Error('Record a retry reason (up to 1,000 characters).')
+  await migrateLegacyOnce()
+  await db.transaction('rw',db.pendingActions,db.recoveryRecords,async()=>{
+    const action=await db.pendingActions.get(id)
+    if (!action || !canRetryPendingAction(action)) throw new Error('This submission cannot be retried by this session. Reconcile it with the site supervisor.')
+    await db.recoveryRecords.add({id:newId(),actionId:action.id,actorId:action.actorId!,facilityId:action.facilityId!,apiBase:action.apiBase!,at:Date.now(),reason:reason.trim(),priorError:action.lastError??'',priorRetryCount:action.retryCount})
+    await db.pendingActions.put({...action,state:'PENDING',retryCount:0,nextAttemptAt:0})
+  })
+}
+
+export async function listRecoveryRecords(): Promise<RecoveryRecord[]> {
+  return (await db.recoveryRecords.orderBy('at').reverse().toArray()).filter(ownsPendingAction)
 }
 
 /** Synchronous legacy shim — deprecated, kept for header badge initial paint only. */

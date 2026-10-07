@@ -34,6 +34,7 @@ export default function Guide() {
     <Section title={live?`${tenantDisplayName(workspace?.configuration,workspace?.organisation?.name)} review`:'Platform practice review'} sub={live?'You are viewing your assigned tenant and site. Operational actions affect live records.':'Practice uses synthetic local data. It does not write tenant records or demonstrate a connected ERP or tracker.'}>
       <p className="text-sm">Authorised tenant reviewers use individual staff accounts. External reviewers can explore the platform in practice; access to a company's operational records requires that company's authorisation.</p>
       <p className="mt-2 text-sm">Use the working-role selector if you are an Admin. Other staff stay within their assigned role. Independent approvals require a different person.</p>
+      <div className="mt-3 flex flex-wrap gap-3">{canVisit('evidence',role)&&<Link className="report-text-link" to="/evidence">Evidence and renewals</Link>}{canVisit('deliveries',role)&&<Link className="report-text-link" to="/deliveries">Deliveries and exceptions</Link>}{canVisit('recovery',role)&&<Link className="report-text-link" to="/recovery">Device recovery desk</Link>}</div>
       {!live&&<p className="mt-2 text-sm">Explore screens in the navigation, then return here. Full return and recovery commands require an authorised live journey; this guide explains their prerequisites.</p>}
     </Section>
     {live&&<Section title="Current site readiness" sub="Read-only inventory. Counts do not certify a truck or authorise release.">

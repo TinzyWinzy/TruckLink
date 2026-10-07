@@ -4,6 +4,7 @@ from . import views as v
 from .catalogue import CatalogueView, SelectionView
 
 urlpatterns = [
+    path('evidence-workspace/', v.EvidenceWorkspaceView.as_view()),
     path('knowledge/',knowledge_api.knowledge),
     path('knowledge/<int:pk>/review/',knowledge_api.review),
     path('knowledge/import-legacy/',knowledge_api.import_legacy),

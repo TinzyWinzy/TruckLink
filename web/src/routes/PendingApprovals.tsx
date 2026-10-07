@@ -17,7 +17,7 @@ export default function PendingApprovals(){
   }
   return <div className="max-w-4xl space-y-4"><PageHeader title="Pending approvals" sub="Independent evidence review and site-specific operational exceptions have different permissions." mode={live?'live':'demo'}/>
     {!live?<Section title="Practice review boundary"><p className="text-sm">Use separate authorised accounts in an isolated training workspace to test independent approval. Local practice does not record regulatory reviews.</p><Link className="report-text-link" to="/guide">Review the workflow guide</Link></Section>:<>
-      <div className="flex flex-wrap gap-3"><button className="report-text-link" onClick={()=>setVersion(n=>n+1)}>Refresh pending reviews</button>{data&&<p className="text-xs">Read {new Date(data.as_of).toLocaleString()} · {data.scope}</p>}</div>
+      <div className="flex flex-wrap gap-3"><button className="report-text-link" onClick={()=>setVersion(n=>n+1)}>Refresh pending reviews</button><Link className="report-text-link" to="/evidence">Open evidence workspace</Link>{data&&<p className="text-xs">Read {new Date(data.as_of).toLocaleString()} · {data.scope}</p>}</div>
       {error&&<p role="alert">{error} <button className="underline" onClick={()=>setVersion(n=>n+1)}>Retry</button></p>}{!data&&!error&&<p role="status">Loading pending reviews…</p>}{notice&&<p role="status">{notice}</p>}
       {data&&<><label className="block text-sm font-bold">Decision reason<textarea className="field mt-1 w-full" value={reason} onChange={e=>setReason(e.target.value)}/></label>
         <Section title={`Evidence and configuration reviews (${data.evidence_reviews.length})`} sub="Tenant-owned records. The author cannot approve their own evidence.">

@@ -1,6 +1,6 @@
 import { selectFacility } from '../lib/api'
 import { Link, useLocation } from 'react-router-dom'
-import { listPendingActions, isOnline } from '../lib/offline/db'
+import { listPendingActions, ownsPendingAction, isOnline } from '../lib/offline/db'
 import { useSession, isPracticeSession, type Role } from '../store/session'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState, type ReactNode } from 'react'
@@ -11,6 +11,8 @@ import { tenantLabel, tenantDisplayName } from '../lib/tenant'
 const PRIMARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] = [
   { to: '/dispatch', label: 'Dispatch flow', route: 'dispatch' },
   { to: '/approvals', label: 'Pending approvals', route: 'approvals' },
+  { to: '/evidence', label: 'Evidence', route: 'evidence' },
+  { to: '/deliveries', label: 'Deliveries & exceptions', route: 'deliveries' },
   { to: '/routes', label: 'Routes & map', route: 'routes' },
   { to: '/queue', label: 'Queue', route: 'queue' },
   { to: '/compliance', label: 'Compliance', route: 'compliance' },
@@ -18,6 +20,7 @@ const PRIMARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] 
 ]
 
 const SECONDARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] = [
+  { to: '/recovery', label: 'Offline recovery', route: 'recovery' },
   { to: '/hub', label: 'Hub', route: 'hub' },
   { to: '/guide', label: 'Guide', route: 'guide' },
   { to: '/alerts', label: 'Alerts', route: 'alerts' },
@@ -67,7 +70,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       if (cancelled) return
       setOnline(onlineNow)
       try {
-        const actions = (await listPendingActions()).filter((a) => a.actorId === userId || !a.actorId)
+        const actions = (await listPendingActions()).filter(ownsPendingAction)
         if (cancelled) return
         setPending(actions.filter((a) => a.state !== 'BLOCKED').length)
         setBlocked(actions.filter((a) => a.state === 'BLOCKED').length)
@@ -85,7 +88,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       window.removeEventListener('offline', sync)
       window.clearInterval(id)
     }
-  }, [setOnline, pathname, userId])
+  }, [setOnline, pathname, userId, workspace?.selectedFacility])
 
   useEffect(() => {
     if (!live || !role) return
@@ -139,10 +142,10 @@ export default function Layout({ children }: { children: ReactNode }) {
             </span>
             {!live&&<span className="pill pill-demo">■ PRACTICE</span>}
             {pending > 0 && (
-              <span role="status" className="pill pill-queued">⏳ {pending} queued</span>
+              <Link to="/recovery" className="pill pill-queued">⏳ {pending} queued</Link>
             )}
             {blocked > 0 && (
-              <span role="status" className="pill pill-warn" title="Saved locally; supervisor reconciliation required before retry">{blocked} need review</span>
+              <Link to="/recovery" className="pill pill-warn" title="Review saved submissions on this device">{blocked} need review</Link>
             )}
             {critical > 0 && (
               <Link to="/alerts" className="pill pill-fail" role="alert">✖ {critical} critical</Link>

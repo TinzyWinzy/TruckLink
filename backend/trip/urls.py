@@ -20,6 +20,7 @@ urlpatterns = [
     path('trips/<int:pk>/journey/plan/', journey_views.journey_command,{'command':'plan'}),
     path('trips/<int:pk>/journey/returns/', journey_views.journey_command,{'command':'returns'}),
     path('trips/<int:pk>/journey/withdraw-release/', journey_views.journey_command,{'command':'withdraw-release'}),
+    path('deliveries/', journey_views.delivery_workspace),
     path('routes/workspace/', route_views.route_workspace),
     path('routes/preview/', route_views.route_command),
     path('routes/drafts/', route_views.route_command, {'save': True}),
