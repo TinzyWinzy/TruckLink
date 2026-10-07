@@ -1,0 +1,13 @@
+# Inspection setup recovery
+
+The operations supervisor encountered inspection 1 with REVIEW_REQUIRED because its operational context was missing. The evaluator was correctly blocked, but the screen offered no usable recovery path and displayed 0% readiness without explaining that evaluation could not start.
+
+The inspection screen now provides a site-scoped setup workspace. Operations and dispatch can select a matching assigned trip, its driver, independently reviewed current vehicle configuration, load, route type, traversed jurisdictions and supporting documents. Operations can record a missing load. The catalog identifies missing prerequisites and the responsible role. Linked journeys restrict choices to their retained trip. Retired drivers, other tenants and other sites are excluded.
+
+Admin now includes a vehicle evidence register for recording retained document references/fingerprints, issue/expiry times, evidenced axle/gross ratings and configuration effective dates. Compliance reviewers can open the same register from Audit. A different human must approve evidence and configuration; selecting another working role does not bypass this requirement. Files stay on the device and must be retained at their recorded location. No authenticity or statutory verification is implied.
+
+Saving setup appends a context. It neither passes inspection nor releases the visit. Historical attempts remain unchanged. Missing or invalid prerequisites hide inspection entry controls and explain the setup block. Once context is available and effective evidence/rules validate, Dispatch can record a fresh inspection. Operations can review permitted exceptions and coordinate the separate queue release.
+
+No production master data, statutory packs, ratings, reviews or inspections are fabricated to clear the reported entry. The customer's real vehicle records, documents, assignment, load and applicable reviewed regulatory configuration remain necessary. ERP imports and fleet registration interfaces remain separate capabilities; the setup screen identifies missing records rather than silently supplying defaults.
+
+Verification: 685 backend tests passed, one opt-in browser harness skipped and eight live tests deselected. Frontend existing/setup suite: 72 tests passed, plus two new evidence-register tests passed. Build, lint and Django checks passed with existing warnings. Synthetic Chromium checks passed for connected journeys and missing-context recovery; setup screenshots were inspected at desktop and 390px mobile. Production verification follows deployment and does not mutate operational records.

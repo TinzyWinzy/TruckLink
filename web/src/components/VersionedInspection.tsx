@@ -3,13 +3,17 @@ import { apiFetch } from '../lib/api'
 import { getRegulatoryContext, inspectOperational, type Attempt, type RegulatoryContext } from '../lib/regulatory'
 import { useSession } from '../store/session'
 import { PageHeader, Section } from './ui'
+import InspectionSetup from './InspectionSetup'
+import { Link } from 'react-router-dom'
 
 const ATTESTATIONS = ['driver-license', 'vehicle-reg', 'cargo-manifest', 'weight-cert', 'axle-calc']
 
-export default function VersionedInspection({ entryId, data, changeEntry }: {
+export default function VersionedInspection({ entryId, data: initialData, changeEntry }: {
   entryId: string; data: RegulatoryContext; changeEntry: (value: string) => void
 }) {
   const { role, workspace } = useSession()
+  const [data,setData] = useState(initialData)
+  const [editing,setEditing] = useState(!initialData.context)
   const [weights, setWeights] = useState<string[]>(() => (data.configuration?.rated_axle_kg ?? ['0']).map(() => ''))
   const [total, setTotal] = useState('')
   const [checked, setChecked] = useState<Record<string, boolean>>({})
@@ -20,6 +24,13 @@ export default function VersionedInspection({ entryId, data, changeEntry }: {
   const extraChecks = data.rulesets.flatMap(r => r.content.units.filter(u => u.definition.kind === 'CHECKLIST').map(u => u.definition.item_id!))
   const checks = [...new Set([...(data.workflow?.mandatory_checks ?? workspace?.configuration?.content.workflow.mandatory_checks ?? ATTESTATIONS), ...extraChecks])]
   const operator = role === 'ADMIN' || role === 'OPERATIONS_SUPERVISOR'
+  const ready = Boolean(data.context && data.configuration && !data.readiness_error)
+  async function reloadSetup() {
+    const updated=await getRegulatoryContext(entryId)
+    setData(updated);setAttempt(updated.attempt);setEditing(false)
+    setWeights((updated.configuration?.rated_axle_kg??[]).map(()=>''));setTotal('');setChecked({})
+    setMessage('Operational setup saved. Dispatch must record a fresh inspection; historical attempts are retained.')
+  }
 
   async function run() {
     setBusy(true)
@@ -63,11 +74,15 @@ export default function VersionedInspection({ entryId, data, changeEntry }: {
         <p>{data.context.origin} → {data.context.destination} · {data.context.route_type} · {data.context.jurisdictions.join(', ')}</p>
         <p>Driver {data.context.driver} · trip {data.context.trip} · load {data.context.load}</p>
         <p>Recorded ratings: axles {data.configuration.rated_axle_kg.join(' / ')} kg · gross {data.configuration.rated_gross_kg} kg</p>
-      </> : <p role="alert">Vehicle, driver, load and route evidence have not been recorded. Ask an authorised supervisor to complete the context.</p>}
+      </> : <p className="text-sm">Vehicle, driver, load and route evidence have not been recorded. Complete the setup below before inspection.</p>}
       {data.readiness_error && <p role="alert" className="mt-2 text-amber-900">{data.readiness_error}</p>}
       {data.rulesets.map(r => <p key={r.id} className="mt-2 text-sm">{r.content.name} v{r.content.version} · {r.content.jurisdiction} · effective {r.content.effective_from} to {r.content.effective_to}</p>)}
       <p className="mt-2 text-xs text-slate-600">Published records reflect recorded human review. No instrument or monetary penalty is asserted to be verified law by this screen.</p>
+      {data.context&&<button className="mt-3 min-h-12 underline" onClick={()=>setEditing(v=>!v)}>{editing?'Close setup':'Review or correct operational setup'}</button>}
     </Section>
+    {editing&&<InspectionSetup entryId={entryId} onSaved={reloadSetup}/>}
+    {!ready&&<p role="status" className="border-l-4 border-amber-600 bg-amber-50 p-4 text-sm">Setup required. Inspection and release remain blocked until the operational context, reviewed vehicle evidence and applicable rules are ready.</p>}
+    {ready&&<>
     <Section title="Measured mass (kg)">
       <div className="grid grid-cols-2 gap-3">
         {weights.map((value, i) => <label key={i} className="text-sm font-bold">Axle {i + 1}
@@ -83,9 +98,11 @@ export default function VersionedInspection({ entryId, data, changeEntry }: {
         <input type="checkbox" className="h-6 w-6" checked={!!checked[id]} onChange={e => setChecked(old => ({ ...old, [id]: e.target.checked }))} />{id.replace(/-/g, ' ')}
       </label>)}
       <button className="btn-primary touch-target mt-3 w-full" disabled={busy || role !== 'DISPATCH_SUPERVISOR'} onClick={run}>{busy ? 'Recording…' : 'Record versioned inspection'}</button>
+      {role!=='DISPATCH_SUPERVISOR'&&<p className="mt-3 text-sm">Dispatch Supervisor records measured mass and inspection attestations. Operations reviews exceptions and coordinates release.</p>}
     </Section>
+    </>}
     {attempt && <Section title={`Inspection ${attempt.id} · ${attempt.decision}`}>
-      <p>Readiness {attempt.result.readiness_percent}% · {attempt.result.engine_version}. Readiness does not grant release.</p>
+      {attempt.decision==='REVIEW_REQUIRED'?<p>Setup prevented this inspection from evaluating readiness. This recorded attempt is retained; complete setup and request a fresh inspection.</p>:<p>Readiness {attempt.result.readiness_percent}%. Readiness does not grant release.</p>}
       <ul className="mt-3 space-y-3">{attempt.result.controls.map(c => <li key={c.id} className="rounded border p-3">
         <strong>{c.status}</strong> · {c.reason}
         {c.provenance && <p className="mt-1 text-xs">{c.provenance.source.title} · {c.provenance.source.kind} · {c.provenance.source.provision} · revision {c.provenance.source.revision} · ruleset {c.provenance.ruleset_id}</p>}
@@ -100,6 +117,7 @@ export default function VersionedInspection({ entryId, data, changeEntry }: {
           <button className="touch-target rounded border px-3" disabled={busy || !reason.trim()} onClick={() => override(false)}>Reject</button>
         </div>
       </div>}
+      {['PASS','PASS_WITH_WARNINGS'].includes(attempt.decision)&&<p className="mt-4 text-sm">Release is a separate action in the <Link className="underline" to="/queue">Shift queue</Link>. Current evidence and rules are checked again at release.</p>}
     </Section>}
     {message && <p role="status" className="rounded border p-3">{message}</p>}
   </div>

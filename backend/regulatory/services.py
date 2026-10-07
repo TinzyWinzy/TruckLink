@@ -220,7 +220,7 @@ def context_snapshot(context, at):
 
 @transaction.atomic
 def create_context(actor, entry, *, evidence_ids, **fields):
-    require_role(actor, (*INSPECTORS, *OPERATORS))
+    require_role(actor, INSPECTORS if get_user_role(actor) in INSPECTORS else OPERATORS, entry.facility)
     assert_site(actor, entry)
     entry = QueueEntry.objects.select_for_update().get(pk=entry.pk)
     if entry.status == 'RELEASED':

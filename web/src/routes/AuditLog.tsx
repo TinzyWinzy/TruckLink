@@ -4,6 +4,7 @@ import type { LiveRow } from '../lib/live'
 import { EmptyState, PageHeader, StatusPill } from '../components/ui'
 import { DEMO_AUDIT } from '../lib/demoData'
 import { useSession } from '../store/session'
+import VehicleEvidenceDesk from '../components/VehicleEvidenceDesk'
 
 const SEED: LiveRow[] = DEMO_AUDIT as unknown as LiveRow[]
 
@@ -30,6 +31,7 @@ export default function AuditLog() {
         sub="Server audit records for releases, overrides and assignments. Chain verification has documented integrity limits."
         mode={live ? 'live' : 'demo'}
       />
+      {live && <VehicleEvidenceDesk />}
       {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
       {logs.length === 0 ? (
         <EmptyState title="No entries yet" sub="Gate releases, overrides and assignments land here." />

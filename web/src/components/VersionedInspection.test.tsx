@@ -39,7 +39,9 @@ describe('versioned operational inspection', () => {
 
   it('shows missing context without inserting pilot ratings', () => {
     render(<VersionedInspection entryId="10" data={{ ...data, context: null, configuration: null }} changeEntry={() => {}} />)
-    expect(screen.getByRole('alert')).toHaveTextContent('have not been recorded')
+    expect(screen.getByText(/have not been recorded/)).toBeVisible()
+    expect(screen.getByText(/Setup required. Inspection and release remain blocked/)).toBeVisible()
+    expect(screen.queryByRole('button',{name:'Record versioned inspection'})).not.toBeInTheDocument()
     expect(screen.queryByText(/Recorded ratings/)).not.toBeInTheDocument()
   })
 })
