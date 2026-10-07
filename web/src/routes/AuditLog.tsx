@@ -12,6 +12,7 @@ export default function AuditLog() {
   const live = useLive()
   const userId = useSession((s) => s.userId)
   const [logs, setLogs] = useState<LiveRow[]>(() => live ? [] : SEED)
+  const [loaded, setLoaded] = useState(!live)
   const [feedError, setFeedError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -19,7 +20,7 @@ export default function AuditLog() {
     let cancelled = false
     let unsub: (() => void) | undefined
     import('../lib/live').then((m) => {
-      if (!cancelled) unsub = m.subscribe('auditLogs', setLogs, 100, setFeedError) ?? undefined
+      if (!cancelled) unsub = m.subscribe('auditLogs', rows => { setLogs(rows); setLoaded(true) }, 100, setFeedError) ?? undefined
     })
     return () => { cancelled = true; unsub?.() }
   }, [live, userId])
@@ -33,7 +34,7 @@ export default function AuditLog() {
       />
       {live && <VehicleEvidenceDesk />}
       {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
-      {logs.length === 0 ? (
+      {!loaded && !feedError ? <p role="status">Loading audit records…</p> : feedError && logs.length === 0 ? null : logs.length === 0 ? (
         <EmptyState title="No entries yet" sub="Gate releases, overrides and assignments land here." />
       ) : (
         <ul className="space-y-2">

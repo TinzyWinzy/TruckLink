@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useLive } from '../lib/liveGate'
 import { ROUTE_GATES, canVisit, landingPathForRole } from '../lib/gates'
-import { tenantLabel } from '../lib/tenant'
+import { tenantLabel, tenantDisplayName } from '../lib/tenant'
 
 const PRIMARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] = [
   { to: '/routes', label: 'Routes & map', route: 'routes' },
@@ -116,7 +116,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             </span>
             <span className="leading-none">
               <span className="block text-[10px] font-extrabold uppercase tracking-[0.18em] text-amber-400">
-                {practice ? 'Practice workspace' : brand?.display_name || workspace?.organisation?.name || 'Operations workspace'}
+                {practice ? 'Practice workspace' : tenantDisplayName(tenant,workspace?.organisation?.name)}
               </span>
               <span className="block text-lg font-extrabold tracking-tight">Trucki</span>
             </span>
@@ -191,7 +191,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       </header>
       {switchError && <p role="alert" className="p-4 text-red-800">{switchError}</p>}
       {workspace && <div className="flex flex-wrap items-center gap-3 border-b border-slate-300 px-6 py-3 text-sm">
-        <span className="font-semibold">{workspace.organisation?.name}</span>
+        <span className="font-semibold">Tenant: {tenantDisplayName(tenant,workspace.organisation?.name)}</span>
         <label>Yard <select aria-label="Selected yard" className="field ml-2 px-3" value={workspace.selectedFacility} onChange={async e => {
           const id = e.target.value
           if (!workspace.facilities.some(f => String(f.id) === id)) return

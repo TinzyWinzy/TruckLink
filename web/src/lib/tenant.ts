@@ -17,3 +17,7 @@ export interface TenantConfiguration {
 export function tenantLabel(configuration: TenantConfiguration | null | undefined, role: string): string {
   return configuration?.content.roles[role]?.label ?? role.replace(/_/g, ' ')
 }
+
+export function tenantDisplayName(configuration: TenantConfiguration | null | undefined, organisationName?: string | null): string {
+  return configuration?.content.branding.display_name?.trim() || organisationName?.trim() || 'Operations workspace'
+}

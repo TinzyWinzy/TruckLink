@@ -13,6 +13,7 @@ export default function Alerts() {
   const { userId, role, displayName } = useSession()
   const live = useLive()
   const [alerts, setAlerts] = useState<LiveRow[]>(() => live ? [] : SEED)
+  const [loaded, setLoaded] = useState(!live)
   const [feedError, setFeedError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [overrideTarget, setOverrideTarget] = useState<string | null>(null)
@@ -57,7 +58,7 @@ export default function Alerts() {
     let cancelled = false
     let unsub: (() => void) | undefined
     import('../lib/live').then((m) => {
-      if (!cancelled) unsub = m.subscribe('alerts', setAlerts, 100, setFeedError) ?? undefined
+      if (!cancelled) unsub = m.subscribe('alerts', rows => { setAlerts(rows); setLoaded(true) }, 100, setFeedError) ?? undefined
     })
     return () => { cancelled = true; unsub?.() }
   }, [live, userId])
@@ -105,8 +106,8 @@ export default function Alerts() {
   return (
     <div>
       <PageHeader
-        title={`Alerts · ${active.length} active`}
-        sub="Critical quarantine alerts first. Acknowledge when you own the problem. Escalation runs at 10 and 30 minutes."
+        title={loaded ? `Alerts · ${active.length} active` : 'Alerts'}
+        sub="Critical quarantine alerts first. Acknowledge when you own the problem. Escalation follows the tenant workflow."
         mode={live ? 'live' : 'demo'}
       />
       {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
@@ -128,7 +129,7 @@ export default function Alerts() {
           </button>
         </div>
       )}
-      {alerts.length === 0 ? (
+      {!loaded && !feedError ? <p role="status">Loading alerts…</p> : feedError && alerts.length === 0 ? null : alerts.length === 0 ? (
         <EmptyState title="Yard is quiet" sub="No alerts. New quarantine, wait and equipment flags land here." />
       ) : (
         <ul className="space-y-2">

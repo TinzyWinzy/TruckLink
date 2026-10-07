@@ -32,7 +32,10 @@ function mapLive(r: LiveRow): Dock {
 export default function DockBoard() {
   const live = useLive()
   const userId = useSession((s) => s.userId)
+  const workspace = useSession((s) => s.workspace)
+  const siteName = workspace?.facilities.find(f => String(f.id) === workspace.selectedFacility)?.name
   const [docks, setDocks] = useState<Dock[]>(() => live ? [] : SEED)
+  const [loaded, setLoaded] = useState(!live)
   const [feedError, setFeedError] = useState<string | null>(null)
   const [queuedIds, setQueuedIds] = useState<string[]>([])
   const [message, setMessage] = useState<string | null>(null)
@@ -45,7 +48,7 @@ export default function DockBoard() {
     let u2: (() => void) | undefined
     import('../lib/live').then((m) => {
       if (cancelled) return
-      u1 = m.subscribe('docks', (found) => setDocks(found.map(mapLive)), 100, setFeedError) ?? undefined
+      u1 = m.subscribe('docks', (found) => { setDocks(found.map(mapLive)); setLoaded(true) }, 100, setFeedError) ?? undefined
       u2 = m.subscribe('queue', (found) => setQueuedIds(found.filter((r) => r.status === 'QUEUED').map((r) => r.id))) ?? undefined
     })
     return () => {
@@ -82,13 +85,13 @@ export default function DockBoard() {
     <div>
       <PageHeader
         title="Dock board"
-        eyebrow="72,000 m² · tap a free dock"
-        sub={live ? `${free} of ${docks.length} docks free · ${queuedIds.length} waiting. Tap a free dock to take the oldest truck.` : 'Practice layout. Training docks only.'}
+        eyebrow={live ? siteName || 'Selected site' : 'Practice site'}
+        sub={live ? loaded ? `${free} of ${docks.length} docks free. Tap a free dock to take the oldest queued truck.` : 'Loading the selected site’s dock configuration.' : 'Practice layout. Training docks only.'}
         mode={live ? 'live' : 'demo'}
       />
       {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError}</p>}
       {message && <p role="status" className="mb-3 rounded-lg bg-slate-900 p-3 text-sm font-bold text-white">{message}</p>}
-      {docks.length === 0 ? (
+      {!loaded && !feedError ? <p role="status">Loading docks…</p> : feedError && docks.length === 0 ? null : docks.length === 0 ? (
         <EmptyState title="No docks configured" sub="Ask your supervisor to set up the yard." />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

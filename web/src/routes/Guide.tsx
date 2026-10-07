@@ -3,6 +3,7 @@ import {Link} from 'react-router-dom'
 import {useLive} from '../lib/liveGate'
 import {apiFetch} from '../lib/api'
 import {canVisit} from '../lib/gates'
+import {tenantDisplayName} from '../lib/tenant'
 import {WALKTHROUGH_ROLES,WALKTHROUGH_TASKS} from '../lib/walkthrough'
 import {PageHeader,Section} from '../components/ui'
 import {useSession,type Role} from '../store/session'
@@ -30,7 +31,7 @@ export default function Guide() {
   const label=(r:Role)=>workspace?.configuration?.content.roles[r]?.label??r.replaceAll('_',' ')
   return <div className="max-w-4xl space-y-4">
     <PageHeader title="Operational walkthrough" sub="Follow a truck from setup and yard arrival through release, delivery and exceptions. Each step names its owner and expected result." mode={live?'live':'demo'}/>
-    <Section title={live?`${workspace?.organisation?.name??'Your tenant'} review`:'Platform practice review'} sub={live?'You are viewing your assigned tenant and site. Operational actions affect live records.':'Practice uses synthetic local data. It does not write tenant records or demonstrate a connected ERP or tracker.'}>
+    <Section title={live?`${tenantDisplayName(workspace?.configuration,workspace?.organisation?.name)} review`:'Platform practice review'} sub={live?'You are viewing your assigned tenant and site. Operational actions affect live records.':'Practice uses synthetic local data. It does not write tenant records or demonstrate a connected ERP or tracker.'}>
       <p className="text-sm">Authorised tenant reviewers use individual staff accounts. External reviewers can explore the platform in practice; access to a company's operational records requires that company's authorisation.</p>
       <p className="mt-2 text-sm">Use the working-role selector if you are an Admin. Other staff stay within their assigned role. Independent approvals require a different person.</p>
       {!live&&<p className="mt-2 text-sm">Explore screens in the navigation, then return here. Full return and recovery commands require an authorised live journey; this guide explains their prerequisites.</p>}
