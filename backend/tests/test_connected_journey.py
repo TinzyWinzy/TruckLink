@@ -188,7 +188,10 @@ def test_journey_api_returns_current_handoff_after_each_origin_command(domain):
     url=f'/api/trips/{d["trip"].pk}/journey/'
     response=c.post(url,{'facility':str(d['default_facility'].pk),'visit_id':d['entry'].pk,'reason':'Synthetic API link'},format='json')
     assert response.status_code==200 and response.data['journey']['next_action']['href']==f'/compliance?entry={d["entry"].pk}'
-    inspect(d); release_entry(d['entry'].pk,d['ops'])
+    inspect(d)
+    handoff=c.get(url).data['journey']['next_action']
+    assert handoff['label']=='Authorise yard release' and handoff['href']=='/queue'
+    release_entry(d['entry'].pk,d['ops'])
     for kind,next_kind in [('DOCK_VACATED','DEPARTED'),('DEPARTED','DESTINATION_ARRIVED')]:
         response=c.post(url+'events/',{'kind':kind,'observed_at':timezone.now().isoformat(),
             'reason':'Synthetic observation','client_key':kind,'details':{}},format='json')

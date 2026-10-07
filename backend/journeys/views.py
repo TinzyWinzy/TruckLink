@@ -93,6 +93,12 @@ def timeline(link):
 def next_action(link, stage, dock_occupied):
     origin_roles = ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER']
     destination_roles = ['OPERATIONS_SUPERVISOR','FACILITY_MANAGER']
+    if stage == 'AT_ORIGIN' and link.visit.status in ('COMPLETED','OVERRIDE_APPROVED'):
+        return {'kind':None,'label':'Authorise yard release','owner_roles':origin_roles,'href':'/queue','scope':None}
+    if stage == 'AT_ORIGIN' and link.visit.status in ('QUARANTINED','PENDING_OVERRIDE'):
+        return {'kind':None,'label':'Resolve the held inspection or independent approval',
+            'owner_roles':['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR'],
+            'href':f'/compliance?entry={link.visit_id}','scope':'A held inspection does not authorise release'}
     actions = {
         'AT_ORIGIN':(None,'Complete inspection and release approval',origin_roles,f'/compliance?entry={link.visit_id}'),
         'YARD_RELEASE_AUTHORISED':('DOCK_VACATED' if dock_occupied and link.visit.milestone_semantics=='SEPARATE_V1' else 'DEPARTED',

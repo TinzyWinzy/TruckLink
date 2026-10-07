@@ -98,7 +98,7 @@ export default function JourneyPanel({ trip, workspace, onChange }: { trip: Rout
         <p className="font-semibold">Next: {journey.next_action.label}</p>
         <p className="mt-1 text-sm">Responsible roles: {journey.next_action.owner_roles.map(r=>r.replaceAll('_',' ').toLowerCase()).join(', ')}.</p>
         {journey.next_action.scope && <p className="mt-2 text-sm">{journey.next_action.scope}</p>}
-        {journey.next_action.href && <div className="mt-2 flex flex-wrap gap-4"><Link className="report-text-link" to={journey.next_action.href}>Open inspection →</Link><Link className="report-text-link" to="/queue">Open release queue →</Link></div>}
+        {journey.next_action.href && <div className="mt-2 flex flex-wrap gap-4"><Link className="report-text-link" to={journey.next_action.href}>{journey.next_action.href === '/queue' ? 'Open release queue' : 'Open inspection'} →</Link>{journey.next_action.href !== '/queue' && <Link className="report-text-link" to="/queue">Open release queue →</Link>}</div>}
       </div>}
       {journey.stage === 'DELIVERY_ACCEPTED' && <p className="mt-3 text-sm">Physical delivery accepted by staff attestation. Evidence reference and fingerprint recorded; reconciliation remains outstanding. ERP acknowledgement and commercial closure are not confirmed.</p>}
       <ol className="mt-4 space-y-3">{journey.events.map(event=><li key={event.id} className="border-l-2 border-slate-200 pl-3 text-sm">
