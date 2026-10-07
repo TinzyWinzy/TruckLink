@@ -25,8 +25,16 @@ test('live ADMIN PIN can switch working roles and return without changing identi
   expect(switched.base_role).toBe('ADMIN')
   const queue = await request.get(`${api}/api/queue/?facility=${original.facilities[0].id}`, { headers })
   expect(queue.ok()).toBe(true)
-  await page.reload()
+  // Expire the browser's access token through a real server-side renewal.
+  // On returning, the app must renew its saved session and retain the working role.
+  const refreshToken = await page.evaluate(() => localStorage.getItem('trucki-refresh-token'))
+  expect(refreshToken).toBeTruthy()
+  await page.goto('about:blank')
+  const renewed = await request.post(`${api}/api/auth/refresh/`, { data: { refresh_token: refreshToken } })
+  expect(renewed.ok()).toBe(true)
+  await page.goto('/queue')
   await expect(page.getByLabel('Switch working role')).toHaveValue('DISPATCH_SUPERVISOR')
+  expect(await page.evaluate(() => localStorage.getItem('trucki-auth-token'))).not.toBe(token)
   await page.getByLabel('Switch working role').selectOption('ADMIN')
   await expect(page).toHaveURL(/\/reports$/)
   await expect(page.getByLabel('Switch working role')).toHaveValue('ADMIN')

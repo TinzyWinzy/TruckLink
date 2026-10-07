@@ -193,3 +193,12 @@ class AdminRoleSelection(models.Model):
     token = models.OneToOneField('authtoken.Token', on_delete=models.CASCADE)
     role = models.CharField(max_length=32, choices=UserRole.choices)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class RefreshSession(models.Model):
+    """Opaque renewable session; only the secret digest is retained server-side."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    secret_hash = models.CharField(max_length=64, unique=True)
+    credential_hash = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)

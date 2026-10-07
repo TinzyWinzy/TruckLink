@@ -57,7 +57,7 @@ function Fallback() {
 /** Restore real yard sessions across refresh. The API token persists in
  * localStorage; this revalidates it against /auth/me/ at boot. Practice
  * sessions restore separately from sessionStorage (session.ts). */
-function AuthRestore({ onReady }: { onReady: (ready: boolean) => void }) {
+function AuthRestore({ onReady, onError, retry }: { onReady: (ready: boolean) => void; onError: (message: string) => void; retry: number }) {
   const { signInReal } = useSession()
   const navigate = useNavigate()
   useEffect(() => {
@@ -65,30 +65,36 @@ function AuthRestore({ onReady }: { onReady: (ready: boolean) => void }) {
     void (async () => {
       try {
         const { restoreSessionLive } = await import('./lib/live')
-        if (useSession.getState().role) return // demo tap or fresh sign-in already holds the shift
+        if (useSession.getState().role) { if (!cancelled) onReady(true); return }
         const s = await restoreSessionLive()
-        if (!s || cancelled) return
+        if (cancelled) return
+        if (!s) { onReady(true); return }
         signInReal(s.uid, s.role, s.displayName, s.baseRole)
         if (window.location.pathname === '/') navigate(landingPathForRole(s.role))
-      } catch {
-        // Offline boot or dead token. staffer signs in again.
-      } finally {
         if (!cancelled) onReady(true)
+      } catch {
+        if (!cancelled) onError('Your session is saved. We could not reconnect to the server. Check your connection and retry.')
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [navigate, signInReal, onReady])
+  }, [navigate, signInReal, onReady, onError, retry])
   return null
 }
 
 export default function App() {
   const [authReady, setAuthReady] = useState(false)
+  const [authError, setAuthError] = useState('')
+  const [retry, setRetry] = useState(0)
   return (
     <BrowserRouter>
       <AuthReady.Provider value={authReady}>
-      <AuthRestore onReady={setAuthReady} />
+      <AuthRestore onReady={setAuthReady} onError={setAuthError} retry={retry} />
+      {authError ? <div className="card mx-auto mt-10 max-w-md p-6" role="alert">
+        <p>{authError}</p>
+        <button className="btn-primary mt-4 px-4" onClick={() => { setAuthError(''); setRetry(v => v + 1) }}>Retry connection</button>
+      </div> : !authReady ? <Fallback /> : <>
       <Suspense fallback={<Fallback />}>
       <Routes>
         <Route path="/routes" element={<RoleGuard route="routes"><Layout><RoutesMap /></Layout></RoleGuard>} />
@@ -106,6 +112,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
         </Suspense>
+      </>}
       </AuthReady.Provider>
     </BrowserRouter>
   )

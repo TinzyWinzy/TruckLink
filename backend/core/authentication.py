@@ -13,6 +13,12 @@ class WorkingRoleTokenAuthentication(TokenAuthentication):
 
     def authenticate_credentials(self, key):
         user, token = super().authenticate_credentials(key)
+        from django.utils import timezone
+        from rest_framework.exceptions import AuthenticationFailed
+        from .sessions import ACCESS_LIFETIME
+        from .models import RefreshSession
+        if token.created + ACCESS_LIFETIME <= timezone.now() and RefreshSession.objects.filter(user=user).exists():
+            raise AuthenticationFailed('Access token expired.')
         profile = getattr(user, 'profile', None)
         if profile and profile.role == UserRole.ADMIN:
             selection = AdminRoleSelection.objects.filter(token=token).first()

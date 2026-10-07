@@ -45,6 +45,7 @@ urlpatterns = [
     path("auth/register/", auth_views.register),
     path("auth/login/", auth_views.login_view),
     path("auth/pin/", auth_views.pin_login),
+    path("auth/refresh/", auth_views.refresh_session),
     path("auth/logout/", auth_views.logout_view),
     path("modelling/run/", model_workspace),
     path("auth/me/", auth_views.me),

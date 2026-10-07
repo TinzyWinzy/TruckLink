@@ -4,7 +4,7 @@ from django.db import transaction
 from django.contrib.auth.hashers import check_password
 from rest_framework import status
 from rest_framework.authtoken.models import Token
-from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes, authentication_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
@@ -12,9 +12,11 @@ from core.models import PinCredential, AdminRoleSelection
 from core.throttling import CredentialAttemptThrottle, CredentialIPThrottle
 
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
+from core.sessions import issue_session, renew_session
 
 
 @api_view(["POST"])
+@authentication_classes([])
 @permission_classes([AllowAny])
 @throttle_classes([CredentialAttemptThrottle, CredentialIPThrottle])
 @transaction.atomic
@@ -29,7 +31,7 @@ def register(request):
     return Response(
         {
             "ok": True,
-            "token": result["token"].key,
+            **issue_session(result["user"]),
             "user": UserSerializer(result["user"]).data,
         },
         status=status.HTTP_201_CREATED,
@@ -37,6 +39,7 @@ def register(request):
 
 
 @api_view(["POST"])
+@authentication_classes([])
 @permission_classes([AllowAny])
 @throttle_classes([CredentialAttemptThrottle, CredentialIPThrottle])
 def login_view(request):
@@ -55,11 +58,9 @@ def login_view(request):
             {"ok": False, "error": "invalid credentials"},
             status=status.HTTP_401_UNAUTHORIZED,
         )
-    token, _ = Token.objects.get_or_create(user=user)
-    AdminRoleSelection.objects.filter(token=token).delete()
     return Response({
         "ok": True,
-        "token": token.key,
+        **issue_session(user),
         "user": UserSerializer(user).data,
     })
 
@@ -67,7 +68,12 @@ def login_view(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
-    Token.objects.filter(user=request.user).delete()
+    from django.contrib.auth import get_user_model
+    from core.models import RefreshSession
+    with transaction.atomic():
+        get_user_model().objects.select_for_update().get(pk=request.user.pk)
+        RefreshSession.objects.filter(user=request.user).delete()
+        Token.objects.filter(user=request.user).delete()
     return Response({"ok": True})
 
 
@@ -82,6 +88,7 @@ def _normalize_staff_id(raw: str) -> str:
 
 
 @api_view(["POST"])
+@authentication_classes([])
 @permission_classes([AllowAny])
 @throttle_classes([CredentialAttemptThrottle, CredentialIPThrottle])
 def pin_login(request):
@@ -105,9 +112,19 @@ def pin_login(request):
     if user is None or not user.is_active:
         return Response(_PIN_FAILURE, status=status.HTTP_401_UNAUTHORIZED)
 
-    token, _ = Token.objects.get_or_create(user=user)
-    AdminRoleSelection.objects.filter(token=token).delete()
-    return Response({"ok": True, "token": token.key, "user": UserSerializer(user).data})
+    return Response({"ok": True, **issue_session(user), "user": UserSerializer(user).data})
+
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@throttle_classes([CredentialIPThrottle])
+def refresh_session(request):
+    result = renew_session(request.data.get('refresh_token'))
+    if not result:
+        return Response({'detail': 'Session expired. Please sign in again.'}, status=401)
+    user, credentials = result
+    return Response({'ok': True, **credentials, 'user': UserSerializer(user).data})
 
 
 @api_view(["GET"])

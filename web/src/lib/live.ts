@@ -10,7 +10,7 @@
  * Server is authoritative for compliance + overrides (SAD §9); the client
  * only renders. Firebase survives solely for web push (push.ts / sw.ts).
  */
-import { apiFetch, apiBase, ApiError, clearToken, facilityId, selectFacility, getToken, isLive, setToken } from './api'
+import { apiFetch, apiBase, ApiError, clearToken, facilityId, selectFacility, getToken, isLive, setToken, setRefreshToken, hasSession } from './api'
 import { isRealLive } from './liveGate'
 import { useSession } from '../store/session'
 import type { TenantConfiguration } from './tenant'
@@ -85,11 +85,12 @@ export async function signInLive(
   password: string,
 ): Promise<SessionUser> {
   if (!isLive()) throw new Error('Sign-in not connected (practice mode)')
-  const data = await apiFetch<{ token: string; user: { id: number; username: string; role?: string } }>(
+  const data = await apiFetch<{ token: string; refresh_token?: string; user: { id: number; username: string; role?: string } }>(
     '/auth/login/',
     { method: 'POST', body: { username: email, password } },
   )
   setToken(data.token)
+  setRefreshToken(data.refresh_token)
   return sessionFrom(data.user)
 }
 
@@ -99,25 +100,30 @@ export async function signInPinLive(
   pin: string,
 ): Promise<SessionUser> {
   if (!isLive()) throw new Error('Sign-in not connected (practice mode)')
-  const data = await apiFetch<{ token: string; user: { id: number; username: string; role?: string } }>(
+  const data = await apiFetch<{ token: string; refresh_token?: string; user: { id: number; username: string; role?: string } }>(
     '/auth/pin/',
     { method: 'POST', body: { staff_id: staffId.trim(), pin: pin.trim() } },
   )
   setToken(data.token)
+  setRefreshToken(data.refresh_token)
   return sessionFrom(data.user)
 }
 
 /** Rehydrate a signed-in session after refresh (token in localStorage).
  * Returns null when signed out, demo mode, or offline at boot. */
 export async function restoreSessionLive(): Promise<SessionUser | null> {
-  if (!isLive()) return null
+  if (!isLive() || !hasSession()) return null
   try {
     const data = await apiFetch<{ user: { id: number; username: string; role?: string } }>(
       '/auth/me/',
     )
     return sessionFrom(data.user)
-  } catch {
-    return null
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      clearToken()
+      return null
+    }
+    throw error
   }
 }
 

@@ -14,6 +14,50 @@ export let facilityId = ''
 export function selectFacility(id: string): void { facilityId = id }
 
 const TOKEN_KEY = 'trucki-auth-token'
+const REFRESH_KEY = 'trucki-refresh-token'
+let sessionGeneration = 0
+let refreshFlight: Promise<void> | null = null
+
+export function setRefreshToken(token?: string): void {
+  sessionGeneration++
+  try {
+    if (token) localStorage.setItem(REFRESH_KEY, token)
+    else localStorage.removeItem(REFRESH_KEY)
+  } catch { /* Storage unavailable. */ }
+}
+
+export function hasSession(): boolean {
+  try { return Boolean(getToken() || localStorage.getItem(REFRESH_KEY)) } catch { return Boolean(getToken()) }
+}
+
+async function refreshAccess(): Promise<void> {
+  if (refreshFlight) return refreshFlight
+  const generation = sessionGeneration
+  refreshFlight = (async () => {
+    let secret: string | null = null
+    try { secret = localStorage.getItem(REFRESH_KEY) } catch { /* Storage unavailable. */ }
+    if (!secret) {
+      clearToken()
+      throw new ApiError('Session expired. Please sign in again.', 401)
+    }
+    let response: Response
+    try {
+      response = await fetch(`${BASE}/api/auth/refresh/`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ refresh_token: secret }),
+      })
+    } catch { throw new ApiError('Network unreachable. Check the yard connection.', 0) }
+    if (generation !== sessionGeneration) throw new ApiError('Session changed. Please retry.', 409)
+    if (!response.ok) {
+      if (response.status === 401) clearToken()
+      throw new ApiError(response.status === 401 ? 'Session expired. Please sign in again.' : 'Session service unavailable. Please retry.', response.status)
+    }
+    const data = await response.json() as { token: string }
+    if (generation !== sessionGeneration) throw new ApiError('Session changed. Please retry.', 409)
+    setToken(data.token)
+  })().finally(() => { refreshFlight = null })
+  return refreshFlight
+}
 
 /** Live backend available (API base configured). Cheap. safe from any chunk. */
 export function isLive(): boolean {
@@ -37,9 +81,11 @@ export function setToken(token: string): void {
 }
 
 export function clearToken(): void {
+  sessionGeneration++
   selectFacility('')
   try {
     localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(REFRESH_KEY)
   } catch {
     // Ignore.
   }
@@ -79,10 +125,13 @@ function messageFrom(data: unknown, status: number): string {
 export async function apiFetch<T = unknown>(
   path: string,
   init: { method?: string; body?: unknown } = {},
+  retried = false,
 ): Promise<T> {
   const { method = 'GET', body } = init
   const headers: Record<string, string> = { Accept: 'application/json' }
-  const token = getToken()
+  const anonymous = ['/auth/login/', '/auth/pin/', '/auth/register/', '/auth/refresh/', '/tenancy/signup/'].includes(path)
+  if (!anonymous && !getToken() && hasSession()) await refreshAccess()
+  const token = anonymous ? null : getToken()
   if (token) headers['Authorization'] = `Token ${token}`
   if (body !== undefined) headers['Content-Type'] = 'application/json'
 
@@ -103,6 +152,12 @@ export async function apiFetch<T = unknown>(
   } catch {
     // Empty/non-JSON body. status still decides below.
   }
+  if (res.status === 401 && !anonymous && !retried && hasSession()) {
+    // Another concurrent request may already have renewed this access token.
+    if (getToken() === token) await refreshAccess()
+    return apiFetch<T>(path, init, true)
+  }
+  if (res.status === 401 && !anonymous && retried) clearToken()
   if (!res.ok) throw new ApiError(messageFrom(data, res.status), res.status)
   return data as T
 }
