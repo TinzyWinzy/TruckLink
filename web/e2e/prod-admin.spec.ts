@@ -162,6 +162,7 @@ test('live ADMIN PIN can switch working roles and return without changing identi
   await expect(page.getByLabel('Switch working role')).toHaveValue('ADMIN')
   await expect(page.getByText(/Last successful read/)).toBeVisible()
   await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0)
+  await expect(page.getByRole('region',{name:'Data availability'})).not.toContainText('Awaiting first read')
   await page.setViewportSize({width:1440,height:1000})
   await page.screenshot({ path: '../docs/design/reports-production-desktop.png', fullPage: true })
   await page.setViewportSize({width:390,height:1000})

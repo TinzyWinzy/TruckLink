@@ -18,6 +18,11 @@ The visual direction keeps Trucki's navy, warm paper and amber palette while put
 - Synthetic browser contracts pass for guided dispatch through release and physical exit, offline arrival replay, setup, Reports loading/error/retry, exports, read-only presentation and tenant configuration. Desktop (1440 px) and mobile (390 px) screenshots were inspected; overflow, keyboard focus, action size and reduced-motion checks passed.
 - Practice browser checks passed for all 18 cases across role sign-in, restrictions, pilot workflow, export and workspace navigation. The older compliance landing assertion was updated to the existing Pending Approvals screen and rechecked independently.
 - The Northstar test is a disposable intercepted fixture. No additional production tenant has been configured.
+- Production checks: 13 passed against the promoted frontend, including sign-in, role switching, session renewal, inspection setup, read-only compliance access, filtered audit export and mobile navigation. The production read-only flow explicitly observed no non-authentication API writes. Entry 1 remains quarantined with VEHICLE, TRIP, RATINGS and LOAD blockers; no operational setup or release was manufactured.
+
+Deployment: [Trucki](https://trucki-two.vercel.app/reports), frontend commit `95cb0b4`, Vercel deployment `dpl_GBGY43QRAtG637sTQdG6vemvVhRd`. [Immutable deployment](https://trucki-5auc74t25-brandontinozs-projects.vercel.app). The backend did not require a deployment.
+
+Reviewed screenshots are stored in `docs/design/reports-hierarchy-*.png` and `inspection-hierarchy-*.png` for synthetic fixtures, and `reports-production-*.png` / `inspection-production-*.png` for the configured first tenant. The production screenshots are interface evidence, not measured performance claims.
 
 The backend evaluator, permissions, independent approvals and release/gate policies are unchanged. This interface update does not assert legal verification. Production operational records must not be created or released during UI verification.
 
