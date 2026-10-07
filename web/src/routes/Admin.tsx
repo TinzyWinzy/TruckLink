@@ -5,6 +5,7 @@ import { PageHeader, Section } from '../components/ui'
 import TenantSettings from '../components/TenantSettings'
 import PlatformConfiguration from '../components/PlatformConfiguration'
 import VehicleEvidenceDesk from '../components/VehicleEvidenceDesk'
+import FleetRegistration from '../components/FleetRegistration'
 
 export default function Admin() {
   const { role } = useSession()
@@ -41,6 +42,7 @@ export default function Admin() {
     <div className="max-w-2xl">
       <PageHeader title="Admin" sub={live ? 'Yard setup controls.' : 'Setup. Works once the tablet is connected.'} mode={live ? 'live' : 'demo'} />
       <div className="space-y-3">
+        {live && <FleetRegistration />}
         {live && <VehicleEvidenceDesk />}
         {live && <TenantSettings />}
         {live && <PlatformConfiguration />}
