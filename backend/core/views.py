@@ -5,17 +5,21 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
+from django.db import IntegrityError
 from django.utils.text import slugify
+import re
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 
 from trip.models import Organisation, UserProfile, UserRole
 from trip.permissions import IsAdmin, get_user_organisation
 
 from .models import Facility, PinCredential, PushSubscription
+from .sessions import issue_session
+from .throttling import CredentialIPThrottle
 
 User = get_user_model()
 
@@ -28,17 +32,42 @@ def _normalize_staff_id(raw: str) -> str:
 
 
 @api_view(["POST"])
+@authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([CredentialIPThrottle])
 def tenancy_signup(request):
     """POST /api/tenancy/signup/ — org + facility + ADMIN user in one transaction."""
     org_name = str(request.data.get("organisation_name", "")).strip()
-    facility_name = str(request.data.get("facility_name", "")).strip() or "Main Yard"
-    username = str(request.data.get("username", "")).strip()
+    onboarding = request.data.get('onboarding_workspace', False)
+    facility_name = str(request.data.get("facility_name", "")).strip() or ("Onboarding workspace" if onboarding else "Main Yard")
+    pin_mode = 'staff_id' in request.data or 'pin' in request.data
+    staff_id = _normalize_staff_id(str(request.data.get('staff_id', '')))
+    pin = str(request.data.get('pin', ''))
+    username = str(request.data.get("username", "")).strip() or (staff_id if pin_mode else '')
     password = str(request.data.get("password", ""))
     email = str(request.data.get("email", "")).strip()
     facility_mode = str(request.data.get("facility_mode", "OPERATIONS"))
+    site_timezone = str(request.data.get('facility_timezone', 'UTC'))
 
     errors = {}
+    if type(onboarding) is not bool:
+        errors['onboarding_workspace'] = 'must be true or false'
+    if len(org_name) > 200 or len(facility_name) > 200 or len(username) > 150:
+        errors['identity'] = 'company, workspace or username is too long'
+    try:
+        ZoneInfo(site_timezone)
+    except (ZoneInfoNotFoundError, ValueError):
+        errors['facility_timezone'] = 'use a supported timezone'
+    if pin_mode:
+        allowed = {'organisation_name','facility_name','facility_mode','facility_timezone','onboarding_workspace','username','staff_id','pin'}
+        if set(request.data) - allowed:
+            errors['fields'] = 'PIN onboarding accepts company/workspace identifiers and credentials only; omit personal contact details'
+        if not re.fullmatch(r'TRK-[A-Z0-9][A-Z0-9-]{0,27}', staff_id):
+            errors['staff_id'] = 'use a staff identifier of at most 32 letters, digits and hyphens'
+        elif PinCredential.objects.filter(staff_id=staff_id).exists():
+            errors['staff_id'] = 'already provisioned'
+        if not re.fullmatch(r'[0-9]{6,12}', pin):
+            errors['pin'] = 'use 6 to 12 digits'
     if facility_mode not in ("DEMO", "OPERATIONS"):
         errors["facility_mode"] = "must be DEMO or OPERATIONS"
     if not org_name:
@@ -47,7 +76,7 @@ def tenancy_signup(request):
         errors["username"] = "required"
     elif User.objects.filter(username=username).exists():
         errors["username"] = "already taken"
-    if len(password) < 6:
+    if not pin_mode and len(password) < 6:
         errors["password"] = "min length 6"
     if errors:
         return Response({"ok": False, "errors": errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -59,26 +88,35 @@ def tenancy_signup(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    with transaction.atomic():
-        org = Organisation.objects.create(name=org_name, slug=slug, requires_release=True)
-        fac_slug = slugify(facility_name)[:100] or "yard"
-        facility = Facility.objects.create(
-            organisation=org, name=facility_name, slug=fac_slug,
-            yard_config={"mode": facility_mode},
-        )
-        user = User.objects.create_user(
-            username=username, password=password, email=email,
-        )
-        profile = UserProfile.objects.create(
-            user=user, organisation=org, role=UserRole.ADMIN,
-        )
-        profile.facilities.add(facility)
-        token, _ = Token.objects.get_or_create(user=user)
+    try:
+        with transaction.atomic():
+            org = Organisation.objects.create(name=org_name, slug=slug, requires_release=True)
+            fac_slug = slugify(facility_name)[:100] or "yard"
+            facility = Facility.objects.create(
+                organisation=org, name=facility_name, slug=fac_slug, timezone=site_timezone,
+                yard_config={"mode": facility_mode, **({'onboarding': True} if onboarding else {})},
+            )
+            user = User.objects.create_user(
+                username=username, password=None if pin_mode else password, email='' if pin_mode else email,
+            )
+            profile = UserProfile.objects.create(user=user, organisation=org, role=UserRole.ADMIN)
+            profile.facilities.add(facility)
+            if pin_mode:
+                PinCredential.objects.create(staff_id=staff_id, pin_hash=make_password(pin), user=user,
+                    organisation=org, facility=facility)
+            from core.audit import append_audit
+            append_audit(facility=facility, actor=user, action='CREATE_TENANT', payload={
+                'organisation_id': org.pk, 'facility_id': facility.pk, 'admin_id': user.pk,
+                'onboarding_workspace': onboarding, 'operational_release_required': True,
+            })
+            session = issue_session(user)
+    except IntegrityError:
+        return Response({'ok':False,'errors':{'identity':'company or administrator identifier already exists'}},status=409)
 
     return Response(
         {
             "ok": True,
-            "token": token.key,
+            **session,
             "user": {"id": user.id, "username": username, "role": UserRole.ADMIN},
             "organisation": {"id": org.id, "name": org.name, "slug": org.slug},
             "facility": {"id": facility.id, "name": facility.name, "slug": facility.slug},

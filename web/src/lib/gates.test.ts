@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ALERT_ACK_ROLES, ROUTE_GATES, canAckAlert, canVisit, landingPathForRole, type RouteKey } from './gates'
-import type { Role } from '../store/session'
+import { useSession, type Role } from '../store/session'
 
 const ALL: Role[] = [
   'DISPATCH_SUPERVISOR',
@@ -12,6 +12,16 @@ const ALL: Role[] = [
 ]
 
 describe('ROUTE_GATES (RBAC matrix)', () => {
+  it('lands an unreleased tenant administrator on onboarding and preserves established tenants', () => {
+    const previous = useSession.getState().workspace
+    try {
+      useSession.getState().setWorkspace({organisation:{id:91,name:'Synthetic Tenant',slug:'synthetic'},facilities:[],selectedFacility:'',configuration:{version:0,digest:'',release:null,modules:{yard:false,reports:false,audit:true},content:{schema_version:1,branding:{display_name:'Synthetic Tenant',accent:'#000000',navy:'#000000',paper:'#ffffff'},roles:{ADMIN:{label:'Admin',enabled:true}},permissions:{},workflow:{mandatory_checks:[],inspection_max_age_seconds:3600,escalation_minutes:{}},integrations:{}}}})
+      expect(landingPathForRole('ADMIN')).toBe('/onboarding')
+      expect(canVisit('onboarding','ADMIN')).toBe(true)
+      expect(canVisit('onboarding','OPERATIONS_SUPERVISOR')).toBe(false)
+      expect(canVisit('reports','ADMIN')).toBe(false)
+    } finally { useSession.getState().setWorkspace(previous) }
+  })
   it('denies signed-out visitors everywhere', () => {
     for (const route of Object.keys(ROUTE_GATES) as RouteKey[]) {
       expect(canVisit(route, null)).toBe(false)

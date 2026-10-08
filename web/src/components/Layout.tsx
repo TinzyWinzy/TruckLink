@@ -21,6 +21,7 @@ const PRIMARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] 
 ]
 
 const SECONDARY: { to: string; label: string; route: keyof typeof ROUTE_GATES }[] = [
+  { to: '/onboarding', label: 'Onboarding', route: 'onboarding' },
   { to: '/recovery', label: 'Offline recovery', route: 'recovery' },
   { to: '/hub', label: 'Hub', route: 'hub' },
   { to: '/guide', label: 'Guide', route: 'guide' },

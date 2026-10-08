@@ -2,9 +2,10 @@
 
 import { canAccess, useSession, type Role } from '../store/session'
 
-export type RouteKey = 'consignments' | 'dispatch' | 'approvals' | 'queue' | 'docks' | 'compliance' | 'alerts' | 'reports' | 'audit' | 'admin' | 'hub' | 'guide' | 'modelling' | 'routes' | 'evidence' | 'deliveries' | 'recovery'
+export type RouteKey = 'onboarding' | 'consignments' | 'dispatch' | 'approvals' | 'queue' | 'docks' | 'compliance' | 'alerts' | 'reports' | 'audit' | 'admin' | 'hub' | 'guide' | 'modelling' | 'routes' | 'evidence' | 'deliveries' | 'recovery'
 
 export const ROUTE_GATES: Record<RouteKey, Role[]> = {
+  onboarding: ['ADMIN'],
   consignments: ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER','COMPLIANCE_OFFICER','EXECUTIVE','ADMIN'],
   evidence: ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER','COMPLIANCE_OFFICER','EXECUTIVE','ADMIN'],
   deliveries: ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER','COMPLIANCE_OFFICER','EXECUTIVE','ADMIN'],
@@ -56,6 +57,8 @@ export function canAckAlert(role: Role | null): boolean {
 /** Post-sign-in landing. every role must land on a route it canVisit.
  * Yard roles → /queue; EXECUTIVE/ADMIN → /reports; COMPLIANCE → /approvals. */
 export function landingPathForRole(role: Role): string {
+  const tenant = useSession.getState().workspace?.configuration
+  if (role === 'ADMIN' && !tenant?.release && tenant?.modules?.yard === false) return '/onboarding'
   const preferred: RouteKey = role === 'EXECUTIVE' || role === 'ADMIN' ? 'reports' : role === 'COMPLIANCE_OFFICER' ? 'approvals' : 'queue'
   const route = [preferred, 'routes', 'hub'].find(key => canVisit(key as RouteKey,role)) ?? 'hub'
   return '/' + route
