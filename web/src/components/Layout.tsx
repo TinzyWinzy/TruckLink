@@ -37,6 +37,13 @@ function visible(items: typeof PRIMARY, role: Role | null) {
   return items.filter((i) => canVisit(i.route,role))
 }
 
+const OVERVIEW_ROUTES = new Set(['workspace','reports','alerts'])
+const NAV_GROUPS = [
+  { label: 'Overview', items: SECONDARY.filter(item => OVERVIEW_ROUTES.has(item.route)) },
+  { label: 'Operations', items: PRIMARY },
+  { label: 'Management', items: SECONDARY.filter(item => !OVERVIEW_ROUTES.has(item.route)) },
+]
+
 export default function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
@@ -47,6 +54,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState(0)
   const [blocked, setBlocked] = useState(0)
   const [critical, setCritical] = useState(0)
+  const [menuOpen, setMenuOpen] = useState(false)
   const live = useLive()
   const tenant = workspace?.configuration
   const brand = tenant?.content.branding
@@ -108,29 +116,29 @@ export default function Layout({ children }: { children: ReactNode }) {
 
   const linkCls = (to: string) => {
     const active = pathname === to
-    const base = 'nav-pill touch-target inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold'
+    const base = 'nav-pill'
     if (active) return `${base} nav-active`
-    return `${base} text-white/75 hover:bg-white/10 hover:text-white`
+    return base
   }
 
   return (
     <div className="transport-workbench min-h-screen text-slate-900">
       <a href="#main-content" className="skip-link">Skip to workspace</a>
       <header className="gantry transport-masthead text-white">
-        <div className="masthead-inner flex flex-wrap items-center gap-x-4 gap-y-3">
-          <Link to={role ? landingPathForRole(role) : '/queue'} className="flex items-center gap-2.5" aria-label="Trucki home">
-            <span aria-hidden="true" className="gantry-mark flex h-9 w-9 items-center justify-center rounded-xl text-base font-black text-slate-900">
+        <div className="masthead-inner">
+          <Link to={role ? landingPathForRole(role) : '/queue'} className="workspace-brand" aria-label="Trucki home">
+            <span aria-hidden="true" className="gantry-mark">
               T
             </span>
-            <span className="leading-none">
-              <span className="block text-xs font-semibold text-amber-300">
-                {practice ? 'Practice workspace' : `Tenant: ${tenantDisplayName(tenant,workspace?.organisation?.name)}`}
+            <span className="brand-copy">
+              <span className="brand-name">Trucki</span>
+              <span className="brand-tenant" title={practice ? 'Practice workspace' : tenantDisplayName(tenant,workspace?.organisation?.name)}>
+                {practice ? 'Practice workspace' : tenantDisplayName(tenant,workspace?.organisation?.name)}
               </span>
-              <span className="block text-lg font-extrabold tracking-tight">Trucki</span>
             </span>
           </Link>
       {workspace && <div className="header-yard">
-        <label>Yard <select aria-label="Selected yard" className="field ml-2 px-3 text-slate-900" value={workspace.selectedFacility} onChange={async e => {
+        <label className="header-control"><span>Site</span><select aria-label="Selected yard" value={workspace.selectedFacility} onChange={async e => {
           const id = e.target.value
           if (!workspace.facilities.some(f => String(f.id) === id)) return
           selectFacility(id)
@@ -139,9 +147,9 @@ export default function Layout({ children }: { children: ReactNode }) {
           navigate(landingPathForRole(role!))
         }}>{workspace.facilities.map(f => <option key={f.id} value={String(f.id)}>{f.name}</option>)}</select></label>
       </div>}
-          <div className="flex flex-wrap items-center gap-1.5" role="status" aria-label="Yard state">
-            <span aria-label={online ? 'Online' : 'Offline'} className={online ? 'pill pill-live' : 'pill pill-warn'}>
-              {online ? '● ONLINE' : '■ OFFLINE'}
+          <div className="header-status" role="status" aria-label="Yard state">
+            <span aria-label={online ? 'Online' : 'Offline'} className={`connection-state ${online?'is-online':'is-offline'}`}>
+              <i aria-hidden="true"/>{online ? 'Online' : 'Offline'}
             </span>
             {!live&&<span className="pill pill-demo">■ PRACTICE</span>}
             {pending > 0 && (
@@ -156,8 +164,8 @@ export default function Layout({ children }: { children: ReactNode }) {
           </div>
           <div className="header-spacer"/>
           {baseRole === 'ADMIN' && (
-            <label className="flex items-center gap-1.5 rounded-lg border border-amber-400/50 bg-white/5 px-2 py-1 text-xs font-bold text-amber-300">
-              View as
+            <label className="header-control header-role">
+              <span>Working role</span>
               <select
                 aria-label={practice ? 'Switch practice role' : 'Switch working role'}
                 disabled={switching || (!practice && !online)}
@@ -181,7 +189,6 @@ export default function Layout({ children }: { children: ReactNode }) {
                     setSwitching(false)
                   }
                 }}
-                className="touch-target min-h-0 rounded bg-transparent py-0.5 pr-1 font-extrabold text-white [&>option]:text-slate-900"
               >
                 {(['DISPATCH_SUPERVISOR', 'OPERATIONS_SUPERVISOR', 'FACILITY_MANAGER', 'EXECUTIVE', 'COMPLIANCE_OFFICER', 'ADMIN'] as Role[]).filter(r => tenant?.content.roles[r]?.enabled !== false).map((r) => (
                   <option key={r} value={r}>{tenantLabel(tenant,r)}</option>
@@ -190,7 +197,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             </label>
           )}
           <details className="account-menu">
-            <summary>Account</summary>
+            <summary><span className="account-avatar" aria-hidden="true">{displayName.trim().charAt(0).toUpperCase()||'U'}</span><span>Account</span><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></summary>
             <div className="account-menu-panel"><p className="font-bold">{displayName}</p><p className="mt-1 mb-3 text-sm">{role ? tenantLabel(tenant,role) : 'Signed out'}</p>
           <button
             type="button"
@@ -212,25 +219,34 @@ export default function Layout({ children }: { children: ReactNode }) {
       {switchError && <p role="alert" className="p-4 text-red-800">{switchError}</p>}
       <div className="workbench-body">
       <aside className="workspace-rail">
-        <div className="rail-heading"><span className="eyebrow">Workspace</span></div>
-        {/* Weighted nav. 3 primary jobs, hub/guide + rest secondary (Hick's Law) */}
-        <nav aria-label="Primary" className="workspace-navigation">
-          {visible(PRIMARY, role).map((item) => (
-            <Link key={item.to} to={item.to} aria-current={pathname === item.to ? 'page' : undefined} className={linkCls(item.to)}>
-              {item.label}
-            </Link>
-          ))}
-          <span aria-hidden="true" className="navigation-divider" />
-          {visible(SECONDARY, role).map((item) => (
-            <Link key={item.to} to={item.to} aria-current={pathname === item.to ? 'page' : undefined} className={linkCls(item.to)}>
-              {item.label}
-              {item.to === '/alerts' && critical > 0 && (
-                <span className="tnum flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-extrabold text-white">
-                  {critical}
-                </span>
-              )}
-            </Link>
-          ))}
+        <div className="rail-heading">
+          <span className="rail-caption">Navigation</span>
+          <span className="mobile-current-page">{[...PRIMARY, ...SECONDARY].find(item => item.to === pathname)?.label ?? 'Workspace'}</span>
+          <button type="button" className="mobile-nav-toggle" aria-controls="workspace-navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(value => !value)}>
+            {menuOpen ? 'Close' : 'Menu'}
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <path d={menuOpen ? 'm5 5 10 10M15 5 5 15' : 'M3 5h14M3 10h14M3 15h14'}/>
+            </svg>
+          </button>
+        </div>
+        <nav id="workspace-navigation" aria-label="Primary" className={`workspace-navigation ${menuOpen ? 'is-open' : ''}`}>
+          {NAV_GROUPS.map(group => {
+            const items = visible(group.items, role)
+            return items.length > 0 && (
+              <div className="navigation-group" key={group.label}>
+                <p className="navigation-group-title">{group.label}</p>
+                {items.map(item => (
+                  <Link key={item.to} to={item.to} onClick={() => setMenuOpen(false)} aria-current={pathname === item.to ? 'page' : undefined} className={linkCls(item.to)}>
+                    <span>{item.label}</span>
+                    {item.to === '/alerts' && critical > 0 && <span className="nav-alert-count">{critical}</span>}
+                    {pathname === item.to && (
+                      <svg className="nav-current-mark" width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m8 5 5 5-5 5"/></svg>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            )
+          })}
         </nav>
         <p className="rail-note">Evidence before decision.<br />Approval before release.</p>
       </aside>
