@@ -90,3 +90,16 @@ Deployment preflight, 8 October 2026:
 - The tenant-release browser fixture now supplies dock data and uses the current guided module checkbox instead of attempting to fill the collapsed advanced JSON editor.
 - Production build, lint (existing shared-UI warning only), Django check and migration consistency check passed.
 - Deployment is authorized by the user. Backend migrations must finish before frontend promotion. Production verification performs authentication and authorized reads only, with no operational writes or customer module requests.
+
+## Production deployment receipt, 8 October 2026
+
+- Runtime revision: `93618a02c477e6b9b9b048783f8c2da90fbbc546` on TruckLink main.
+- Render backend: `dep-db3k9s3l550s73ajtp10`, LIVE at 07:24:29 UTC. Startup applied the new tenancy migrations. Health returned HTTP 200 with `ok=true`.
+- Vercel frontend: `dpl_DZwQmX4uszBLZfy3W8nrUsiXpwd5`, READY. Vite build took 15 seconds. Staged immutable URL: https://trucki-ooz94u2ae-brandontinozs-projects.vercel.app/ . Promoted to https://trucki-two.vercel.app/ ; inspection confirmed the public URL resolves to this deployment.
+- Staged HTML/asset checks passed. Browser sign-in on the temporary hostname was rejected by the backend's existing CORS policy. The public-origin preflight passed. No CORS permissions were widened; authenticated tenant API checks passed before promotion, and the full browser verification passed on the public domain afterwards.
+- Real Trinitas administrator verification passed: PIN sign-in, module catalogue, included audit, v1 audit-only continuity entitlement, no active operational release, no checkout, scoped audit-only workspace, foreign workspace/audit denial, unavailable reports denial, session restoration after reload, mobile layout and sign-out.
+- Browser verification observed zero page errors and zero HTTP 5xx responses. Render error-severity log scans from deployment start through 07:29:52 UTC returned no entries. This is a bounded deployment check, not continuous monitoring; drains were not audited or changed.
+- No module request, contract/trial grant, release activation, dock, vehicle, trip or other operational record was created during production verification. Authentication sessions and their normal audit records were the only writes.
+- Direct database queries through the hosted Render connector were unavailable under the database's existing external-connection restrictions. No networking permissions were changed. The deployed migration's Trinitas continuity result was verified through authenticated APIs; established-tenant continuity also passed disposable migration tests.
+
+This receipt is saved locally after deployment. A documentation-only push is unnecessary and would trigger another backend deployment.
