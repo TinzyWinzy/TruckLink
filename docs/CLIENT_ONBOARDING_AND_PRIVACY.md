@@ -41,3 +41,13 @@ The discovery checklist is guidance, not a stored privacy authorization, consent
 ## Validation
 
 13 new synthetic backend cases test single-account creation, blank personal fields, PIN hashing, scoped renewable access, locked writes, invalid/excessive inputs, duplicate credentials, cross-tenant access and rollback. Together with retained auth and architecture tests, 50 backend cases pass. Browser verification covers the new tenant landing, restoration, navigation and mobile width. Existing tenant data is not part of the synthetic tests.
+
+## Production receipt, 8 October 2026
+
+Application commit `13bb6de174066b23181e700da07f47ee65717984` is deployed. Render `dep-db3jlnijnfac738e48kg` reached LIVE at 06:41:33 UTC. Vercel production `dpl_GJeqgxqSPvpRoKpYbmPfw13YDRgv` was staged, passed 10 read-only smoke checks, and was promoted to https://trucki-two.vercel.app. Its immutable URL is https://trucki-osukpokl8-brandontinozs-projects.vercel.app.
+
+The user-approved Trinitas tenant is organisation 2, with administrative placeholder workspace 2 and one ADMIN user 3 (`TRK-TRINITAS-ADMIN`). Provisioning submitted no personal contact fields. Only audit is enabled; no active release, discovered policies, integrations or operational inventory were created. Credentials and local provisioning/verification helpers are excluded from Git, with no PIN or session secret in this record.
+
+Production Chromium verification passed actual PIN sign-in, Trinitas identity, operational-module lock state, own-site audit read, denial of BAK audit access, session restoration, desktop/mobile layout and sign-out. API verification also denied access to BAK dashboard aggregates. No operational writes were made during verification. The staged suite's separate BAK-authenticated dashboard check remained skipped because BAK credentials were unavailable; this Trinitas verification does not establish a complete customer dispatch lifecycle.
+
+Frontend build and lint passed with the existing shared-UI Fast Refresh warning. 105 existing frontend unit cases passed in the full run; the new gate case initially had an incomplete synthetic module fixture, which was corrected and all six gate cases then passed. The synthetic onboarding browser check passed. No database migration was required for this release.
