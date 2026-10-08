@@ -69,19 +69,18 @@ def resolved(organisation, at=None, facility=None):
     content = deepcopy(row.content) if row else defaults()
     if not row and not content['branding']['display_name']:
         content['branding']['display_name'] = organisation.name
-    from .releases import active_release,release_config,artifacts
+    from .releases import active_release,release_config
     release = active_release(organisation,at)
     if release:
         content = release_config(release,facility,at)
         row = release.configuration
-    modules = artifacts(release,kind='MODULES',at=at)[0].content if release else None
-    if not release and getattr(organisation,'requires_release',False):
-        from .registry import MODULES
-        modules = {key:key == 'audit' for key in MODULES}
+    from .subscriptions import entitlement, effective_modules, configured_modules
+    modules = effective_modules(organisation,at)
     from regulatory.engine.evaluator import digest
     return {'id':row.pk if row else None,'version': row.version if row else 0, 'digest': row.digest if row else '', 'content': content,
         'effective_digest':digest(content),
-        'modules':modules,'release':{'id':release.pk,'version':release.version,'digest':release.digest} if release else None}
+        'modules':modules,'configured_modules':configured_modules(organisation,at),'subscription':entitlement(organisation,at),
+        'release':{'id':release.pk,'version':release.version,'digest':release.digest} if release else None}
 
 
 def role_enabled(organisation, role):

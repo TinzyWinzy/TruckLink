@@ -23,6 +23,9 @@ class DashboardView(APIView):
         site, error = resolve_facility(request)
         if error is not None:
             return error
+        from tenancy.releases import module_enabled
+        if not module_enabled(site.organisation,'reports'):
+            return Response({'detail':'Operational intelligence requires an entitled, configured reports module'},status=403)
         window = request.query_params.get('window', '24h')
         days = {'24h': 1, '7d': 7, '30d': 30}.get(window)
         if days is None:
@@ -71,10 +74,10 @@ class DashboardView(APIView):
             key = bucket.isoformat()
             series.append({'at': key, 'arrivals': arrivals.get(key, 0), 'exits': exits.get(key, 0)})
             bucket += timedelta(hours=1) if hourly else timedelta(days=1)
-        can_docks = rbac_allows(role, 'docks', 'read', site.organisation, site)
+        can_docks = module_enabled(site.organisation, 'docks') and rbac_allows(role, 'docks', 'read', site.organisation, site)
         docks = Dock.objects.filter(organisation=site.organisation, facility=site)
         dock_counts = dict(docks.values('status').annotate(n=Count('pk')).values_list('status', 'n')) if can_docks else None
-        can_alerts = rbac_allows(role, 'alerts', 'read', site.organisation, site)
+        can_alerts = module_enabled(site.organisation, 'yard') and rbac_allows(role, 'alerts', 'read', site.organisation, site)
         alerts = Alert.objects.filter(organisation=site.organisation, facility=site, acknowledged=False)
         alert_counts = dict(alerts.values('severity').annotate(n=Count('pk')).values_list('severity', 'n')) if can_alerts else None
         payload = {

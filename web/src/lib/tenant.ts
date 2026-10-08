@@ -1,4 +1,6 @@
 export interface TenantConfiguration {
+  configured_modules?: Record<string, boolean>
+  subscription?: {version:number;state:string;basis:string|null;modules:string[];effective_from:string|null;effective_to:string|null}
   id?: number | null
   modules?: Record<string, boolean> | null
   release?: { id: number; version: number; digest: string } | null

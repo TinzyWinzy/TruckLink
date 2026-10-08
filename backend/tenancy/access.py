@@ -30,6 +30,8 @@ def enforce_request(user,request):
     if module and not module_enabled(org,module):
         raise PermissionDenied(f'Tenant module {module} is disabled')
     if path in ('/api/trip/','/api/trip/estimate/','/api/routes/preview/','/api/routes/drafts/'):
+        if not module_enabled(org,'routing'):
+            raise PermissionDenied('Tenant module routing is disabled')
         from .integrations import adapter_enabled
         if not adapter_enabled(org,'road-routing-v1'):
             raise PermissionDenied('Tenant road-routing adapter is disabled')

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useSession } from '../store/session'
 import { tenantDisplayName } from '../lib/tenant'
 import { PageHeader, Section } from '../components/ui'
+import ModuleSelection from '../components/ModuleSelection'
 
 export default function Onboarding() {
   const { workspace } = useSession()
@@ -16,6 +17,7 @@ export default function Onboarding() {
       <dl className="mt-4 grid gap-4 sm:grid-cols-2"><div><dt className="text-sm text-slate-600">Company</dt><dd className="font-semibold">{company}</dd></div><div><dt className="text-sm text-slate-600">Selected workspace</dt><dd className="font-semibold">{site?.name ?? 'No assigned workspace'}</dd></div></dl>
       {!release && <p className="mt-3 text-sm">An onboarding workspace is an administrative placeholder. Confirm actual sites and docks during discovery.</p>}
     </section>
+    <ModuleSelection />
     <Section title="Before operational activation" sub="Discovery tasks, not completed compliance checks.">
       <ol className="list-decimal space-y-4 pl-5 text-sm">
         <li><strong>Confirm company authority and sites.</strong> Identify the onboarding owner, actual sites and their timezones.</li>

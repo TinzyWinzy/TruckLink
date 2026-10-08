@@ -64,14 +64,14 @@ export function CountChart({ title, subtitle, values, empty, colour }: {
   </section>
 }
 
-export function DashboardCharts({ data }: { data: Dashboard }) {
+export function DashboardCharts({ data, showDocks=true, showAlerts=true }: { data: Dashboard; showDocks?:boolean; showAlerts?:boolean }) {
   const dockTotal = data.docks ? Object.values(data.docks).reduce((a,b)=>a+b,0) : null
   return <>
     <div className="intel-top-grid"><ActivityChart data={data} /><CountChart title="Time in yard" subtitle="All active visits, measured since recorded arrival" values={data.age_buckets} empty="No recorded active visits." colour={(_, i) => [colours.ink, colours.ink, colours.warning, colours.blocked][i]} /></div>
     <div className="intel-bottom-grid">
       <CountChart title="Active movements" subtitle={`${data.summary.active} active visits across all arrival dates`} values={Object.entries(data.active_statuses).map(([key,count])=>({key,label:label(key),count}))} empty="No recorded active visits." colour={key=>key==='QUARANTINED'?colours.blocked:key==='PENDING_OVERRIDE'?colours.warning:colours.ink} />
-      <CountChart title="Dock occupancy" subtitle={dockTotal == null ? 'Dock data not permitted for this account' : `${dockTotal} configured docks · current snapshot`} values={['OCCUPIED','AVAILABLE','MAINTENANCE'].map(key=>({key,label:label(key),count:data.docks?.[key]??0}))} empty={dockTotal == null ? 'Dock data unavailable for this account.' : 'No configured docks.'} colour={key=>key==='AVAILABLE'?colours.exits:key==='MAINTENANCE'?colours.warning:colours.ink} />
-      <CountChart title="Open alerts" subtitle="Unacknowledged alerts by severity" values={['CRITICAL','HIGH','MEDIUM','LOW'].map(key=>({key,label:label(key),count:data.alerts?.[key]??0}))} empty={data.alerts==null?'Alert data unavailable for this account.':'No unacknowledged alerts recorded.'} colour={key=>['CRITICAL','HIGH'].includes(key)?colours.blocked:key==='MEDIUM'?colours.warning:colours.muted} />
+      {showDocks&&<CountChart title="Dock occupancy" subtitle={dockTotal == null ? 'Dock data not permitted for this account' : `${dockTotal} configured docks · current snapshot`} values={['OCCUPIED','AVAILABLE','MAINTENANCE'].map(key=>({key,label:label(key),count:data.docks?.[key]??0}))} empty={dockTotal == null ? 'Dock data unavailable for this account.' : 'No configured docks.'} colour={key=>key==='AVAILABLE'?colours.exits:key==='MAINTENANCE'?colours.warning:colours.ink} />}
+      {showAlerts&&<CountChart title="Open alerts" subtitle="Unacknowledged alerts by severity" values={['CRITICAL','HIGH','MEDIUM','LOW'].map(key=>({key,label:label(key),count:data.alerts?.[key]??0}))} empty={data.alerts==null?'Alert data unavailable for this account.':'No unacknowledged alerts recorded.'} colour={key=>['CRITICAL','HIGH'].includes(key)?colours.blocked:key==='MEDIUM'?colours.warning:colours.muted} />}
     </div>
   </>
 }

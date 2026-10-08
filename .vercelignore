@@ -1,0 +1,11 @@
+# The existing Vercel project builds only web/. Keep local credentials and
+# backend/runtime artifacts out of the deployment upload.
+.git/
+.secrets/
+backend/
+docs/
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+**/.env*

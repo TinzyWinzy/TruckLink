@@ -2,9 +2,10 @@
 
 import { canAccess, useSession, type Role } from '../store/session'
 
-export type RouteKey = 'onboarding' | 'consignments' | 'dispatch' | 'approvals' | 'queue' | 'docks' | 'compliance' | 'alerts' | 'reports' | 'audit' | 'admin' | 'hub' | 'guide' | 'modelling' | 'routes' | 'evidence' | 'deliveries' | 'recovery'
+export type RouteKey = 'workspace' | 'onboarding' | 'consignments' | 'dispatch' | 'approvals' | 'queue' | 'docks' | 'compliance' | 'alerts' | 'reports' | 'audit' | 'admin' | 'hub' | 'guide' | 'modelling' | 'routes' | 'evidence' | 'deliveries' | 'recovery'
 
 export const ROUTE_GATES: Record<RouteKey, Role[]> = {
+  workspace: ['ADMIN','DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER','COMPLIANCE_OFFICER','EXECUTIVE'],
   onboarding: ['ADMIN'],
   consignments: ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER','COMPLIANCE_OFFICER','EXECUTIVE','ADMIN'],
   evidence: ['DISPATCH_SUPERVISOR','OPERATIONS_SUPERVISOR','FACILITY_MANAGER','COMPLIANCE_OFFICER','EXECUTIVE','ADMIN'],
@@ -59,7 +60,8 @@ export function canAckAlert(role: Role | null): boolean {
 export function landingPathForRole(role: Role): string {
   const tenant = useSession.getState().workspace?.configuration
   if (role === 'ADMIN' && !tenant?.release && tenant?.modules?.yard === false) return '/onboarding'
+  if (tenant?.subscription && tenant.subscription.basis !== 'LEGACY_CONTINUITY' && canVisit('workspace',role)) return '/workspace'
   const preferred: RouteKey = role === 'EXECUTIVE' || role === 'ADMIN' ? 'reports' : role === 'COMPLIANCE_OFFICER' ? 'approvals' : 'queue'
-  const route = [preferred, 'routes', 'hub'].find(key => canVisit(key as RouteKey,role)) ?? 'hub'
+  const route = [preferred, 'routes', 'workspace', 'hub'].find(key => canVisit(key as RouteKey,role)) ?? 'hub'
   return '/' + route
 }

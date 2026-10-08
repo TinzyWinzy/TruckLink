@@ -104,7 +104,7 @@ function ReportsWorkspace({ window, onWindow, onRetry }: { window: DashboardWind
       <div><p className="text-sm font-semibold">Needs attention</p><h2>{title}</h2><p className="mt-2 text-sm">{unavailable ? 'Use a fresh snapshot before making an operational decision.' : counts?.blocked ? 'Resolve missing records and independent reviews from the movement worklist.' : 'Elapsed time indicates age, not the cause of a delay or permission to release.'}</p></div>
       {canVisit('queue',role) && <Link className="btn-secondary inline-flex items-center justify-center px-4" to="/queue">Open shift queue →</Link>}
     </section>
-    <MovementWorklist attention />
+    {canVisit('dispatch',role)&&<MovementWorklist attention />}
     <div className="report-metric-strip">
       <Stat label="Active in yard" value={data?String(counts!.active):'Awaiting data'} unavailable={unavailable} hint="All recorded active visits, including older arrivals" />
       <Stat label="Recorded arrivals" value={data?String(counts!.arrivals):'Awaiting data'} unavailable={unavailable} hint="Arrivals in the selected chart window" />
@@ -114,7 +114,7 @@ function ReportsWorkspace({ window, onWindow, onRetry }: { window: DashboardWind
     {loading && <div className="intel-loading" role="status">Loading activity graphs and source coverage…</div>}
     {data && <div className={stale?'intel-stale-charts':''} aria-label={stale?'Last recorded dashboard snapshot':'Current dashboard graphs'}>
       {stale && <p className="intel-stale-banner" role="status">{paused?'Updates paused.':'Snapshot may be stale.'} Charts show the last successful read at {updated}.</p>}
-      <DashboardCharts data={data} />
+      <DashboardCharts data={data} showDocks={workspace?.configuration?.modules?.docks!==false} showAlerts={workspace?.configuration?.modules?.yard!==false} />
     </div>}
     <section className="report-panel" aria-label="Data availability">
       <div className="report-section-heading"><h2>Data availability</h2><span>Source coverage</span></div>

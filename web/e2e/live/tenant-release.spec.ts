@@ -16,6 +16,7 @@ test('configuration authoring, publication and activation update module navigati
     const path = new URL(route.request().url()).pathname
     if (path === '/api/auth/me/' && !route.request().headers().authorization) { await route.fulfill({status:401,json:{}}); return }
     let response:unknown = {}
+    if (path === '/api/docks/') response = {docks:[]}
     if (path === '/api/auth/pin/') response = {token:'synthetic-only',user:user()}
     if (path === '/api/auth/me/') response = {user:user()}
     if (path === '/api/tenant/configuration/') response = {configuration:config}
@@ -49,7 +50,7 @@ test('configuration authoring, publication and activation update module navigati
   await expect(page).toHaveURL(/\/reports$/)
   await page.getByRole('link',{name:'Admin',exact:true}).click()
   await page.getByRole('button',{name:'MODULES · capabilities · v1 · #1',exact:true}).click()
-  await page.getByLabel('Revision configuration').fill(JSON.stringify({...modules,routing:false},null,2))
+  await page.getByRole('checkbox',{name:'routing',exact:true}).uncheck()
   await page.getByLabel('Release change reason').fill('Synthetic module test')
   await page.getByRole('button',{name:'Save configuration revision',exact:true}).click()
   await expect(page.getByText('Configuration revision saved.',{exact:false})).toBeVisible()

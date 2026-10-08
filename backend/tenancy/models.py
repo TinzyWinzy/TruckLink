@@ -169,3 +169,59 @@ class WorkflowEvent(Retained):
         super().clean()
         if self.execution.organisation_id != self.organisation_id or self.audit.organisation_id != self.organisation_id or self.audit.facility_id != self.execution.facility_id:
             raise ValidationError('Workflow event is outside execution tenant/site')
+
+
+class TenantModuleSelection(Retained):
+    """An administrator's versioned request; it grants no commercial or operational access."""
+    organisation = models.ForeignKey('trip.Organisation',on_delete=models.PROTECT)
+    version = models.PositiveIntegerField()
+    modules = models.JSONField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['organisation','version'],name='unique_tenant_module_selection')]
+
+    def clean(self):
+        super().clean()
+        from .catalogue import expand_modules
+        expand_modules(self.modules)
+        if self.version < 1 or not self.creator_id or self.creator.profile.role != 'ADMIN':
+            raise ValidationError('Tenant administrator and positive selection version required')
+
+
+class TenantEntitlementVersion(models.Model):
+    """Platform-issued access ceiling, independent of tenant-owned configuration."""
+    organisation = models.ForeignKey('trip.Organisation',on_delete=models.PROTECT)
+    version = models.PositiveIntegerField()
+    modules = models.JSONField()
+    state = models.CharField(max_length=16,choices=[('ACTIVE','Active'),('SUSPENDED','Suspended')])
+    basis = models.CharField(max_length=24,choices=[('LEGACY_CONTINUITY','Legacy continuity'),('CONTRACT','Approved contract'),('TRIAL','Approved trial')])
+    effective_from = models.DateTimeField(default=timezone.now)
+    effective_to = models.DateTimeField(null=True,blank=True)
+    creator = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,null=True,blank=True)
+    reason = models.TextField()
+    created_at = models.DateTimeField(default=timezone.now,editable=False)
+    objects = ImmutableQuerySet.as_manager()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['organisation','version'],name='unique_tenant_entitlement_version')]
+
+    def clean(self):
+        from .catalogue import expand_modules
+        if self.modules != expand_modules(self.modules):
+            raise ValidationError('Grant must include required module dependencies and audit')
+        if self.version < 1 or not isinstance(self.reason,str) or not self.reason.strip() or (self.effective_to and self.effective_to <= self.effective_from):
+            raise ValidationError('Positive version, reason and valid effective dates required')
+        if self.creator_id:
+            if not self.creator.is_superuser or not self.creator.is_active:
+                raise ValidationError('Entitlements require an active platform operator')
+        elif self.basis != 'LEGACY_CONTINUITY':
+            raise ValidationError('A platform operator must issue the entitlement')
+
+    def save(self,*args,**kwargs):
+        if not self._state.adding:
+            raise ValidationError('Append a new entitlement version')
+        self.full_clean()
+        return super().save(*args,**kwargs)
+
+    def delete(self,*args,**kwargs):
+        raise ValidationError('Entitlement history is retained')

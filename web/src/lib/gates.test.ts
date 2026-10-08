@@ -20,6 +20,10 @@ describe('ROUTE_GATES (RBAC matrix)', () => {
       expect(canVisit('onboarding','ADMIN')).toBe(true)
       expect(canVisit('onboarding','OPERATIONS_SUPERVISOR')).toBe(false)
       expect(canVisit('reports','ADMIN')).toBe(false)
+      const configured=useSession.getState().workspace!
+      useSession.getState().setWorkspace({...configured,configuration:{...configured.configuration!,release:{id:1,version:1,digest:'synthetic'},subscription:{version:1,state:'ACTIVE',basis:'TRIAL',modules:['audit'],effective_from:null,effective_to:null}}})
+      expect(landingPathForRole('ADMIN')).toBe('/workspace')
+      expect(canVisit('reports','ADMIN')).toBe(false)
     } finally { useSession.getState().setWorkspace(previous) }
   })
   it('denies signed-out visitors everywhere', () => {

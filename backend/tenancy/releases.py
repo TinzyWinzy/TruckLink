@@ -47,11 +47,8 @@ def release_config(release, facility=None, at=None):
 
 
 def module_enabled(org, module):
-    release = active_release(org)
-    if not release:
-        return module == 'audit' or not getattr(org,'requires_release',False)
-    rows = artifacts(release,kind='MODULES')
-    return bool(rows and rows[0].content.get(module,False))
+    from .subscriptions import effective_modules
+    return effective_modules(org).get(module,False)
 
 
 def require_module(org, module):
@@ -99,6 +96,10 @@ def validate_release(row):
     modules = [r for r in rows if r.kind == 'MODULES']
     if len(modules) != 1 or modules[0].facility_id:
         raise ValidationError('Exactly one tenant-wide module configuration required')
+    from .subscriptions import entitlement
+    selected = {key for key,enabled in modules[0].content.items() if enabled}
+    if not selected <= set(entitlement(row.organisation)['modules']):
+        raise ValidationError('Selected modules require a platform-issued subscription entitlement')
     scopes = set()
     for r in rows:
         r.full_clean()
