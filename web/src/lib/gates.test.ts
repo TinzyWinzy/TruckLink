@@ -18,6 +18,7 @@ describe('ROUTE_GATES (RBAC matrix)', () => {
       useSession.getState().setWorkspace({organisation:{id:91,name:'Synthetic Tenant',slug:'synthetic'},facilities:[],selectedFacility:'',configuration:{version:0,digest:'',release:null,modules:{yard:false,reports:false,audit:true},content:{schema_version:1,branding:{display_name:'Synthetic Tenant',accent:'#000000',navy:'#000000',paper:'#ffffff'},roles:{ADMIN:{label:'Admin',enabled:true}},permissions:{},workflow:{mandatory_checks:[],inspection_max_age_seconds:3600,escalation_minutes:{}},integrations:{}}}})
       expect(landingPathForRole('ADMIN')).toBe('/onboarding')
       expect(canVisit('onboarding','ADMIN')).toBe(true)
+      expect(canVisit('onboarding','COMPLIANCE_OFFICER')).toBe(true)
       expect(canVisit('onboarding','OPERATIONS_SUPERVISOR')).toBe(false)
       expect(canVisit('reports','ADMIN')).toBe(false)
       const configured=useSession.getState().workspace!

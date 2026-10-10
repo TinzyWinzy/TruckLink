@@ -31,14 +31,15 @@ export default function PlatformConfiguration({stage}: {stage?: 'configure'|'rev
     const organisationId = useSession.getState().workspace?.organisation?.id
     const [r,versions,published,c,subscription] = await Promise.all([
       apiFetch<Registry>('/tenant/registry/'), apiFetch<{revisions:Revision[]}>('/tenant/revisions/'),
-      apiFetch<{releases:Release[]}>('/tenant/releases/'), apiFetch<{configuration:TenantConfiguration}>('/tenant/configuration/'), readSubscription(),
+      apiFetch<{releases:Release[]}>('/tenant/releases/'), apiFetch<{configuration:TenantConfiguration}>('/tenant/configuration/'),
+      useSession.getState().role === 'ADMIN' ? readSubscription() : Promise.resolve(null),
     ])
     const current = useSession.getState().workspace
     if (current?.organisation?.id !== organisationId) return
     setRegistry(r); setRevisions(versions.revisions); setReleases(published.releases)
-    setRequestedModules(subscription.selection?.required_modules ?? subscription.entitlement.modules)
+    setRequestedModules(subscription?.selection?.required_modules ?? subscription?.entitlement.modules ?? [])
     setConfigId(c.configuration.id ?? r.release?.configuration_id ?? null)
-    const requested = new Set<string>(subscription.selection?.required_modules ?? subscription.entitlement.modules)
+    const requested = new Set<string>(subscription?.selection?.required_modules ?? subscription?.entitlement.modules ?? [])
     setContent(old=>old==='{}'?JSON.stringify(Object.fromEntries(Object.keys(r.modules).map(k=>[k,k==='audit'||requested.has(k)])),null,2):old)
     setSelected(r.release?.artifact_ids ?? [])
     if (current) useSession.getState().setWorkspace({...current,configuration:c.configuration})
