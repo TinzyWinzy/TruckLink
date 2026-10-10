@@ -4,7 +4,7 @@ import { useSession } from '../store/session'
 import type { TenantConfiguration } from '../lib/tenant'
 import { Section } from './ui'
 
-export default function TenantSettings() {
+export default function TenantSettings({guided=false}: {guided?:boolean} = {}) {
   const { workspace, setWorkspace } = useSession()
   const [config, setConfig] = useState<TenantConfiguration | null>(null)
   const [reason, setReason] = useState('')
@@ -35,6 +35,7 @@ export default function TenantSettings() {
   return <Section title="Tenant configuration" sub={'Version ' + config.version + '. Changes append history; existing records remain intact.'}>
     <form onSubmit={event => { event.preventDefault(); void save() }}><fieldset disabled={busy} className="space-y-4">
       <label className="block text-sm">Tenant display name<input required maxLength={200} className="field mt-1 w-full px-3" value={config.content.branding.display_name} onChange={event => edit(content => { content.branding.display_name = event.target.value })} /></label>
+      <details open={guided?undefined:true}><summary className="cursor-pointer text-sm font-bold">Branding, roles and advanced operating defaults</summary><div className="mt-3 space-y-4">
       <div className="grid grid-cols-3 gap-3">{(['accent','navy','paper'] as const).map(key => <label key={key} className="text-sm capitalize">{key} color<input type="color" className="field mt-1 w-full" value={config.content.branding[key]} onChange={event => edit(content => { content.branding[key] = event.target.value })} /></label>)}</div>
       <div className="space-y-2"><h3 className="font-semibold">Tenant roles</h3>{Object.entries(config.content.roles).map(([role, value]) => <div key={role} className="flex items-center gap-3">
         <input type="checkbox" aria-label={'Enable ' + role} disabled={role === 'ADMIN'} checked={value.enabled} onChange={event => edit(content => { content.roles[role].enabled = event.target.checked })} />
@@ -45,8 +46,9 @@ export default function TenantSettings() {
       <div className="grid gap-3 sm:grid-cols-2">{['FM','EXEC'].map(key => <label key={key} className="text-sm">{key === 'FM' ? 'Facility manager' : 'Executive'} escalation after minutes<input readOnly={!!config.release} type="number" min={1} max={10080} required className="field mt-1 w-full px-3" value={config.content.workflow.escalation_minutes[key]} onChange={event => edit(content => { content.workflow.escalation_minutes[key] = Number(event.target.value) })} /></label>)}</div>
       <p className="text-sm">Sites remain scoped to this tenant. Integration credentials are bound by a platform operator and are never stored in this form. Role settings cannot bypass independent approvals or regulatory controls.</p>
       {config.release && <p className="text-sm">Operational requirements are managed through independently reviewed workflow revisions in Modules and workflow releases below.</p>}
+      </div></details>
       <label className="block text-sm">Reason for change<textarea required className="field mt-1 w-full p-3" value={reason} onChange={event => setReason(event.target.value)} /></label>
-      <button type="submit" className="btn-primary px-4">{busy ? 'Saving configuration' : 'Save tenant configuration'}</button>
+      <button type="submit" className="btn-primary px-4">{busy ? 'Saving configuration' : guided ? 'Save company details' : 'Save tenant configuration'}</button>
       {message && <p role="status" className="text-sm">{message}</p>}
     </fieldset></form>
   </Section>

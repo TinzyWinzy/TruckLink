@@ -46,6 +46,49 @@ def allowed_rows(model,request,org):
     return rows
 
 
+class SiteInput(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
+    timezone = serializers.CharField(max_length=64)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def sites(request):
+    """Provision an operational site without granting operational activation."""
+    from core.models import Facility
+    from django.utils.text import slugify
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    def serialize(site):
+        return {'id': site.pk, 'name': site.name, 'slug': site.slug,
+                'timezone': site.timezone, 'placeholder': bool(site.yard_config.get('onboarding'))}
+    try:
+        org = identity(request, request.method == 'POST')
+        if request.method == 'GET':
+            return Response({'sites': [serialize(s) for s in user_facilities(request.user).filter(organisation=org, is_deleted=False)]})
+        form = SiteInput(data=request.data)
+        form.is_valid(raise_exception=True)
+        data = form.validated_data
+        try:
+            ZoneInfo(data['timezone'])
+        except (ZoneInfoNotFoundError, ValueError):
+            return Response({'error': 'Choose a valid timezone, for example Africa/Harare.'}, status=400)
+        with transaction.atomic():
+            Organisation.objects.select_for_update().get(pk=org.pk)
+            base = slugify(data['name'])[:80] or 'site'
+            slug = base
+            suffix = 2
+            while Facility.objects.filter(organisation=org, slug=slug).exists():
+                slug = f'{base}-{suffix}'
+                suffix += 1
+            site = Facility.objects.create(organisation=org, slug=slug, yard_config={'mode': 'OPERATIONS'}, **data)
+            request.user.profile.facilities.add(site)
+            from core.audit import append_audit
+            append_audit(facility=site, actor=request.user, action='CREATE_SITE', payload={'site_id': site.pk, 'timezone': site.timezone})
+        return Response({'site': serialize(site)}, status=201)
+    except (PermissionError, IntegrityError) as exc:
+        return error(exc)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def registry(request):
@@ -77,7 +120,12 @@ def revisions(request):
     try:
         org = identity(request,request.method == 'POST')
         if request.method == 'GET':
-            return Response({'revisions':[output(r) for r in allowed_rows(TenantArtifactRevision,request,org).order_by('-pk')[:300]]})
+            rows = list(allowed_rows(TenantArtifactRevision,request,org).order_by('-pk')[:300])
+            reviews = {}
+            for review_row in ArtifactReview.objects.filter(organisation=org,artifact_id__in=[r.pk for r in rows]).order_by('-pk'):
+                reviews.setdefault(review_row.artifact_id, review_row.approved)
+            return Response({'revisions':[dict(output(r), authored_by_you=r.creator_id==request.user.pk,
+                review_approved=reviews.get(r.pk)) for r in rows]})
         form = ArtifactInput(data=request.data); form.is_valid(raise_exception=True); data = form.validated_data
         if data['kind'] == 'INTEGRATION' and not request.user.is_superuser:
             raise PermissionError('Integration bindings require a platform operator')

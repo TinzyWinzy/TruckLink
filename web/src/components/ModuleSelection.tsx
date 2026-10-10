@@ -2,19 +2,19 @@ import { useEffect, useState } from 'react'
 import { readSubscription, requiredModules, saveModuleSelection, type ModuleKey, type Subscription } from '../lib/subscriptions'
 import { Section } from './ui'
 
-export default function ModuleSelection() {
+export default function ModuleSelection({onSaved}: {onSaved?: () => void} = {}) {
   const [data,setData]=useState<Subscription|null>(null)
   const [selected,setSelected]=useState<ModuleKey[]>([])
   const [error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[reload,setReload]=useState(0)
   useEffect(()=>{let active=true;void readSubscription().then(value=>{if(active){setData(value);setSelected(value.selection?.modules??value.entitlement.modules)}}).catch(()=>{if(active)setError('Module choices could not be loaded. Retry when connected.')});return()=>{active=false}},[reload])
   function reloadModules(){setError('');setMessage('');setData(null);setReload(n=>n+1)}
-  async function save(){if(!data)return;setBusy(true);setError('');setMessage('');try{const value=await saveModuleSelection(selected,data.selection?.version??0);setData(value);setSelected(value.selection!.modules);setMessage('Module request saved. Subscription approval and operational activation are separate steps.')}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
+  async function save(){if(!data)return;setBusy(true);setError('');setMessage('');try{const value=await saveModuleSelection(selected,data.selection?.version??0);setData(value);setSelected(value.selection!.modules);setMessage('Module request saved. Subscription approval and operational activation are separate steps.');onSaved?.()}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
   const included=data?requiredModules(selected,data.catalogue):[]
   return <Section title="Choose your modules" sub="Request the capabilities your company needs. Saving a request does not activate access or take payment.">
     {!data&&!error&&<p role="status">Loading module choices…</p>}
     {error&&<div role="alert"><p>{error}</p><button type="button" className="btn-secondary mt-3 px-4" disabled={busy} onClick={reloadModules}>Reload modules</button></div>}
     {data&&<form onSubmit={e=>{e.preventDefault();void save()}}>
-      <p className="mb-4 text-sm">Access status: {data.entitlement.state.toLowerCase().replaceAll('_',' ')}{data.entitlement.basis==='LEGACY_CONTINUITY'?' (existing workspace continuity)':''}. Pricing and checkout are not configured.</p>
+      <p className="mb-4 text-sm">Subscription permission: {data.entitlement.state.toLowerCase().replaceAll('_',' ')}{data.entitlement.basis==='LEGACY_CONTINUITY'?' (existing workspace continuity)':''}. Operational readiness is shown separately in setup. Pricing and checkout are not configured.</p>
       <div className="grid gap-3 sm:grid-cols-2">{data.catalogue.map(row=>{
         const requested=included.includes(row.key),active=data.effective_modules[row.key],granted=data.entitlement.modules.includes(row.key)
         return <label key={row.key} className={`rounded-lg border p-4 ${requested?'border-blue-400 bg-blue-50/40':'border-slate-200'}`}>
