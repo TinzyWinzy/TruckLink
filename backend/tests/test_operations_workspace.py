@@ -31,6 +31,8 @@ def test_worklists_respect_tenant_site_and_do_not_write(domain):
     assert response.status_code==200
     item=response.data['movements'][0]
     assert item['next_action']['stage']=='TRIP' and item['next_action']['assigned_person'] is None
+    assert item['stage_wait_started_at'] is None and item['stage_wait_minutes'] is None
+    assert response.data['worklist']['mode']=='latest_visits'
     assert 'setup' not in item and m.InspectionAttempt.objects.count()==before
     unassigned=Facility.objects.create(organisation=d['org'],name='Unassigned',slug='unassigned-read')
     foreign=Organisation.objects.create(name='Other company',slug='other-worklist')
@@ -39,6 +41,36 @@ def test_worklists_respect_tenant_site_and_do_not_write(domain):
         for f in (unassigned,other):assert c.get(f'/api/{endpoint}/?facility={f.pk}').status_code==404
         assert c.post(f'/api/{endpoint}/?facility={site.pk}',{},format='json').status_code==405
     assert c.get(f'/api/operations/?facility={site.pk}&entry=999999').status_code==404
+    assert c.get(f'/api/operations/?facility={unassigned.pk}&view=active').status_code==404
+
+def test_active_worklist_is_complete_cursor_paged_and_preserves_legacy_view(domain):
+    d=domain;site=d['default_facility'];actor=d['reviewer'];c=client(actor)
+    d['entry'].status='COMPLETED';d['entry'].save()
+    active=[]
+    for index in range(3):
+        active.append(QueueEntry.objects.create(
+            organisation=d['org'],facility=site,reg_number=f'SYNTH-PAGE-{index}',
+            status='QUEUED',entry_timestamp=timezone.now(),
+        ))
+    QueueEntry.objects.create(
+        organisation=d['org'],facility=site,reg_number='SYNTH-LEGACY-RELEASED',
+        status='RELEASED',entry_timestamp=timezone.now(),
+    )
+    path=f'/api/operations/?facility={site.pk}'
+    latest=c.get(path)
+    assert latest.status_code==200
+    assert any(row['id']==d['entry'].pk for row in latest.data['movements'])
+    first=c.get(path+'&view=active&limit=2')
+    assert first.status_code==200 and first.data['worklist']['total']==3
+    assert len(first.data['movements'])==2 and first.data['worklist']['has_more']
+    cursor=first.data['worklist']['next_cursor']
+    second=c.get(path+f'&view=active&limit=2&cursor={cursor}')
+    assert second.status_code==200 and second.data['worklist']['total']==3
+    assert len(second.data['movements'])==1 and second.data['worklist']['has_more'] is False
+    ids={row['id'] for row in first.data['movements']+second.data['movements']}
+    assert ids=={entry.pk for entry in active}
+    assert c.get(path+'&view=active&cursor=invalid!').status_code==400
+    assert c.get(path+'&view=active&limit=101').status_code==400
 
 def test_pending_evidence_disables_self_review_and_backend_rejects_it(domain):
     d=domain;at=timezone.now();e=m.EvidenceRevision.objects.create(organisation=d['org'],creator=d['author'],evidence_key='new-proof',revision=1,kind='VEHICLE_RATING',issuer='Synthetic issuer',document_ref='test://new-proof',document_sha256='c'*64,issued_at=at,expires_at=d['evidence'].expires_at,vehicle=d['vehicle'])
@@ -72,10 +104,14 @@ def test_complete_practice_dispatch_with_independent_exception_approval(domain):
     release_entry(entry.pk,d['ops2']);entry.refresh_from_db()
     assert entry.release_authorized_at and entry.exit_timestamp is None
     def event(kind,key):return record_event(d['ops2'],link,kind=kind,observed_at=timezone.now(),reason='Synthetic observed event',client_key=key,details={})
-    event('DOCK_VACATED','vacancy');event('DEPARTED','exit');entry.refresh_from_db()
+    event('DOCK_VACATED','vacancy');departure=event('DEPARTED','exit');entry.refresh_from_db()
     assert entry.exit_timestamp and Dock.objects.get(pk=created.data['dock']['id']).status=='AVAILABLE'
     movement=c.get(f'/api/operations/?facility={site.pk}').data['movements'][0]
     assert movement['next_action']['stage']=='JOURNEY'
+    active=c.get(f'/api/operations/?facility={site.pk}&view=active').data['movements']
+    active_movement=next(row for row in active if row['id']==entry.pk)
+    assert active_movement['stage_wait_started_at']==departure.observed_at
+    assert active_movement['stage_wait_basis']=='JOURNEY_EVENT_OBSERVED'
     attempt.refresh_from_db();assert attempt.decision=='QUARANTINE'
     assert m.ReleaseRecord.objects.get(queue_entry=entry).approval.creator_id==d['ops2'].pk
 

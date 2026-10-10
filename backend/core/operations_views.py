@@ -1,4 +1,8 @@
 """Read-only tenant/site handoffs. No aggregate grants release authority."""
+import base64
+import binascii
+from django.db.models import Q
+from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from rest_framework.decorators import api_view,permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -11,7 +15,8 @@ from regulatory.views import setup_data
 from regulatory import models as m,services as s
 
 
-def movement(entry,actor):
+def movement(entry,actor,as_of=None):
+    as_of=as_of or timezone.now()
     setup=setup_data(entry,actor,include_choices=False)
     context=entry.regulatory_contexts.order_by('-created_at','-pk').first()
     attempt=entry.inspection_attempts.first()
@@ -33,8 +38,35 @@ def movement(entry,actor):
     else:action='Resolve readiness and record a fresh inspection';stage='INSPECTION';roles=['DISPATCH_SUPERVISOR']
     ownership=entry.ownerships.filter(stage=stage).select_related('owner').first()
     owner=ownership.owner if ownership else None
+    stage_since=None
+    stage_time_basis='NOT_RECORDED'
+    if stage=='SETUP' and context:
+        stage_since=context.created_at
+        stage_time_basis='REGULATORY_CONTEXT_CREATED'
+    elif stage=='INSPECTION' and attempt:
+        stage_since=attempt.created_at
+        stage_time_basis='INSPECTION_ATTEMPT_CREATED'
+    elif stage=='APPROVAL' and attempt:
+        request=attempt.override_requests.filter(approval__isnull=True).order_by('-created_at','-pk').first()
+        if request:
+            stage_since=request.created_at
+            stage_time_basis='OVERRIDE_REQUEST_CREATED'
+    elif stage=='RELEASE' and attempt:
+        stage_since=attempt.created_at
+        stage_time_basis='INSPECTION_ATTEMPT_CREATED'
+    elif stage=='EXIT':
+        stage_since=entry.release_authorized_at
+        if stage_since:
+            stage_time_basis='RELEASE_AUTHORIZED'
+    elif stage=='JOURNEY' and link:
+        event=link.events.filter(kind='DEPARTED').order_by('observed_at','pk').first()
+        if event:
+            stage_since=event.observed_at
+            stage_time_basis='JOURNEY_EVENT_OBSERVED'
     return {'id':entry.pk,'plate':entry.reg_number,'driver_name':entry.driver_name,'status':entry.status,
-        'entered_at':entry.entry_timestamp,'age_minutes':max(0,int((timezone.now()-entry.entry_timestamp).total_seconds()/60)),
+        'entered_at':entry.entry_timestamp,'age_minutes':max(0,int((as_of-entry.entry_timestamp).total_seconds()/60)),
+        'stage_wait_started_at':stage_since,'stage_wait_minutes':max(0,int((as_of-stage_since).total_seconds()/60)) if stage_since else None,
+        'stage_wait_basis':stage_time_basis,
         'trip_id':link.trip_id if link else context.trip_id if context else None,'journey_linked':bool(link),
         'context_id':context.pk if context else None,'attempt_id':attempt.pk if attempt else None,
         'decision':attempt.decision if attempt else None,'blockers':blockers,
@@ -52,16 +84,64 @@ def operations(request):
     role=get_user_role(request.user)
     if not rbac_allows(role,'compliance','read',site.organisation,site):
         return Response({'detail':'Operational inspection read access required'},status=403)
-    entries=QueueEntry.objects.filter(organisation=site.organisation,facility=site).select_related('journey_link').order_by('-entry_timestamp')
+    entries=QueueEntry.objects.filter(organisation=site.organisation,facility=site).select_related('journey_link').order_by('-entry_timestamp','-pk')
+    active_view=request.query_params.get('view')=='active'
+    if active_view:
+        entries=entries.filter(
+            (~Q(status='COMPLETED') & ~Q(status='RELEASED'))
+            | Q(status='RELEASED',milestone_semantics='SEPARATE_V1',journey_link__isnull=False)
+        ).exclude(
+            status='RELEASED',
+            journey_link__trip__status__in=('delivered','returned','paid','cancelled'),
+        )
     selected=request.query_params.get('entry')
     if selected:
         if not str(selected).isdigit():return Response({'detail':'Invalid visit'},status=400)
         entries=entries.filter(pk=selected)
         if not entries.exists():return Response({'detail':'Visit not found'},status=404)
-    rows=[movement(e,request.user) for e in entries[:100]]
-    return Response({'facility':{'id':site.pk,'name':site.name,'timezone':site.timezone},'as_of':timezone.now(),
-        'movements':rows,'limit':100,'docks':Dock.objects.filter(organisation=site.organisation,facility=site).count(),
-        'notice':'Latest 100 visits. Next tasks and recorded ownership do not grant release authority.'})
+    as_of=timezone.now()
+    if active_view:
+        raw_limit=request.query_params.get('limit','25')
+        cursor=request.query_params.get('cursor')
+        if not raw_limit.isdigit() or not 1<=int(raw_limit)<=100:
+            return Response({'detail':'Active worklist limit must be 1-100'},status=400)
+        limit=int(raw_limit)
+        cursor_timestamp=None
+        cursor_pk=None
+        if cursor:
+            try:
+                decoded=base64.urlsafe_b64decode(cursor+'='*((-len(cursor))%4)).decode()
+                timestamp_text,pk_text=decoded.rsplit('|',1)
+                timestamp=parse_datetime(timestamp_text)
+                if not timestamp or not timezone.is_aware(timestamp) or not pk_text.isdigit() or int(pk_text)<1:
+                    raise ValueError
+            except (binascii.Error,UnicodeDecodeError,ValueError):
+                return Response({'detail':'Invalid active worklist cursor'},status=400)
+            cursor_timestamp=timestamp
+            cursor_pk=int(pk_text)
+        total=entries.count()
+        if cursor_timestamp:
+            entries=entries.filter(
+                Q(entry_timestamp__lt=cursor_timestamp)
+                | Q(entry_timestamp=cursor_timestamp,pk__lt=cursor_pk)
+            )
+        page=list(entries[:limit+1])
+        has_more=len(page)>limit
+        page=page[:limit]
+        next_cursor=None
+        if has_more and page:
+            last=page[-1]
+            encoded=f'{last.entry_timestamp.isoformat()}|{last.pk}'.encode()
+            next_cursor=base64.urlsafe_b64encode(encoded).decode().rstrip('=')
+        worklist={'mode':'active','total':total,'limit':limit,'has_more':has_more,'next_cursor':next_cursor}
+    else:
+        limit=100
+        page=list(entries[:limit])
+        worklist={'mode':'latest_visits','total':None,'limit':limit,'has_more':None,'next_cursor':None}
+    rows=[movement(e,request.user,as_of=as_of) for e in page]
+    return Response({'facility':{'id':site.pk,'name':site.name,'timezone':site.timezone},'as_of':as_of,
+        'movements':rows,'limit':limit,'worklist':worklist,'docks':Dock.objects.filter(organisation=site.organisation,facility=site).count(),
+        'notice':'Active work includes unresolved yard visits and separate-milestone journeys. Stage wait is shown only where retained records establish when the stage began. Next tasks and recorded ownership do not grant release authority.' if active_view else 'Latest 100 visits. Next tasks and recorded ownership do not grant release authority.'})
 
 
 @api_view(['GET','POST'])

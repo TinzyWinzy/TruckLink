@@ -88,6 +88,10 @@ This is the connected versioned journey. Existing unlinked/legacy workflows rema
 | Rejected delivery | Operations / Facility Manager | Document same-destination reattempt plan, then record arrival and a new outcome | Rejection remains retained; the plan cannot complete the trip |
 | Physical delivery accepted | Operations / Facility Manager with the customer's ERP owner | Reconcile retained evidence and external commercial records | External reconciliation is outstanding; Trucki does not assert it completed |
 
+The operations endpoint keeps its existing latest-visits response by default for compatibility with dispatch. The movement worklist opts into `GET /api/operations/?view=active`, which returns tenant/site-scoped unresolved work, an active-work total, and cursor pagination ordered by entry timestamp and ID. The cursor keeps subsequent pages stable when new arrivals are added; because this is a live queue, records may still enter or leave the active set as their status changes. Separate-release journeys stay active after gate exit until the linked trip reaches a terminal status (`delivered`, `returned`, `paid`, or `cancelled`); legacy released visits are not treated as active journeys.
+
+Arrival age and stage wait are separate measures: `age_minutes` is measured from arrival, while `stage_wait_minutes` is populated only when retained data supports a stage-start timestamp. `stage_wait_started_at` and `stage_wait_basis` expose that timestamp and its evidence source. When no reliable stage start was retained, wait time is null and the basis is `NOT_RECORDED`; this is not a zero-minute wait. Journey timing uses the earliest retained `DEPARTED` event's `observed_at` (when observed), not the server's event-record creation time. These measures describe evidence available to the system, not an inferred or guaranteed SLA.
+
 ## 4. Core records and relationships
 
 ```mermaid
