@@ -5,6 +5,8 @@ import { Section } from './ui'
 
 export type InspectionSetupData = {
   entry:{id:number;registration:string;status:string};can_record_context:boolean;can_record_load:boolean;
+  linked_trip_id:number|null;
+  current_context:{id:number;configuration:number;driver:number;trip:number;load:number;route_type:string;jurisdictions:string[];origin:string;destination:string;evidence_ids:number[]}|null;
   blockers:{code:string;title:string;owner:string}[];
   trips:{id:number;origin:string;destination:string;driver:number;driver_name:string;vehicle:number;routing_snapshot?:{route_type?:string;jurisdictions?:string[]}}[];
   configurations:{id:number;revision:number;vehicle:number;vehicle_class:string;usable:boolean}[];
@@ -20,7 +22,16 @@ export default function InspectionSetup({entryId,onSaved,showBlockers=true}:{ent
   const [origin,setOrigin]=useState(''); const [destination,setDestination]=useState(''); const [evidence,setEvidence]=useState<number[]>([])
   const [load,setLoad]=useState({reference:'',cargo_class:'',declared_mass_kg:''})
   const refresh=()=>apiFetch<InspectionSetupData>(`/regulatory/queue/${entryId}/setup/`).then(setData)
-  useEffect(()=>{let active=true; apiFetch<InspectionSetupData>(`/regulatory/queue/${entryId}/setup/`).then(d=>{if(active)setData(d)}).catch(e=>{if(active)setError((e as Error).message)});return()=>{active=false}},[entryId])
+  useEffect(()=>{let active=true; apiFetch<InspectionSetupData>(`/regulatory/queue/${entryId}/setup/`).then(d=>{if(!active)return;setData(d)
+    setConfiguration('');setLoadId('');setOrigin('');setDestination('');setRouteType('DOMESTIC');setJurisdictions('');setEvidence([])
+    const saved=d.current_context
+    const tripId=d.linked_trip_id??saved?.trip
+    setTripId(tripId?String(tripId):'')
+    if(saved){setConfiguration(String(saved.configuration));setLoadId(String(saved.load));setOrigin(saved.origin);setDestination(saved.destination)
+      setRouteType(saved.route_type);setJurisdictions(saved.jurisdictions.join(', '));setEvidence(saved.evidence_ids)}
+    else if(tripId){const trip=d.trips.find(t=>t.id===tripId);if(trip){setOrigin(trip.origin);setDestination(trip.destination)
+      setRouteType(trip.routing_snapshot?.route_type??'DOMESTIC');setJurisdictions(trip.routing_snapshot?.jurisdictions?.join(', ')??'')}}
+  }).catch(e=>{if(active)setError((e as Error).message)});return()=>{active=false}},[entryId])
   const trip=data?.trips.find(t=>String(t.id)===tripId)
   const documents=data?.evidence.filter(e=>(!!trip&& (e.vehicle===trip.vehicle||e.driver===trip.driver||e.trip===trip.id))||e.load===Number(loadId))??[]
   async function saveLoad(){
@@ -44,6 +55,7 @@ export default function InspectionSetup({entryId,onSaved,showBlockers=true}:{ent
       {showBlockers&&data.blockers.length>0&&<ol className="prerequisite-list">{data.blockers.map(b=><li key={b.code}><div><strong>{b.title}</strong><p>Responsible role: {b.owner}</p></div></li>)}</ol>}
       <details className="operational-details my-3"><summary>Setup responsibilities</summary><p>Dispatch manages trips in <Link className="underline" to="/routes">Routes & map</Link>. Admin manages vehicle evidence in <Link className="underline" to="/admin">Admin</Link>. Compliance uses <Link className="underline" to="/approvals">Pending approvals</Link>. A different person must approve rating evidence and configurations.</p></details>
       {!data.can_record_context?<p className="text-sm">An operations or dispatch supervisor must record setup. Released visits retain their historical context.</p>:<div className="grid gap-4 sm:grid-cols-2">
+        {data.current_context&&<p className="text-sm sm:col-span-2">Previous setup loaded. Review it and save again only if details need updating.</p>}
         <label className="text-sm font-bold">Assigned trip<select className="field mt-1 w-full" value={tripId} onChange={e=>{
           setTripId(e.target.value);setConfiguration('');setEvidence([]);const t=data.trips.find(t=>String(t.id)===e.target.value)
           if(t){setOrigin(t.origin);setDestination(t.destination);setRouteType(t.routing_snapshot?.route_type??'DOMESTIC');setJurisdictions(t.routing_snapshot?.jurisdictions?.join(', ')??'')}

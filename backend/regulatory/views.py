@@ -205,8 +205,18 @@ def setup_data(entry,actor,include_choices=True):
     editable=entry.status!='RELEASED'
     can_context=editable and (rbac_allows(role,'regulatory','inspect',entry.organisation,entry.facility)
         or rbac_allows(role,'regulatory','operate',entry.organisation,entry.facility))
+    context_query=entry.regulatory_contexts.all()
+    if link: context_query=context_query.filter(trip_id=link.trip_id)
+    current_context=context_query.order_by('-created_at','-pk').first()
     return {'entry':{'id':entry.pk,'registration':entry.reg_number,'status':entry.status,'facility':entry.facility_id},
         'can_record_context':can_context,'can_record_load':editable and rbac_allows(role,'regulatory','operate',entry.organisation,entry.facility),
+        'linked_trip_id':link.trip_id if link else None,
+        'current_context':({
+            'id':current_context.pk,'configuration':current_context.configuration_id,'driver':current_context.driver_id,
+            'trip':current_context.trip_id,'load':current_context.load_id,'route_type':current_context.route_type,
+            'jurisdictions':current_context.jurisdictions,'origin':current_context.origin,'destination':current_context.destination,
+            'evidence_ids':list(current_context.evidence.values_list('pk',flat=True)),
+        } if current_context else None),
         'trips':[{'id':t.pk,'origin':t.origin,'destination':t.destination,'driver':t.driver_id,'driver_name':t.driver.name,
             'vehicle':t.vehicle_id,'routing_snapshot':t.routing_snapshot} for t in trips.order_by('-created_at')[:200]],
         'configurations':choices,'loads':[output(x) for x in loads],

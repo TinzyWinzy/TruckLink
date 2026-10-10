@@ -17,6 +17,19 @@ def test_setup_choices_are_matching_tenant_vehicle_and_site(domain):
     assert [t['id'] for t in data['trips']]==[d['trip'].pk]
     assert data['configurations'][0]['usable']
     assert not data['blockers']
+    assert data['current_context']['trip']==d['trip'].pk
+    assert data['current_context']['load']==d['load'].pk
+    assert data['current_context']['origin']==d['trip'].origin
+
+def test_setup_preselects_only_the_visit_linked_trip(domain):
+    from journeys.models import JourneyLink
+    d=domain;c=APIClient();c.force_authenticate(d['ops'])
+    JourneyLink.objects.create(organisation=d['org'],facility=d['default_facility'],visit=d['entry'],
+        trip=d['trip'],assignment={'synthetic':True},creator=d['inspector'],reason='Synthetic test link')
+    response=c.get(f'/api/regulatory/queue/{d["entry"].pk}/setup/')
+    assert response.status_code==200
+    assert response.data['linked_trip_id']==d['trip'].pk
+    assert [trip['id'] for trip in response.data['trips']]==[d['trip'].pk]
 
 def test_operations_records_load_then_context_and_evaluates_separately(domain):
     d=domain;c=APIClient();c.force_authenticate(d['ops'])
