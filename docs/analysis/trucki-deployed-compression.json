@@ -1,0 +1,96 @@
+{
+  "authenticated": false,
+  "checks": [
+    {
+      "url": "https://trucki-two.vercel.app/",
+      "requested_encoding": "identity",
+      "status": 200,
+      "headers": {
+        "Content-Encoding": null,
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Length": "804",
+        "Vary": null,
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      },
+      "wire_body_bytes": 804,
+      "decoded_bytes": 804,
+      "elapsed_ms": 450.75
+    },
+    {
+      "url": "https://trucki-two.vercel.app/assets/index-UkEVafiL.js",
+      "requested_encoding": "identity",
+      "status": 200,
+      "headers": {
+        "Content-Encoding": null,
+        "Content-Type": "application/javascript; charset=utf-8",
+        "Content-Length": "356201",
+        "Vary": null,
+        "Cache-Control": "public, max-age=31536000, immutable"
+      },
+      "wire_body_bytes": 356201,
+      "decoded_bytes": 356201,
+      "elapsed_ms": 967.37
+    },
+    {
+      "url": "https://trucki-two.vercel.app/assets/index-UkEVafiL.js",
+      "requested_encoding": "gzip",
+      "status": 200,
+      "headers": {
+        "Content-Encoding": "gzip",
+        "Content-Type": "application/javascript; charset=utf-8",
+        "Content-Length": null,
+        "Vary": null,
+        "Cache-Control": "public, max-age=31536000, immutable"
+      },
+      "wire_body_bytes": 113740,
+      "decoded_bytes": 356201,
+      "elapsed_ms": 458.11
+    },
+    {
+      "url": "https://trucki-two.vercel.app/assets/index-UkEVafiL.js",
+      "requested_encoding": "br",
+      "status": 200,
+      "headers": {
+        "Content-Encoding": "br",
+        "Content-Type": "application/javascript; charset=utf-8",
+        "Content-Length": null,
+        "Vary": null,
+        "Cache-Control": "public, max-age=31536000, immutable"
+      },
+      "wire_body_bytes": 115955,
+      "decoded_bytes": null,
+      "elapsed_ms": 482.97
+    },
+    {
+      "url": "https://spotteraiassessment-khaj.onrender.com/api/health/",
+      "requested_encoding": "gzip",
+      "status": 200,
+      "headers": {
+        "Content-Encoding": null,
+        "Content-Type": "application/json",
+        "Content-Length": null,
+        "Vary": "Cookie, origin",
+        "Cache-Control": null
+      },
+      "wire_body_bytes": 35,
+      "decoded_bytes": 35,
+      "elapsed_ms": 35579.2
+    },
+    {
+      "url": "https://spotteraiassessment-khaj.onrender.com/api/yard/board/?facility=1&scope=active&compact=1",
+      "requested_encoding": "gzip",
+      "status": 401,
+      "headers": {
+        "Content-Encoding": null,
+        "Content-Type": "application/json",
+        "Content-Length": null,
+        "Vary": "Cookie, origin",
+        "Cache-Control": null
+      },
+      "wire_body_bytes": 58,
+      "decoded_bytes": 58,
+      "elapsed_ms": 546.69
+    }
+  ],
+  "limitation": "Unauthenticated board read only verifies access rejection. Large authenticated API response compression remains unverified."
+}

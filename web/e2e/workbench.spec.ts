@@ -11,8 +11,12 @@ test('BAK workbench stays usable on desktop and mobile', async ({ page }) => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     await page.screenshot({ path: `../docs/design/bak-${name}.png`, fullPage: true })
   }
+  const menu = page.getByRole('button', { name: 'Menu', exact: true })
+  await menu.click()
+  await expect(page.getByRole('button', { name: 'Close', exact: true })).toHaveAttribute('aria-expanded', 'true')
   await page.getByRole('link', { name: 'Compliance', exact: true }).click()
   await expect(page).toHaveURL(/\/compliance/)
+  await expect(menu).toHaveAttribute('aria-expanded', 'false')
 })
 
 test('Reports connects status evidence to review actions on desktop and mobile', async ({ page }) => {

@@ -54,7 +54,7 @@ def run_model(*, seed=42, vehicles=72, docks=3, arrivals_per_hour=18, service_mi
                'override_eligible': result['override_eligible'], 'wait_minutes': None,
                'turnaround_minutes': None, 'dock': None}
         if result['decision'] == 'PASS':
-            bay = min(range(docks), key=lambda i: available[i])
+            bay = available.index(min(available))
             start = max(arrival, available[bay]); duration = rng.uniform(.8,1.2)*service_minutes
             available[bay] = start + duration; busy += duration
             row.update(dock=bay+1, wait_minutes=round(start-arrival,2),

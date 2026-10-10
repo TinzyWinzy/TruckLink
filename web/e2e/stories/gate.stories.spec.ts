@@ -30,7 +30,11 @@ async function release(page: Page, name: string) {
   await page.getByRole('button', { name: 'Release SYNTH 100', exact: false }).click()
   await expect(page.getByRole('button', { name: 'Release SYNTH 100', exact: false })).toHaveCount(0)
   const row = page.getByRole('listitem').filter({ has: page.locator(`a[href="/compliance?entry=${entries[name]}"]`) })
-  await expect(row).toContainText('RELEASED')
+  await expect(row).toHaveCount(0)
+  const response = await page.request.get(`${api}/api/queue/?facility=${process.env.STORY_FACILITY}`, { headers: await headers(page) })
+  expect(response.ok()).toBe(true)
+  const history = await response.json()
+  expect(history.queue.find((entry: { id: number }) => entry.id === entries[name]).status).toBe('RELEASED')
 }
 
 test('BAK-01/06/15/16/21: inspector records PASS, refreshes and releases', async ({ page }) => {
@@ -84,8 +88,11 @@ test('BAK-19/20/21: self-approval denied; separate supervisor approves and relea
 
 test('BAK-16/28: absent corridor configuration never passes or permits an exception', async ({ page }) => {
   await login(page, 'inspector')
-  await inspect(page, 'missing')
-  await expect(page.getByText(/Inspection \d+ · REVIEW_REQUIRED$/)).toBeVisible()
+  await page.goto(`/compliance?entry=${entries.missing}`)
+  await expect(page.getByText('Complete setup before inspection')).toBeVisible()
+  await expect(page.getByText('Setup required. Inspection and release remain blocked.')).toBeVisible()
+  await expect(page.getByLabel('Axle 1', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Record versioned inspection' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Request exception', exact: true })).toHaveCount(0)
   const response = await page.request.post(`${api}/api/queue/${entries.missing}/release/`, { headers: await headers(page) })
   expect(response.status()).toBe(409)

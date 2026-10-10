@@ -1,0 +1,56 @@
+{
+  "kernel": "precomputed synthetic arrival/dock scheduling batch",
+  "integration": "isolated ctypes C ABI experiment, release build; no production dependency",
+  "limits": "Excludes RNG, regulatory evaluation, report construction, hashing and API/DB work. Floating output compared before report rounding.",
+  "runs": [
+    {
+      "movements": 100,
+      "python_median_ms": 0.0447,
+      "rust_with_conversion_median_ms": 0.0498,
+      "rust_preallocated_kernel_median_ms": 0.0022,
+      "end_to_end_speedup": 0.9,
+      "rust_bulk_buffers_median_ms": 0.0204,
+      "bulk_buffer_end_to_end_speedup": 2.19,
+      "tuned_python_median_ms": 0.0214,
+      "bulk_buffer_vs_tuned_python_speedup": 1.05,
+      "parity_dock_counts": [
+        1,
+        3,
+        12
+      ]
+    },
+    {
+      "movements": 5000,
+      "python_median_ms": 1.9965,
+      "rust_with_conversion_median_ms": 2.4694,
+      "rust_preallocated_kernel_median_ms": 0.0326,
+      "end_to_end_speedup": 0.81,
+      "rust_bulk_buffers_median_ms": 0.7643,
+      "bulk_buffer_end_to_end_speedup": 2.61,
+      "tuned_python_median_ms": 1.0076,
+      "bulk_buffer_vs_tuned_python_speedup": 1.32,
+      "parity_dock_counts": [
+        1,
+        3,
+        12
+      ]
+    },
+    {
+      "movements": 50000,
+      "python_median_ms": 21.1996,
+      "rust_with_conversion_median_ms": 26.0087,
+      "rust_preallocated_kernel_median_ms": 0.4548,
+      "end_to_end_speedup": 0.82,
+      "rust_bulk_buffers_median_ms": 8.8255,
+      "bulk_buffer_end_to_end_speedup": 2.4,
+      "tuned_python_median_ms": 11.0374,
+      "bulk_buffer_vs_tuned_python_speedup": 1.25,
+      "parity_dock_counts": [
+        1,
+        3,
+        12
+      ]
+    }
+  ],
+  "parity": "Passed 27 batch comparisons plus blocked/tie/wait fixture"
+}

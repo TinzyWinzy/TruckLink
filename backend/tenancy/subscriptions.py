@@ -5,8 +5,10 @@ from django.utils import timezone
 from .catalogue import dependencies, expand_modules
 from .registry import MODULES
 from .models import TenantEntitlementVersion
+from .read_cache import memoize_read
 
 
+@memoize_read
 def entitlement(org, at=None):
     now = at or timezone.now()
     row = TenantEntitlementVersion.objects.filter(organisation=org,effective_from__lte=now).order_by('-version').first()
@@ -22,6 +24,7 @@ def entitlement(org, at=None):
         'effective_from':None,'effective_to':None}
 
 
+@memoize_read
 def configured_modules(org, at=None):
     from .releases import active_release, artifacts
     release = active_release(org,at)
@@ -31,6 +34,7 @@ def configured_modules(org, at=None):
     return {key:key == 'audit' or not org.requires_release for key in MODULES}
 
 
+@memoize_read
 def effective_modules(org, at=None):
     configured = configured_modules(org,at)
     granted = set(entitlement(org,at)['modules'])

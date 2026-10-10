@@ -1,0 +1,17 @@
+# Disposable local PostgreSQL only. No production credentials or volumes.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: trucki_perf
+      POSTGRES_USER: trucki_perf
+      POSTGRES_PASSWORD: local-synthetic-performance-only
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trucki_perf -d trucki_perf"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

@@ -63,6 +63,7 @@ def test_user_story_browser_journeys(domain, live_server, settings):
         assert QueueEntry.objects.get(pk=entries[name]).status == 'RELEASED'
         assert m.ReleaseRecord.objects.filter(queue_entry_id=entries[name]).exists()
     assert not m.ReleaseRecord.objects.filter(queue_entry_id=entries['missing']).exists()
+    assert not m.InspectionAttempt.objects.filter(queue_entry_id=entries['missing']).exists()
     assert m.InspectionAttempt.objects.filter(queue_entry_id=entries['remediation']).count() == 2
     original = m.InspectionAttempt.objects.get(queue_entry_id=entries['exception'])
     assert original.decision == 'QUARANTINE'

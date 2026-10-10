@@ -1,0 +1,1270 @@
+{
+  "dataset": {
+    "active_visits": 300,
+    "closed_visits": 2700,
+    "acknowledged_alerts": 100
+  },
+  "environment": "Local Python 3.14, file SQLite, Django test client; no transport or production capacity claim",
+  "board": {
+    "legacy_full": {
+      "bytes": 1548143,
+      "queries": 15,
+      "median_ms": 219.467,
+      "gzip": {
+        "gzip_1": {
+          "bytes": 81694,
+          "mean_compression_ms": 0.717
+        },
+        "gzip_6": {
+          "bytes": 55922,
+          "mean_compression_ms": 3.671
+        }
+      },
+      "cpu": {
+        "repeats": 8,
+        "process_cpu_s": 4.9375,
+        "function_timer": "cProfile default elapsed timer; cumulative times include database waits and profiling overhead",
+        "top_cumulative": [
+          {
+            "file": "test_performance_profile.py",
+            "function": "read",
+            "line": 60,
+            "calls": 8,
+            "self_s": 1.8e-05,
+            "cumulative_s": 4.931933
+          },
+          {
+            "file": "test.py",
+            "function": "get",
+            "line": 294,
+            "calls": 8,
+            "self_s": 3e-05,
+            "cumulative_s": 4.931914
+          },
+          {
+            "file": "test.py",
+            "function": "get",
+            "line": 201,
+            "calls": 8,
+            "self_s": 6.7e-05,
+            "cumulative_s": 4.931885
+          },
+          {
+            "file": "test.py",
+            "function": "generic",
+            "line": 234,
+            "calls": 8,
+            "self_s": 4.2e-05,
+            "cumulative_s": 4.931721
+          },
+          {
+            "file": "client.py",
+            "function": "generic",
+            "line": 633,
+            "calls": 8,
+            "self_s": 6.6e-05,
+            "cumulative_s": 4.931679
+          },
+          {
+            "file": "test.py",
+            "function": "request",
+            "line": 289,
+            "calls": 8,
+            "self_s": 2.7e-05,
+            "cumulative_s": 4.931523
+          },
+          {
+            "file": "test.py",
+            "function": "request",
+            "line": 243,
+            "calls": 8,
+            "self_s": 3.4e-05,
+            "cumulative_s": 4.931492
+          },
+          {
+            "file": "client.py",
+            "function": "request",
+            "line": 1067,
+            "calls": 8,
+            "self_s": 0.000186,
+            "cumulative_s": 4.931457
+          },
+          {
+            "file": "client.py",
+            "function": "__call__",
+            "line": 169,
+            "calls": 8,
+            "self_s": 0.00011,
+            "cumulative_s": 4.930607
+          },
+          {
+            "file": "test.py",
+            "function": "get_response",
+            "line": 260,
+            "calls": 8,
+            "self_s": 1.9e-05,
+            "cumulative_s": 4.928706
+          },
+          {
+            "file": "base.py",
+            "function": "get_response",
+            "line": 138,
+            "calls": 8,
+            "self_s": 3.1e-05,
+            "cumulative_s": 4.928685
+          },
+          {
+            "file": "exception.py",
+            "function": "inner",
+            "line": 53,
+            "calls": 88,
+            "self_s": 0.000148,
+            "cumulative_s": 4.928529
+          },
+          {
+            "file": "deprecation.py",
+            "function": "__call__",
+            "line": 434,
+            "calls": 56,
+            "self_s": 0.000194,
+            "cumulative_s": 4.92852
+          },
+          {
+            "file": "read_cache.py",
+            "function": "__call__",
+            "line": 14,
+            "calls": 8,
+            "self_s": 3.2e-05,
+            "cumulative_s": 4.92827
+          },
+          {
+            "file": "middleware.py",
+            "function": "__call__",
+            "line": 116,
+            "calls": 8,
+            "self_s": 1.9e-05,
+            "cumulative_s": 4.928078
+          },
+          {
+            "file": "middleware.py",
+            "function": "__call__",
+            "line": 46,
+            "calls": 8,
+            "self_s": 3.2e-05,
+            "cumulative_s": 4.928044
+          },
+          {
+            "file": "base.py",
+            "function": "_get_response",
+            "line": 176,
+            "calls": 8,
+            "self_s": 0.000101,
+            "cumulative_s": 4.925928
+          },
+          {
+            "file": "csrf.py",
+            "function": "_view_wrapper",
+            "line": 63,
+            "calls": 8,
+            "self_s": 1.7e-05,
+            "cumulative_s": 4.849774
+          },
+          {
+            "file": "base.py",
+            "function": "view",
+            "line": 97,
+            "calls": 8,
+            "self_s": 5.1e-05,
+            "cumulative_s": 4.849757
+          },
+          {
+            "file": "views.py",
+            "function": "dispatch",
+            "line": 490,
+            "calls": 8,
+            "self_s": 0.000121,
+            "cumulative_s": 4.849685
+          },
+          {
+            "file": "views.py",
+            "function": "get",
+            "line": 57,
+            "calls": 8,
+            "self_s": 0.005504,
+            "cumulative_s": 4.741769
+          },
+          {
+            "file": "serializers.py",
+            "function": "data",
+            "line": 816,
+            "calls": 24,
+            "self_s": 0.000126,
+            "cumulative_s": 3.607906
+          },
+          {
+            "file": "serializers.py",
+            "function": "data",
+            "line": 237,
+            "calls": 24,
+            "self_s": 9.1e-05,
+            "cumulative_s": 3.607533
+          },
+          {
+            "file": "serializers.py",
+            "function": "to_representation",
+            "line": 728,
+            "calls": 24,
+            "self_s": 0.010035,
+            "cumulative_s": 3.607411
+          },
+          {
+            "file": "serializers.py",
+            "function": "to_representation",
+            "line": 530,
+            "calls": 24800,
+            "self_s": 0.417755,
+            "cumulative_s": 3.531492
+          },
+          {
+            "file": "fields.py",
+            "function": "to_representation",
+            "line": 1216,
+            "calls": 73600,
+            "self_s": 0.121341,
+            "cumulative_s": 1.295207
+          },
+          {
+            "file": "query.py",
+            "function": "_fetch_all",
+            "line": 2285,
+            "calls": 104,
+            "self_s": 0.009171,
+            "cumulative_s": 1.229551
+          },
+          {
+            "file": "query.py",
+            "function": "__iter__",
+            "line": 124,
+            "calls": 24936,
+            "self_s": 0.043828,
+            "cumulative_s": 1.220358
+          },
+          {
+            "file": "query.py",
+            "function": "__iter__",
+            "line": 458,
+            "calls": 80,
+            "self_s": 0.000111,
+            "cumulative_s": 1.20979
+          },
+          {
+            "file": "fields.py",
+            "function": "enforce_timezone",
+            "line": 1168,
+            "calls": 73600,
+            "self_s": 0.074795,
+            "cumulative_s": 1.031729
+          }
+        ],
+        "top_self": [
+          {
+            "file": "serializers.py",
+            "function": "to_representation",
+            "line": 530,
+            "calls": 24800,
+            "self_s": 0.417755,
+            "cumulative_s": 3.531492
+          },
+          {
+            "file": "fields.py",
+            "function": "get_attribute",
+            "line": 87,
+            "calls": 488800,
+            "self_s": 0.275756,
+            "cumulative_s": 0.846735
+          },
+          {
+            "file": "base.py",
+            "function": "__init__",
+            "line": 502,
+            "calls": 25648,
+            "self_s": 0.256215,
+            "cumulative_s": 0.485258
+          },
+          {
+            "file": "~",
+            "function": "<built-in method builtins.isinstance>",
+            "line": 0,
+            "calls": 1145648,
+            "self_s": 0.238146,
+            "cumulative_s": 0.422457
+          },
+          {
+            "file": "~",
+            "function": "<built-in method builtins.getattr>",
+            "line": 0,
+            "calls": 1018056,
+            "self_s": 0.235006,
+            "cumulative_s": 0.897353
+          },
+          {
+            "file": "relations.py",
+            "function": "get_attribute",
+            "line": 172,
+            "calls": 50400,
+            "self_s": 0.153281,
+            "cumulative_s": 0.305588
+          },
+          {
+            "file": "serializers.py",
+            "function": "_readable_fields",
+            "line": 396,
+            "calls": 513600,
+            "self_s": 0.138399,
+            "cumulative_s": 0.371194
+          },
+          {
+            "file": "<frozen _collections_abc>",
+            "function": "__iter__",
+            "line": 900,
+            "calls": 513600,
+            "self_s": 0.133998,
+            "cumulative_s": 0.200566
+          },
+          {
+            "file": "fields.py",
+            "function": "get_attribute",
+            "line": 426,
+            "calls": 439200,
+            "self_s": 0.128988,
+            "cumulative_s": 0.968107
+          },
+          {
+            "file": "fields.py",
+            "function": "to_representation",
+            "line": 1216,
+            "calls": 73600,
+            "self_s": 0.121341,
+            "cumulative_s": 1.295207
+          },
+          {
+            "file": "~",
+            "function": "<method 'fetchmany' of 'sqlite3.Cursor' objects>",
+            "line": 0,
+            "calls": 384,
+            "self_s": 0.106578,
+            "cumulative_s": 0.177282
+          },
+          {
+            "file": "local.py",
+            "function": "__getattr__",
+            "line": 54,
+            "calls": 73640,
+            "self_s": 0.105205,
+            "cumulative_s": 0.204259
+          },
+          {
+            "file": "fields.py",
+            "function": "is_simple_callable",
+            "line": 61,
+            "calls": 464800,
+            "self_s": 0.101547,
+            "cumulative_s": 0.14757
+          },
+          {
+            "file": "functional.py",
+            "function": "__getattribute__",
+            "line": 276,
+            "calls": 149184,
+            "self_s": 0.100296,
+            "cumulative_s": 0.118059
+          },
+          {
+            "file": "~",
+            "function": "<method 'isoformat' of 'datetime.datetime' objects>",
+            "line": 0,
+            "calls": 73600,
+            "self_s": 0.097769,
+            "cumulative_s": 0.097769
+          },
+          {
+            "file": "<frozen abc>",
+            "function": "__instancecheck__",
+            "line": 117,
+            "calls": 439784,
+            "self_s": 0.093516,
+            "cumulative_s": 0.183871
+          },
+          {
+            "file": "local.py",
+            "function": "__getattr__",
+            "line": 156,
+            "calls": 73776,
+            "self_s": 0.092308,
+            "cumulative_s": 0.650382
+          },
+          {
+            "file": "~",
+            "function": "<built-in method _abc._abc_instancecheck>",
+            "line": 0,
+            "calls": 439784,
+            "self_s": 0.090355,
+            "cumulative_s": 0.090355
+          },
+          {
+            "file": "~",
+            "function": "<built-in method builtins.setattr>",
+            "line": 0,
+            "calls": 522792,
+            "self_s": 0.088746,
+            "cumulative_s": 0.20656
+          },
+          {
+            "file": "operations.py",
+            "function": "convert_datetimefield_value",
+            "line": 289,
+            "calls": 220080,
+            "self_s": 0.085927,
+            "cumulative_s": 0.246727
+          }
+        ]
+      }
+    },
+    "active_compact": {
+      "bytes": 156825,
+      "queries": 15,
+      "median_ms": 37.056,
+      "gzip": {
+        "gzip_1": {
+          "bytes": 8761,
+          "mean_compression_ms": 0.096
+        },
+        "gzip_6": {
+          "bytes": 6521,
+          "mean_compression_ms": 0.359
+        }
+      },
+      "cpu": {
+        "repeats": 8,
+        "process_cpu_s": 0.734375,
+        "function_timer": "cProfile default elapsed timer; cumulative times include database waits and profiling overhead",
+        "top_cumulative": [
+          {
+            "file": "test_performance_profile.py",
+            "function": "read",
+            "line": 60,
+            "calls": 8,
+            "self_s": 1.9e-05,
+            "cumulative_s": 0.747271
+          },
+          {
+            "file": "test.py",
+            "function": "get",
+            "line": 294,
+            "calls": 8,
+            "self_s": 3e-05,
+            "cumulative_s": 0.747252
+          },
+          {
+            "file": "test.py",
+            "function": "get",
+            "line": 201,
+            "calls": 8,
+            "self_s": 5.9e-05,
+            "cumulative_s": 0.747222
+          },
+          {
+            "file": "test.py",
+            "function": "generic",
+            "line": 234,
+            "calls": 8,
+            "self_s": 4.4e-05,
+            "cumulative_s": 0.747079
+          },
+          {
+            "file": "client.py",
+            "function": "generic",
+            "line": 633,
+            "calls": 8,
+            "self_s": 6e-05,
+            "cumulative_s": 0.747036
+          },
+          {
+            "file": "test.py",
+            "function": "request",
+            "line": 289,
+            "calls": 8,
+            "self_s": 2.7e-05,
+            "cumulative_s": 0.746896
+          },
+          {
+            "file": "test.py",
+            "function": "request",
+            "line": 243,
+            "calls": 8,
+            "self_s": 3.3e-05,
+            "cumulative_s": 0.746866
+          },
+          {
+            "file": "client.py",
+            "function": "request",
+            "line": 1067,
+            "calls": 8,
+            "self_s": 0.000155,
+            "cumulative_s": 0.746834
+          },
+          {
+            "file": "client.py",
+            "function": "__call__",
+            "line": 169,
+            "calls": 8,
+            "self_s": 0.0001,
+            "cumulative_s": 0.746068
+          },
+          {
+            "file": "test.py",
+            "function": "get_response",
+            "line": 260,
+            "calls": 8,
+            "self_s": 1.9e-05,
+            "cumulative_s": 0.744353
+          },
+          {
+            "file": "base.py",
+            "function": "get_response",
+            "line": 138,
+            "calls": 8,
+            "self_s": 2.6e-05,
+            "cumulative_s": 0.744332
+          },
+          {
+            "file": "exception.py",
+            "function": "inner",
+            "line": 53,
+            "calls": 88,
+            "self_s": 0.000133,
+            "cumulative_s": 0.74413
+          },
+          {
+            "file": "deprecation.py",
+            "function": "__call__",
+            "line": 434,
+            "calls": 56,
+            "self_s": 0.000177,
+            "cumulative_s": 0.74412
+          },
+          {
+            "file": "read_cache.py",
+            "function": "__call__",
+            "line": 14,
+            "calls": 8,
+            "self_s": 2.8e-05,
+            "cumulative_s": 0.743881
+          },
+          {
+            "file": "middleware.py",
+            "function": "__call__",
+            "line": 116,
+            "calls": 8,
+            "self_s": 1.9e-05,
+            "cumulative_s": 0.743722
+          },
+          {
+            "file": "middleware.py",
+            "function": "__call__",
+            "line": 46,
+            "calls": 8,
+            "self_s": 3.1e-05,
+            "cumulative_s": 0.743688
+          },
+          {
+            "file": "base.py",
+            "function": "_get_response",
+            "line": 176,
+            "calls": 8,
+            "self_s": 9.4e-05,
+            "cumulative_s": 0.741828
+          },
+          {
+            "file": "csrf.py",
+            "function": "_view_wrapper",
+            "line": 63,
+            "calls": 8,
+            "self_s": 1.7e-05,
+            "cumulative_s": 0.732429
+          },
+          {
+            "file": "base.py",
+            "function": "view",
+            "line": 97,
+            "calls": 8,
+            "self_s": 4.6e-05,
+            "cumulative_s": 0.732412
+          },
+          {
+            "file": "views.py",
+            "function": "dispatch",
+            "line": 490,
+            "calls": 8,
+            "self_s": 0.000131,
+            "cumulative_s": 0.732347
+          },
+          {
+            "file": "views.py",
+            "function": "get",
+            "line": 57,
+            "calls": 8,
+            "self_s": 0.000949,
+            "cumulative_s": 0.625342
+          },
+          {
+            "file": "serializers.py",
+            "function": "data",
+            "line": 816,
+            "calls": 24,
+            "self_s": 0.00012,
+            "cumulative_s": 0.455559
+          },
+          {
+            "file": "serializers.py",
+            "function": "data",
+            "line": 237,
+            "calls": 24,
+            "self_s": 9.7e-05,
+            "cumulative_s": 0.455345
+          },
+          {
+            "file": "serializers.py",
+            "function": "to_representation",
+            "line": 728,
+            "calls": 24,
+            "self_s": 0.001775,
+            "cumulative_s": 0.455223
+          },
+          {
+            "file": "serializers.py",
+            "function": "to_representation",
+            "line": 530,
+            "calls": 3200,
+            "self_s": 0.046784,
+            "cumulative_s": 0.365637
+          },
+          {
+            "file": "query.py",
+            "function": "_fetch_all",
+            "line": 2285,
+            "calls": 104,
+            "self_s": 0.002139,
+            "cumulative_s": 0.294019
+          },
+          {
+            "file": "query.py",
+            "function": "__iter__",
+            "line": 124,
+            "calls": 3336,
+            "self_s": 0.007203,
+            "cumulative_s": 0.291859
+          },
+          {
+            "file": "query.py",
+            "function": "__iter__",
+            "line": 458,
+            "calls": 80,
+            "self_s": 0.000103,
+            "cumulative_s": 0.274428
+          },
+          {
+            "file": "compiler.py",
+            "function": "execute_sql",
+            "line": 1613,
+            "calls": 120,
+            "self_s": 0.000912,
+            "cumulative_s": 0.152858
+          },
+          {
+            "file": "fields.py",
+            "function": "to_representation",
+            "line": 1216,
+            "calls": 6400,
+            "self_s": 0.010989,
+            "cumulative_s": 0.113966
+          }
+        ],
+        "top_self": [
+          {
+            "file": "serializers.py",
+            "function": "to_representation",
+            "line": 530,
+            "calls": 3200,
+            "self_s": 0.046784,
+            "cumulative_s": 0.365637
+          },
+          {
+            "file": "base.py",
+            "function": "__init__",
+            "line": 502,
+            "calls": 4048,
+            "self_s": 0.035287,
+            "cumulative_s": 0.072359
+          },
+          {
+            "file": "fields.py",
+            "function": "get_attribute",
+            "line": 87,
+            "calls": 49600,
+            "self_s": 0.028293,
+            "cumulative_s": 0.088035
+          },
+          {
+            "file": "~",
+            "function": "<built-in method builtins.isinstance>",
+            "line": 0,
+            "calls": 137912,
+            "self_s": 0.028069,
+            "cumulative_s": 0.047929
+          },
+          {
+            "file": "~",
+            "function": "<function SQLiteCursorWrapper.execute at 0x0000018CDAE4F270>",
+            "line": 0,
+            "calls": 120,
+            "self_s": 0.026149,
+            "cumulative_s": 0.026149
+          },
+          {
+            "file": "~",
+            "function": "<built-in method builtins.getattr>",
+            "line": 0,
+            "calls": 110728,
+            "self_s": 0.025609,
+            "cumulative_s": 0.093717
+          },
+          {
+            "file": "~",
+            "function": "<method 'fetchmany' of 'sqlite3.Cursor' objects>",
+            "line": 0,
+            "calls": 168,
+            "self_s": 0.0173,
+            "cumulative_s": 0.026641
+          },
+          {
+            "file": "serializers.py",
+            "function": "_readable_fields",
+            "line": 396,
+            "calls": 52800,
+            "self_s": 0.015985,
+            "cumulative_s": 0.053729
+          },
+          {
+            "file": "fields.py",
+            "function": "get_attribute",
+            "line": 426,
+            "calls": 45600,
+            "self_s": 0.015594,
+            "cumulative_s": 0.103006
+          },
+          {
+            "file": "related_descriptors.py",
+            "function": "__set__",
+            "line": 88,
+            "calls": 12840,
+            "self_s": 0.015418,
+            "cumulative_s": 0.021541
+          },
+          {
+            "file": "inspect.py",
+            "function": "_bind",
+            "line": 3087,
+            "calls": 416,
+            "self_s": 0.015163,
+            "cumulative_s": 0.01684
+          },
+          {
+            "file": "relations.py",
+            "function": "get_attribute",
+            "line": 172,
+            "calls": 4800,
+            "self_s": 0.014582,
+            "cumulative_s": 0.029635
+          },
+          {
+            "file": "<frozen _collections_abc>",
+            "function": "__iter__",
+            "line": 900,
+            "calls": 52800,
+            "self_s": 0.013808,
+            "cumulative_s": 0.020727
+          },
+          {
+            "file": "~",
+            "function": "<built-in method builtins.setattr>",
+            "line": 0,
+            "calls": 69192,
+            "self_s": 0.0121,
+            "cumulative_s": 0.033682
+          },
+          {
+            "file": "functional.py",
+            "function": "__getattribute__",
+            "line": 276,
+            "calls": 17184,
+            "self_s": 0.011866,
+            "cumulative_s": 0.01386
+          },
+          {
+            "file": "operations.py",
+            "function": "convert_datetimefield_value",
+            "line": 289,
+            "calls": 25680,
+            "self_s": 0.011311,
+            "cumulative_s": 0.032644
+          },
+          {
+            "file": "fields.py",
+            "function": "to_representation",
+            "line": 1216,
+            "calls": 6400,
+            "self_s": 0.010989,
+            "cumulative_s": 0.113966
+          },
+          {
+            "file": "compiler.py",
+            "function": "apply_converters",
+            "line": 1554,
+            "calls": 3352,
+            "self_s": 0.010137,
+            "cumulative_s": 0.043975
+          },
+          {
+            "file": "fields.py",
+            "function": "is_simple_callable",
+            "line": 61,
+            "calls": 47200,
+            "self_s": 0.010134,
+            "cumulative_s": 0.01479
+          },
+          {
+            "file": "<frozen abc>",
+            "function": "__instancecheck__",
+            "line": 117,
+            "calls": 46248,
+            "self_s": 0.009897,
+            "cumulative_s": 0.019446
+          }
+        ]
+      }
+    }
+  },
+  "modelling": {
+    "vehicles": 5000,
+    "cpu": {
+      "repeats": 10,
+      "process_cpu_s": 0.5625,
+      "function_timer": "cProfile default elapsed timer; cumulative times include database waits and profiling overhead",
+      "top_cumulative": [
+        {
+          "file": "test_performance_profile.py",
+          "function": "<lambda>",
+          "line": 84,
+          "calls": 10,
+          "self_s": 0.000248,
+          "cumulative_s": 0.559903
+        },
+        {
+          "file": "modelling.py",
+          "function": "run_model",
+          "line": 9,
+          "calls": 10,
+          "self_s": 0.13464,
+          "cumulative_s": 0.559655
+        },
+        {
+          "file": "random.py",
+          "function": "choices",
+          "line": 460,
+          "calls": 50000,
+          "self_s": 0.086059,
+          "cumulative_s": 0.117952
+        },
+        {
+          "file": "evaluator.py",
+          "function": "digest",
+          "line": 19,
+          "calls": 30,
+          "self_s": 0.000141,
+          "cumulative_s": 0.104309
+        },
+        {
+          "file": "evaluator.py",
+          "function": "canonical",
+          "line": 15,
+          "calls": 30,
+          "self_s": 7.1e-05,
+          "cumulative_s": 0.09828
+        },
+        {
+          "file": "__init__.py",
+          "function": "dumps",
+          "line": 185,
+          "calls": 30,
+          "self_s": 0.000135,
+          "cumulative_s": 0.098209
+        },
+        {
+          "file": "encoder.py",
+          "function": "encode",
+          "line": 185,
+          "calls": 30,
+          "self_s": 0.000122,
+          "cumulative_s": 0.098042
+        },
+        {
+          "file": "encoder.py",
+          "function": "iterencode",
+          "line": 207,
+          "calls": 30,
+          "self_s": 0.09787,
+          "cumulative_s": 0.09787
+        },
+        {
+          "file": "~",
+          "function": "<built-in method builtins.sum>",
+          "line": 0,
+          "calls": 290,
+          "self_s": 0.025132,
+          "cumulative_s": 0.050117
+        },
+        {
+          "file": "~",
+          "function": "<built-in method builtins.round>",
+          "line": 0,
+          "calls": 110230,
+          "self_s": 0.0453,
+          "cumulative_s": 0.0453
+        },
+        {
+          "file": "random.py",
+          "function": "expovariate",
+          "line": 605,
+          "calls": 50000,
+          "self_s": 0.020709,
+          "cumulative_s": 0.035347
+        },
+        {
+          "file": "~",
+          "function": "<built-in method builtins.min>",
+          "line": 0,
+          "calls": 30060,
+          "self_s": 0.021449,
+          "cumulative_s": 0.029145
+        },
+        {
+          "file": "modelling.py",
+          "function": "<genexpr>",
+          "line": 65,
+          "calls": 200040,
+          "self_s": 0.018724,
+          "cumulative_s": 0.018724
+        },
+        {
+          "file": "~",
+          "function": "<method 'random' of '_random.Random' objects>",
+          "line": 0,
+          "calls": 130060,
+          "self_s": 0.016443,
+          "cumulative_s": 0.016443
+        },
+        {
+          "file": "random.py",
+          "function": "uniform",
+          "line": 500,
+          "calls": 30060,
+          "self_s": 0.008121,
+          "cumulative_s": 0.011999
+        },
+        {
+          "file": "~",
+          "function": "<built-in method _bisect.bisect_right>",
+          "line": 0,
+          "calls": 50000,
+          "self_s": 0.010534,
+          "cumulative_s": 0.010534
+        },
+        {
+          "file": "~",
+          "function": "<built-in method builtins.len>",
+          "line": 0,
+          "calls": 100320,
+          "self_s": 0.010272,
+          "cumulative_s": 0.010272
+        },
+        {
+          "file": "~",
+          "function": "<method 'update' of 'dict' objects>",
+          "line": 0,
+          "calls": 30120,
+          "self_s": 0.009438,
+          "cumulative_s": 0.009438
+        },
+        {
+          "file": "modelling.py",
+          "function": "case",
+          "line": 23,
+          "calls": 60,
+          "self_s": 0.000226,
+          "cumulative_s": 0.008715
+        },
+        {
+          "file": "modelling.py",
+          "function": "<lambda>",
+          "line": 57,
+          "calls": 90180,
+          "self_s": 0.007696,
+          "cumulative_s": 0.007696
+        },
+        {
+          "file": "~",
+          "function": "<built-in method math.log>",
+          "line": 0,
+          "calls": 50000,
+          "self_s": 0.007479,
+          "cumulative_s": 0.007479
+        },
+        {
+          "file": "~",
+          "function": "<method 'append' of 'list' objects>",
+          "line": 0,
+          "calls": 51990,
+          "self_s": 0.007448,
+          "cumulative_s": 0.007448
+        },
+        {
+          "file": "~",
+          "function": "<built-in method math.isfinite>",
+          "line": 0,
+          "calls": 50000,
+          "self_s": 0.005728,
+          "cumulative_s": 0.005728
+        },
+        {
+          "file": "copy.py",
+          "function": "deepcopy",
+          "line": 110,
+          "calls": 5950,
+          "self_s": 0.002086,
+          "cumulative_s": 0.005469
+        },
+        {
+          "file": "~",
+          "function": "<built-in method _hashlib.openssl_sha256>",
+          "line": 0,
+          "calls": 30,
+          "self_s": 0.005129,
+          "cumulative_s": 0.005129
+        },
+        {
+          "file": "copy.py",
+          "function": "_deepcopy_dict",
+          "line": 198,
+          "calls": 650,
+          "self_s": 0.001437,
+          "cumulative_s": 0.004732
+        },
+        {
+          "file": "services.py",
+          "function": "evaluate_inspection",
+          "line": 246,
+          "calls": 70,
+          "self_s": 0.000249,
+          "cumulative_s": 0.004526
+        },
+        {
+          "file": "evaluator.py",
+          "function": "evaluate",
+          "line": 66,
+          "calls": 70,
+          "self_s": 0.001699,
+          "cumulative_s": 0.004198
+        },
+        {
+          "file": "~",
+          "function": "<built-in method builtins.max>",
+          "line": 0,
+          "calls": 30070,
+          "self_s": 0.004098,
+          "cumulative_s": 0.004098
+        },
+        {
+          "file": "modelling.py",
+          "function": "<genexpr>",
+          "line": 76,
+          "calls": 30070,
+          "self_s": 0.003322,
+          "cumulative_s": 0.003322
+        }
+      ],
+      "top_self": [
+        {
+          "file": "modelling.py",
+          "function": "run_model",
+          "line": 9,
+          "calls": 10,
+          "self_s": 0.13464,
+          "cumulative_s": 0.559655
+        },
+        {
+          "file": "encoder.py",
+          "function": "iterencode",
+          "line": 207,
+          "calls": 30,
+          "self_s": 0.09787,
+          "cumulative_s": 0.09787
+        },
+        {
+          "file": "random.py",
+          "function": "choices",
+          "line": 460,
+          "calls": 50000,
+          "self_s": 0.086059,
+          "cumulative_s": 0.117952
+        },
+        {
+          "file": "~",
+          "function": "<built-in method builtins.round>",
+          "line": 0,
+          "calls": 110230,
+          "self_s": 0.0453,
+          "cumulative_s": 0.0453
+        },
+        {
+          "file": "~",
+          "function": "<built-in method builtins.sum>",
+          "line": 0,
+          "calls": 290,
+          "self_s": 0.025132,
+          "cumulative_s": 0.050117
+        },
+        {
+          "file": "~",
+          "function": "<built-in method builtins.min>",
+          "line": 0,
+          "calls": 30060,
+          "self_s": 0.021449,
+          "cumulative_s": 0.029145
+        },
+        {
+          "file": "random.py",
+          "function": "expovariate",
+          "line": 605,
+          "calls": 50000,
+          "self_s": 0.020709,
+          "cumulative_s": 0.035347
+        },
+        {
+          "file": "modelling.py",
+          "function": "<genexpr>",
+          "line": 65,
+          "calls": 200040,
+          "self_s": 0.018724,
+          "cumulative_s": 0.018724
+        },
+        {
+          "file": "~",
+          "function": "<method 'random' of '_random.Random' objects>",
+          "line": 0,
+          "calls": 130060,
+          "self_s": 0.016443,
+          "cumulative_s": 0.016443
+        },
+        {
+          "file": "~",
+          "function": "<built-in method _bisect.bisect_right>",
+          "line": 0,
+          "calls": 50000,
+          "self_s": 0.010534,
+          "cumulative_s": 0.010534
+        },
+        {
+          "file": "~",
+          "function": "<built-in method builtins.len>",
+          "line": 0,
+          "calls": 100320,
+          "self_s": 0.010272,
+          "cumulative_s": 0.010272
+        },
+        {
+          "file": "~",
+          "function": "<method 'update' of 'dict' objects>",
+          "line": 0,
+          "calls": 30120,
+          "self_s": 0.009438,
+          "cumulative_s": 0.009438
+        },
+        {
+          "file": "random.py",
+          "function": "uniform",
+          "line": 500,
+          "calls": 30060,
+          "self_s": 0.008121,
+          "cumulative_s": 0.011999
+        },
+        {
+          "file": "modelling.py",
+          "function": "<lambda>",
+          "line": 57,
+          "calls": 90180,
+          "self_s": 0.007696,
+          "cumulative_s": 0.007696
+        },
+        {
+          "file": "~",
+          "function": "<built-in method math.log>",
+          "line": 0,
+          "calls": 50000,
+          "self_s": 0.007479,
+          "cumulative_s": 0.007479
+        },
+        {
+          "file": "~",
+          "function": "<method 'append' of 'list' objects>",
+          "line": 0,
+          "calls": 51990,
+          "self_s": 0.007448,
+          "cumulative_s": 0.007448
+        },
+        {
+          "file": "~",
+          "function": "<built-in method math.isfinite>",
+          "line": 0,
+          "calls": 50000,
+          "self_s": 0.005728,
+          "cumulative_s": 0.005728
+        },
+        {
+          "file": "~",
+          "function": "<built-in method _hashlib.openssl_sha256>",
+          "line": 0,
+          "calls": 30,
+          "self_s": 0.005129,
+          "cumulative_s": 0.005129
+        },
+        {
+          "file": "~",
+          "function": "<built-in method builtins.max>",
+          "line": 0,
+          "calls": 30070,
+          "self_s": 0.004098,
+          "cumulative_s": 0.004098
+        },
+        {
+          "file": "modelling.py",
+          "function": "<genexpr>",
+          "line": 76,
+          "calls": 30070,
+          "self_s": 0.003322,
+          "cumulative_s": 0.003322
+        }
+      ]
+    }
+  }
+}

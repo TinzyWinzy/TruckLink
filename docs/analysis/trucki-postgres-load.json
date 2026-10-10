@@ -1,0 +1,59 @@
+{
+  "database": "PostgreSQL 17, dedicated pytest test_trucki_perf",
+  "dataset": {
+    "tenants": 4,
+    "sites_per_tenant": 2,
+    "active_per_site": 300,
+    "history_per_site": 2700,
+    "alerts_per_site": 100
+  },
+  "transport": "Django test client; real token auth, middleware, ORM, rendering, concurrent audited creates; no HTTP/TLS",
+  "limits": "Bounded workload within default throttles; CPU and Python allocations exclude the database process; no HTTP/TLS or production SLA claim",
+  "separate_memory_sample": {
+    "concurrency": 8,
+    "requests": 8,
+    "peak_traced_python_bytes": 5533940,
+    "note": "Python allocations during this sample; not total RSS or database memory"
+  },
+  "runs": [
+    {
+      "concurrency": 1,
+      "requests": 120,
+      "commands": 12,
+      "requests_per_second": 8.69,
+      "median_ms": 96.06,
+      "p95_ms": 210.73,
+      "p99_ms": 215.68,
+      "process_cpu_s": 3.609,
+      "median_sql_ms": 43.45,
+      "median_read_queries": 15.0,
+      "errors": 0
+    },
+    {
+      "concurrency": 4,
+      "requests": 120,
+      "commands": 12,
+      "requests_per_second": 18.4,
+      "median_ms": 202.61,
+      "p95_ms": 323.12,
+      "p99_ms": 335.02,
+      "process_cpu_s": 5.797,
+      "median_sql_ms": 106.13,
+      "median_read_queries": 15.0,
+      "errors": 0
+    },
+    {
+      "concurrency": 8,
+      "requests": 120,
+      "commands": 12,
+      "requests_per_second": 17.3,
+      "median_ms": 412.5,
+      "p95_ms": 685.34,
+      "p99_ms": 729.1,
+      "process_cpu_s": 8.031,
+      "median_sql_ms": 252.96,
+      "median_read_queries": 15.0,
+      "errors": 0
+    }
+  ]
+}

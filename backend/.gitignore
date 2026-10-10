@@ -48,3 +48,5 @@ dist/
 htmlcov/
 .coverage
 .tox/
+.test-tmp/
+postgres-load.json

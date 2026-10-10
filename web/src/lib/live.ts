@@ -10,7 +10,8 @@
  * Server is authoritative for compliance + overrides (SAD §9); the client
  * only renders. Firebase survives solely for web push (push.ts / sw.ts).
  */
-import { apiFetch, apiBase, ApiError, clearToken, facilityId, selectFacility, getToken, isLive, setToken, setRefreshToken, hasSession } from './api'
+import { apiFetch, apiBase, ApiError, clearToken, facilityId, selectFacility, getToken, getSessionGeneration, isLive, setToken, setRefreshToken, hasSession } from './api'
+import { sharedPoll } from './sharedPoll'
 import { isRealLive } from './liveGate'
 import { useSession } from '../store/session'
 import type { TenantConfiguration } from './tenant'
@@ -229,26 +230,22 @@ function mapAudit(r: Record<string, unknown>): LiveRow {
   }
 }
 
-async function fetchFeed(name: Feed, max: number): Promise<LiveRow[]> {
-  if (name === 'auditLogs') {
-    const data = await apiFetch<{ entries?: Record<string, unknown>[] }>(
-      `/audit/?${facQS()}`,
-    )
-    return (data.entries ?? []).slice(0, max).map(mapAudit)
-  }
-  if (name === 'equipment') {
-    // No equipment read API in R1 (board covers queue/docks/alerts).
-    return []
-  }
-  const board = await apiFetch<{
-    queue?: Record<string, unknown>[]
-    docks?: Record<string, unknown>[]
-    alerts?: Record<string, unknown>[]
-  }>(`/yard/board/?${facQS()}`)
-  if (name === 'queue') return (board.queue ?? []).map(mapQueue)
-  if (name === 'docks') return (board.docks ?? []).map(mapDock)
-  return (board.alerts ?? []).map(mapAlert)
+function pollScope(): string | null {
+  if (!isRealLive() || !facilityId) return null
+  const state = useSession.getState()
+  return JSON.stringify([apiBase, getSessionGeneration(), state.userId,
+    state.workspace?.organisation?.id, state.role, facilityId])
 }
+
+type Board = { queue?: Record<string, unknown>[]; docks?: Record<string, unknown>[]; alerts?: Record<string, unknown>[] }
+const subscribeBoard = sharedPoll<Board>({
+  scope: pollScope, intervalMs: POLL_MS,
+  load: signal => apiFetch(`/yard/board/?${facQS()}&scope=active&compact=1`, { signal }),
+})
+const subscribeAudit = sharedPoll<{ entries?: Record<string, unknown>[] }>({
+  scope: pollScope, intervalMs: POLL_MS,
+  load: signal => apiFetch(`/audit/?${facQS()}`, { signal }),
+})
 
 /** Poll a feed every POLL_MS (REST replacement for Firestore onSnapshot). */
 export function subscribe(
@@ -257,36 +254,15 @@ export function subscribe(
   max = 100,
   onError?: (message: string | null) => void,
 ): (() => void) | null {
-  if (!isRealLive()) return null
-  let stopped = false
-  let warned = false
-  let inFlight = false
-  const identity = useSession.getState().userId
-  const tick = async () => {
-    if (stopped || inFlight || identity !== useSession.getState().userId || !isRealLive()) return
-    inFlight = true
-    try {
-      const rows = await fetchFeed(name, max)
-      if (!stopped && identity === useSession.getState().userId) {
-        cb(rows)
-        onError?.(null)
-      }
-    } catch (err) {
-      if (!stopped && identity === useSession.getState().userId) onError?.('Server data unavailable. displayed records may be stale. Retry when connected.')
-      if (!warned) {
-        warned = true
-        console.warn(`[live] ${name} poll failed: ${(err as Error).message}`)
-      }
-    } finally {
-      inFlight = false
-    }
-  }
-  void tick()
-  const timer = setInterval(() => void tick(), POLL_MS)
-  return () => {
-    stopped = true
-    clearInterval(timer)
-  }
+  if (!pollScope()) return null
+  if (name === 'auditLogs') return subscribeAudit(data => cb((data.entries ?? []).slice(0, max).map(mapAudit)), onError)
+  if (name === 'equipment') { cb([]); return () => {} }
+  return subscribeBoard(board => {
+    // Queue/dock collections remain complete: truncating would hide actionable visits.
+    if (name === 'queue') cb((board.queue ?? []).map(mapQueue))
+    else if (name === 'docks') cb((board.docks ?? []).map(mapDock))
+    else cb((board.alerts ?? []).map(mapAlert))
+  }, onError)
 }
 
 // --- Writes (all idempotent where the server supports it) ----------------------

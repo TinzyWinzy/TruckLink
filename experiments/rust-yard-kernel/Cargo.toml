@@ -1,0 +1,12 @@
+[package]
+name = "trucki_yard_kernel"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+lto = true
+codegen-units = 1

@@ -1,6 +1,7 @@
 from copy import deepcopy
 import re
 from django.core.exceptions import ValidationError
+from .read_cache import memoize_read
 
 CHECKS = ['driver-license', 'vehicle-reg', 'cargo-manifest', 'weight-cert', 'axle-calc']
 
@@ -62,6 +63,7 @@ def validate(content):
             raise ValidationError('Integration bindings use environment prefixes, never secret values')
 
 
+@memoize_read
 def resolved(organisation, at=None, facility=None):
     from django.utils import timezone
     from .models import TenantConfiguration

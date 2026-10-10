@@ -1,0 +1,53 @@
+{
+  "dataset": {
+    "queue_entries": 300,
+    "acknowledged_alerts": 100
+  },
+  "transport": "Django test client; real token auth, middleware, ORM and JSON rendering; no network",
+  "database": "disposable file SQLite",
+  "query_counts": {
+    "/api/yard/board/?facility=1": 123,
+    "/api/queue/?facility=1": 20
+  },
+  "runs": [
+    {
+      "concurrency": 1,
+      "requests": 48,
+      "requests_per_second": 2.6,
+      "median_ms": 335.5,
+      "p95_ms": 745.62,
+      "max_ms": 1034.66,
+      "errors": 0,
+      "response_bytes": [
+        149925,
+        178525
+      ]
+    },
+    {
+      "concurrency": 4,
+      "requests": 48,
+      "requests_per_second": 2.21,
+      "median_ms": 1625.83,
+      "p95_ms": 3058.88,
+      "max_ms": 3539.54,
+      "errors": 0,
+      "response_bytes": [
+        149925,
+        178525
+      ]
+    },
+    {
+      "concurrency": 8,
+      "requests": 48,
+      "requests_per_second": 3.11,
+      "median_ms": 2236.56,
+      "p95_ms": 3746.11,
+      "max_ms": 5487.87,
+      "errors": 0,
+      "response_bytes": [
+        149925,
+        178525
+      ]
+    }
+  ]
+}

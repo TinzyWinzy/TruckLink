@@ -1,0 +1,53 @@
+{
+  "scope": "Full synthetic model plus DRF JSON rendering; no auth, database or HTTP transport",
+  "production_limit": "API permits 1\u2013300 vehicles; 5,000 is an experimental larger batch only",
+  "parity": {
+    "exact_report_and_digest_comparisons": 54,
+    "seeds": [
+      0,
+      42,
+      43
+    ],
+    "docks": [
+      1,
+      3,
+      12
+    ]
+  },
+  "method": "31 randomized interleaved samples per variant and size; Rust includes RNG, buffer conversion and Python row reconstruction",
+  "runs": [
+    {
+      "vehicles": 72,
+      "json_bytes": 30721,
+      "median_ms": {
+        "original_python": 1.158,
+        "tuned_python": 1.136,
+        "rust_batch_experiment": 1.167
+      },
+      "rust_vs_tuned_speedup": 0.973,
+      "tuned_vs_original_speedup": 1.019
+    },
+    {
+      "vehicles": 300,
+      "json_bytes": 70009,
+      "median_ms": {
+        "original_python": 2.663,
+        "tuned_python": 2.583,
+        "rust_batch_experiment": 2.649
+      },
+      "rust_vs_tuned_speedup": 0.975,
+      "tuned_vs_original_speedup": 1.031
+    },
+    {
+      "vehicles": 5000,
+      "json_bytes": 883614,
+      "median_ms": {
+        "original_python": 35.474,
+        "tuned_python": 34.341,
+        "rust_batch_experiment": 35.09
+      },
+      "rust_vs_tuned_speedup": 0.979,
+      "tuned_vs_original_speedup": 1.033
+    }
+  ]
+}

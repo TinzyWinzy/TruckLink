@@ -16,6 +16,7 @@ export function selectFacility(id: string): void { facilityId = id }
 const TOKEN_KEY = 'trucki-auth-token'
 const REFRESH_KEY = 'trucki-refresh-token'
 let sessionGeneration = 0
+export function getSessionGeneration(): number { return sessionGeneration }
 let refreshFlight: Promise<void> | null = null
 
 export function setRefreshToken(token?: string): void {

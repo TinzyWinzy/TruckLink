@@ -31,8 +31,9 @@ from yard.reports import compute_turnaround_stats, parse_range
 
 from .serializers import (
     AlertSerializer, DockAssignSerializer, DockCreateSerializer, DockSerializer,
-    QueueCreateSerializer, QueueEntrySerializer, QueueUpdateSerializer,
+    QueueCreateSerializer, QueueEntrySerializer, QueueUpdateSerializer, poll_queue_rows,
 )
+from .queries import scoped_visits
 from .services import ReleaseBlocked, release_entry
 
 
@@ -57,23 +58,31 @@ class YardBoardView(APIView):
         facility, err = resolve_facility(request)
         if err is not None:
             return err
+        scope = request.query_params.get('scope', 'all')
+        if scope not in ('all', 'active') or request.query_params.get('compact', '0') not in ('0', '1'):
+            return Response({'detail': 'Board scope must be all or active; compact must be 0 or 1'}, status=400)
         entries = QueueEntry.objects.filter(facility=facility).select_related(
             "assigned_dock", "journey_link",
         )
+        entries = scoped_visits(entries, scope)
+        compact = request.query_params.get('compact') == '1'
+        queue_rows = poll_queue_rows(entries) if compact else QueueEntrySerializer(entries, many=True).data
         docks = Dock.objects.filter(facility=facility).select_related("current_entry")
-        alerts = Alert.objects.filter(facility=facility)
+        alerts = Alert.objects.filter(facility=facility).select_related("acknowledged_by")
         counts: dict[str, int] = {}
-        for entry in entries:
-            counts[entry.status] = counts.get(entry.status, 0) + 1
-        return Response({
+        for entry in queue_rows:
+            counts[entry['status']] = counts.get(entry['status'], 0) + 1
+        response = Response({
             "ok": True,
             "facility": {"id": facility.id, "name": facility.name, "slug": facility.slug},
-            "queue": [QueueEntrySerializer(e).data for e in entries],
-            "docks": [DockSerializer(d).data for d in docks],
-            "alerts": [AlertSerializer(a).data for a in alerts[:100]],
+            "queue": queue_rows,
+            "docks": DockSerializer(docks, many=True).data,
+            "alerts": AlertSerializer(alerts[:100], many=True).data,
             "counts": counts,
             "alerts_unacknowledged": alerts.filter(acknowledged=False).count(),
         })
+        response['Cache-Control'] = 'private, no-store'
+        return response
 
 
 class QueueListView(APIView):
@@ -84,9 +93,27 @@ class QueueListView(APIView):
         facility, err = resolve_facility(request)
         if err is not None:
             return err
+        scope = request.query_params.get('scope', 'all')
+        if scope not in ('all', 'active', 'history'):
+            return Response({'detail': 'Queue scope must be all, active or history'}, status=400)
+        limit = request.query_params.get('limit', '100' if scope == 'history' else None)
+        try:
+            limit = int(limit) if limit is not None else None
+            offset = int(request.query_params.get('offset', '0'))
+            if offset < 0 or (limit is not None and not 1 <= limit <= 200) or (limit is None and offset):
+                raise ValueError
+        except (ValueError, TypeError):
+            return Response({'detail': 'Limit must be 1 to 200; offset must be nonnegative and requires limit'}, status=400)
         entries = QueueEntry.objects.filter(facility=facility).select_related('journey_link')
-        rows = [QueueEntrySerializer(e).data for e in entries]
-        return Response({"ok": True, "count": len(rows), "queue": rows})
+        entries = scoped_visits(entries, scope).order_by('entry_timestamp', 'pk')
+        total = entries.count() if limit is not None else None
+        rows = QueueEntrySerializer(entries[offset:offset+limit] if limit is not None else entries, many=True).data
+        payload = {"ok": True, "count": len(rows), "queue": rows}
+        if limit is not None:
+            payload.update(total=total, next_offset=offset+len(rows) if offset+len(rows) < total else None)
+        response = Response(payload)
+        response['Cache-Control'] = 'private, no-store'
+        return response
 
     def post(self, request):
         serializer = QueueCreateSerializer(data=request.data)
@@ -218,7 +245,7 @@ class DockListView(APIView):
         if err is not None:
             return err
         docks = Dock.objects.filter(facility=facility)
-        rows = [DockSerializer(d).data for d in docks]
+        rows = DockSerializer(docks, many=True).data
         return Response({"ok": True, "count": len(rows), "docks": rows})
 
     @transaction.atomic
@@ -320,8 +347,8 @@ class AlertListView(APIView):
         facility, err = resolve_facility(request)
         if err is not None:
             return err
-        alerts = Alert.objects.filter(facility=facility)
-        rows = [AlertSerializer(a).data for a in alerts[:200]]
+        alerts = Alert.objects.filter(facility=facility).select_related("acknowledged_by")
+        rows = AlertSerializer(alerts[:200], many=True).data
         return Response({"ok": True, "count": len(rows), "alerts": rows})
 
 

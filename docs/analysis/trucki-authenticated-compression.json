@@ -1,0 +1,47 @@
+{
+  "tested_at": "2026-10-10T08:52:33.591821+00:00",
+  "tenant": "trucki-performance-test-e7be631926",
+  "facility_id": "3",
+  "seed_status": 200,
+  "seed_error": null,
+  "checks": [
+    {
+      "url": "https://spotteraiassessment-khaj.onrender.com/api/yard/board/?facility=3&scope=active&compact=1",
+      "requested_encoding": "identity",
+      "status": 200,
+      "headers": {
+        "Content-Encoding": null,
+        "Content-Type": "application/json",
+        "Content-Length": null,
+        "Vary": "origin",
+        "Cache-Control": null
+      },
+      "wire_body_bytes": 5461,
+      "decoded_bytes": 5461,
+      "elapsed_ms": 667.76
+    },
+    {
+      "url": "https://spotteraiassessment-khaj.onrender.com/api/yard/board/?facility=3&scope=active&compact=1",
+      "requested_encoding": "gzip",
+      "status": 200,
+      "headers": {
+        "Content-Encoding": "gzip",
+        "Content-Type": "application/json",
+        "Content-Length": null,
+        "Vary": "origin",
+        "Cache-Control": null
+      },
+      "wire_body_bytes": 1212,
+      "decoded_bytes": 5461,
+      "elapsed_ms": 1876.37
+    }
+  ],
+  "unauthenticated_status": 401,
+  "authenticated_success": true,
+  "identity_gzip_json_equal": true,
+  "authenticated_api_compression_verified": true,
+  "queue_rows": 7,
+  "wire_reduction_percent": 77.81,
+  "limitation": "Two sequential reads of an isolated demo tenant; not a load or latency benchmark. Current production deployment only.",
+  "logout_status": 200
+}

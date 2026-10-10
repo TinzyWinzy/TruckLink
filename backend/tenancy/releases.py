@@ -5,8 +5,10 @@ from django.db import transaction
 from django.utils import timezone
 from regulatory.engine.evaluator import digest
 from .registry import MODULES, TEMPLATES, ADAPTERS
+from .read_cache import memoize_read
 
 
+@memoize_read
 def active_release(org, at=None):
     from .models import ReleaseActivation
     row = ReleaseActivation.objects.filter(organisation=org,effective_from__lte=at or timezone.now()).order_by('-version').select_related('release').first()

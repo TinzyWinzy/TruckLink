@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from rest_framework import serializers
+from django.db.models import F
 
 from yard.models import Alert, Dock, QueueEntry
 
@@ -23,6 +24,31 @@ class QueueEntrySerializer(serializers.ModelSerializer):
             "id", "facility", "entry_timestamp", "exit_timestamp",
             "dwell_duration_seconds", "created_at", "updated_at", "milestone_semantics", "release_authorized_at", "dock_vacated_at",
         ]
+
+
+class PollQueueSerializer(QueueEntrySerializer):
+    """The complete row contract consumed by the live polling adapter."""
+    class Meta(QueueEntrySerializer.Meta):
+        fields = [field for field in QueueEntrySerializer.Meta.fields
+                  if field not in ('facility', 'created_at', 'idempotency_key')]
+        read_only_fields = [field for field in QueueEntrySerializer.Meta.read_only_fields
+                            if field not in ('facility', 'created_at', 'idempotency_key')]
+
+
+def poll_queue_rows(entries):
+    """Read projection preserving the compact serializer's JSON contract.
+
+    Fetch scalar columns and the linked trip ID directly, avoiding construction
+    of queue, dock and journey model instances for every polling row.
+    """
+    fields = [field for field in PollQueueSerializer.Meta.fields if field != 'journey_trip_id']
+    rows = list(entries.values(*fields, journey_trip_id=F('journey_link__trip_id')))
+    datetime_field = serializers.DateTimeField()
+    for row in rows:
+        for field in ('entry_timestamp', 'exit_timestamp', 'updated_at', 'release_authorized_at', 'dock_vacated_at'):
+            if row[field] is not None:
+                row[field] = datetime_field.to_representation(row[field])
+    return rows
 
 
 class QueueCreateSerializer(serializers.Serializer):
