@@ -1,0 +1,14 @@
+[
+  {
+    "path": "/assets/index-DivRED4D.js",
+    "status": 200,
+    "api_target_matches": true,
+    "compact_poll_present": false
+  },
+  {
+    "path": "/assets/live-cGrPaNsQ.js",
+    "status": 200,
+    "api_target_matches": false,
+    "compact_poll_present": true
+  }
+]

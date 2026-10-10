@@ -1,0 +1,65 @@
+{
+  "phase": "before",
+  "at": "2026-10-10T09:28:04.908343+00:00",
+  "checks": {
+    "full": {
+      "url": "https://spotteraiassessment-khaj.onrender.com/api/yard/board/?facility=3",
+      "requested_encoding": "identity",
+      "status": 200,
+      "headers": {
+        "Content-Encoding": null,
+        "Content-Type": "application/json",
+        "Content-Length": null,
+        "Vary": "origin",
+        "Cache-Control": null
+      },
+      "wire_body_bytes": 5461,
+      "decoded_bytes": 5461,
+      "elapsed_ms": 607.89
+    },
+    "compact": {
+      "url": "https://spotteraiassessment-khaj.onrender.com/api/yard/board/?facility=3&scope=active&compact=1",
+      "requested_encoding": "identity",
+      "status": 200,
+      "headers": {
+        "Content-Encoding": null,
+        "Content-Type": "application/json",
+        "Content-Length": null,
+        "Vary": "origin",
+        "Cache-Control": null
+      },
+      "wire_body_bytes": 5461,
+      "decoded_bytes": 5461,
+      "elapsed_ms": 709.28
+    },
+    "gzip": {
+      "url": "https://spotteraiassessment-khaj.onrender.com/api/yard/board/?facility=3&scope=active&compact=1",
+      "requested_encoding": "gzip",
+      "status": 200,
+      "headers": {
+        "Content-Encoding": "gzip",
+        "Content-Type": "application/json",
+        "Content-Length": null,
+        "Vary": "origin",
+        "Cache-Control": null
+      },
+      "wire_body_bytes": 1212,
+      "decoded_bytes": 5461,
+      "elapsed_ms": 680.83
+    }
+  },
+  "unauthenticated_status": 401,
+  "queue_rows": {
+    "full": 7,
+    "compact": 7,
+    "gzip": 7
+  },
+  "compact_omits_metadata": false,
+  "identity_gzip_equal": true,
+  "gzip_verified": true,
+  "no_store": false,
+  "compact_body_bytes": 5461,
+  "gzip_body_bytes": 1212,
+  "limitations": "Small unchanged demo fixture; single samples are not a latency benchmark. No load or operational writes.",
+  "logout_status": 200
+}
