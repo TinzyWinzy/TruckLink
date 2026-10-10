@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useSession } from '../store/session'
-import { apiFetch } from '../lib/api'
+import { apiFetch, selectFacility } from '../lib/api'
 import { tenantDisplayName } from '../lib/tenant'
 import { readSubscription, type Subscription } from '../lib/subscriptions'
 import { PageHeader, Section } from '../components/ui'
@@ -32,7 +32,11 @@ export default function Onboarding() {
     const {site}=await apiFetch<{site:Site}>('/tenant/sites/',{method:'POST',body:{name,timezone}})
     const current=useSession.getState().workspace
     if(current?.organisation?.id!==org)return
-    if(current)useSession.getState().setWorkspace({...current,facilities:[...current.facilities,site],selectedFacility:String(site.id)})
+    if(current){
+      selectFacility(String(site.id))
+      try{localStorage.setItem(`trucki-yard-${useSession.getState().userId}`,String(site.id))}catch{ /* Storage unavailable. */ }
+      useSession.getState().setWorkspace({...current,facilities:[...current.facilities,site],selectedFacility:String(site.id)})
+    }
     setName('');await refresh()
   }catch(e){setError((e as Error).message)}finally{setBusy(false)}}
   const release=workspace?.configuration?.release
@@ -51,7 +55,7 @@ export default function Onboarding() {
     {step===1&&<><Section title="Confirm operational sites" sub="Owner: company administrator. The onboarding workspace is an administrative placeholder.">
       {sites.map(site=><p key={site.id} className="mb-2 text-sm"><strong>{site.name}</strong> · {site.timezone} · {site.placeholder?'Administrative placeholder':'Operational site saved'}</p>)}
       {role==='ADMIN'&&<form className="mt-4 space-y-3" onSubmit={e=>{e.preventDefault();void createSite()}}><label className="block text-sm">Site name<input required maxLength={200} className="field mt-1 w-full px-3" value={name} onChange={e=>setName(e.target.value)}/></label><label className="block text-sm">Site timezone<input required className="field mt-1 w-full px-3" value={timezone} onChange={e=>setTimezone(e.target.value)}/></label><button className="btn-primary px-4" disabled={busy}>{busy?'Creating site…':'Create operational site'}</button><p className="text-sm">The new site is assigned to your account. Operations still require an activated release.</p></form>}
-    </Section>{role==='ADMIN'&&<><TenantSettings guided/>{sites.some(s=>String(s.id)===workspace?.selectedFacility&&!s.placeholder)&&<details className="card p-4"><summary>Configure docks for the selected operational site</summary><DockSetup/></details>}</>}</>}
+    </Section>{role==='ADMIN'&&<><TenantSettings guided/>{workspace?.configuration?.modules?.docks!==true&&<p className="text-sm">Dock creation becomes available after the docks capability is activated. Record site settings now and return here to configure docks.</p>}{workspace?.configuration?.modules?.docks===true&&sites.some(s=>String(s.id)===workspace?.selectedFacility&&!s.placeholder)&&<details className="card p-4"><summary>Configure docks for the selected operational site</summary><DockSetup/></details>}</>}</>}
     {step===2&&role==='ADMIN'&&<><ModuleSelection onSaved={()=>void refresh()}/>{capabilitySaved&&<p role="status">Request saved. Continue to operating procedures.{blocked.length?` Platform operator approval needed: ${blocked.join(', ')}.`:''}</p>}</>}
     {step===3&&<><Section title="Define your operating procedures" sub="Owner: company administrator."><p>Save capabilities matching your request, site settings, and a workflow. Confirm inspection checks, escalation owners and timing before review.</p>{!companySaved&&<p className="mt-3">Prerequisite: save company configuration and a real site in step 1.</p>}{!capabilitySaved&&<p className="mt-3">Prerequisite: save a capability request in step 2.</p>}</Section>{role==='ADMIN'&&<PlatformConfiguration stage="configure"/>}</>}
     {step===4&&<><Section title="Hand procedures to an independent reviewer" sub="Owner: a different authorized administrator or compliance officer."><p>The author cannot approve their own workflow or policy, even after switching working roles. Ask the reviewer to sign in with their own account.</p><p className="mt-3">Review handoff: <code>/onboarding?step=4</code>. No notification is sent automatically.</p></Section><PlatformConfiguration stage="review"/>{role==='ADMIN'&&<details className="card p-4"><summary>Provision a reviewer account</summary><StaffProvisioning/></details>}</>}

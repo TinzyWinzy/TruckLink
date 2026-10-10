@@ -5,7 +5,8 @@ import Onboarding from './Onboarding'
 const api=vi.hoisted(()=>vi.fn())
 const session=vi.hoisted(()=>({role:'ADMIN'}))
 const subscription=vi.hoisted(()=>vi.fn())
-vi.mock('../lib/api',()=>({apiFetch:api}))
+const selectFacility=vi.hoisted(()=>vi.fn())
+vi.mock('../lib/api',()=>({apiFetch:api,selectFacility}))
 vi.mock('../lib/subscriptions',()=>({readSubscription:subscription}))
 vi.mock('../store/session',()=>{
   const state={get role(){return session.role},workspace:{organisation:{id:1,name:'Test'},configuration:null,facilities:[],selectedFacility:''},setWorkspace:vi.fn()}
@@ -40,4 +41,13 @@ it('lets a compliance reviewer open the handoff without requesting admin-only mo
   expect(subscription).not.toHaveBeenCalled()
   expect(screen.queryByRole('button',{name:'Create operational site'})).not.toBeInTheDocument()
   expect(screen.queryByText('Reviewer provisioning')).not.toBeInTheDocument()
+})
+it('selects the created site for subsequent site-scoped API commands',async()=>{
+  render(<MemoryRouter><Onboarding/></MemoryRouter>)
+  await screen.findByText('Placeholder')
+  api.mockResolvedValueOnce({site:{id:42,name:'Main yard',slug:'main-yard',timezone:'Africa/Harare',placeholder:false}})
+  fireEvent.change(screen.getByRole('textbox',{name:'Site name'}),{target:{value:'Main yard'}})
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Create operational site'}))})
+  expect(api).toHaveBeenCalledWith('/tenant/sites/',{method:'POST',body:{name:'Main yard',timezone:'Africa/Harare'}})
+  expect(selectFacility).toHaveBeenCalledWith('42')
 })
