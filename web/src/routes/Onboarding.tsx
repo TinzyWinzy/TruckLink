@@ -43,15 +43,44 @@ export default function Onboarding() {
   const companySaved=!!workspace?.configuration?.id&&sites.some(s=>!s.placeholder)
   const capabilitySaved=!!subscription?.selection
   const blocked=subscription?.selection?.required_modules.filter(m=>!subscription.entitlement.modules.includes(m))??[]
-  const statuses=[companySaved?'Saved':'Needs setup',capabilitySaved?'Request saved':'Needs selection',revisions.length?'Drafts saved':'Save procedures',revisions.some(r=>['WORKFLOW','POLICY'].includes(r.kind)&&r.review_approved)?'Approval recorded':'Different reviewer required',release?'Active':'Awaiting activation']
+  const workflowSaved=revisions.some(r=>r.kind==='WORKFLOW')
+  const reviewable=revisions.filter(r=>['WORKFLOW','POLICY'].includes(r.kind))
+  const reviewComplete=reviewable.length>0&&reviewable.every(r=>r.review_approved===true)
+  const statuses=[companySaved?'Complete':'Needs setup',capabilitySaved?'Request saved':'Needs selection',workflowSaved?'Workflow saved':'Needs workflow',reviewComplete?'Approved':'Review needed',release?'Active':'Not active']
+  const nextAction=role==='COMPLIANCE_OFFICER'
+    ? !reviewable.length
+      ? {step:3,title:'Waiting for procedures',description:'Ask the company administrator to save a workflow or policy. You can review it here once it is ready.'}
+      : !reviewComplete
+        ? {step:4,title:'Review procedures',description:'Open the saved workflow or policy and record an independent decision.'}
+        : {step:5,title:'Review complete',description:'The company administrator can now publish and activate the approved configuration.'}
+    : !companySaved
+      ? {step:1,title:'Set up your company and site',description:'Save company details and create at least one real operational site.'}
+      : !capabilitySaved
+        ? {step:2,title:'Choose your capabilities',description:'Select the capabilities your operation needs and save the request.'}
+        : !workflowSaved
+          ? {step:3,title:'Save an operating workflow',description:'Confirm your inspection checks and escalation timing, then save a workflow revision.'}
+          : !reviewComplete
+            ? {step:4,title:'Request an independent review',description:'Have a different authorized administrator or compliance officer review each saved workflow or policy.'}
+            : !release
+              ? {step:5,title:'Publish and activate',description:'Select the approved revisions, publish a release, then activate it.'}
+              : null
   const go=(value:number)=>setParams({step:String(value)})
   return <div className="max-w-4xl space-y-6">
     <PageHeader title="Client onboarding" sub={`${tenantDisplayName(workspace?.configuration,workspace?.organisation?.name)} · Set up your operation, one step at a time.`}/>
-    <section className="card p-5" aria-label="Activation status"><h2 className="text-xl font-bold">{release?'Operational configuration active':'Setup in progress — operations are locked'}</h2><p className="mt-2">{release?`Active release ${release.version}.`:'Save company details and a real site, choose capabilities, then independently review and activate your procedures.'}</p><p className="mt-2 text-sm">Progress comes from saved company records. Advancing a step does not mark it complete.</p></section>
+    <section className="card p-5" aria-label="Next action">
+      <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">{release?'Setup complete':'Your next step'}</p>
+      <h2 className="mt-1 text-xl font-bold">{nextAction?.title??'Operational configuration active'}</h2>
+      <p className="mt-2">{nextAction?.description??`Release ${release?.version} is active. Open the operations workspace to continue.`}</p>
+      {blocked.length>0&&<p className="mt-2 text-sm" role="status">Platform operator approval is still needed for: {blocked.join(', ')}.</p>}
+      <div className="mt-4 flex flex-wrap gap-3">
+        {nextAction&&<button className="btn-primary px-4" onClick={()=>go(nextAction.step)}>Go to {steps[nextAction.step-1].toLowerCase()}</button>}
+        <Link className="btn-secondary inline-flex items-center px-4" to="/workspace">Open workspace</Link>
+      </div>
+    </section>
     <nav aria-label="Setup steps"><ol className="grid gap-2 sm:grid-cols-5">{steps.map((label,index)=><li key={label}><button className={`w-full rounded-lg border p-3 text-left ${step===index+1?'border-blue-500 bg-blue-50':'border-slate-200'}`} aria-current={step===index+1?'step':undefined} onClick={()=>go(index+1)}><strong className="block text-sm">{index+1}. {label}</strong><span className="mt-1 block text-xs">{statuses[index]}</span></button></li>)}</ol></nav>
     {error&&<div role="alert" className="card p-4">{error}<button className="btn-secondary ml-3 px-3" onClick={()=>void refresh()}>Retry loading setup</button></div>}
     {!loaded&&!error&&<p role="status">Loading saved setup…</p>}
-    {role!=='ADMIN'&&<p className="card p-4">Company administrators own setup. Independent reviews require an authorized administrator or compliance officer using a different account.</p>}
+    {role!=='ADMIN'&&<p className="card p-4">Company setup belongs to an administrator. Reviewers must use their own authorized account; authors cannot approve their own procedures.</p>}
     {step===1&&<><Section title="Confirm operational sites" sub="Owner: company administrator. The onboarding workspace is an administrative placeholder.">
       {sites.map(site=><p key={site.id} className="mb-2 text-sm"><strong>{site.name}</strong> · {site.timezone} · {site.placeholder?'Administrative placeholder':'Operational site saved'}</p>)}
       {role==='ADMIN'&&<form className="mt-4 space-y-3" onSubmit={e=>{e.preventDefault();void createSite()}}><label className="block text-sm">Site name<input required maxLength={200} className="field mt-1 w-full px-3" value={name} onChange={e=>setName(e.target.value)}/></label><label className="block text-sm">Site timezone<input required className="field mt-1 w-full px-3" value={timezone} onChange={e=>setTimezone(e.target.value)}/></label><button className="btn-primary px-4" disabled={busy}>{busy?'Creating site…':'Create operational site'}</button><p className="text-sm">The new site is assigned to your account. Operations still require an activated release.</p></form>}

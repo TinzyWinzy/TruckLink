@@ -12,11 +12,11 @@ const ALL: Role[] = [
 ]
 
 describe('ROUTE_GATES (RBAC matrix)', () => {
-  it('lands an unreleased tenant administrator on onboarding and preserves established tenants', () => {
+  it('lands an unreleased tenant administrator on the workspace and preserves established tenants', () => {
     const previous = useSession.getState().workspace
     try {
       useSession.getState().setWorkspace({organisation:{id:91,name:'Synthetic Tenant',slug:'synthetic'},facilities:[],selectedFacility:'',configuration:{version:0,digest:'',release:null,modules:{yard:false,reports:false,audit:true},content:{schema_version:1,branding:{display_name:'Synthetic Tenant',accent:'#000000',navy:'#000000',paper:'#ffffff'},roles:{ADMIN:{label:'Admin',enabled:true}},permissions:{},workflow:{mandatory_checks:[],inspection_max_age_seconds:3600,escalation_minutes:{}},integrations:{}}}})
-      expect(landingPathForRole('ADMIN')).toBe('/onboarding')
+      expect(landingPathForRole('ADMIN')).toBe('/workspace')
       expect(canVisit('onboarding','ADMIN')).toBe(true)
       expect(canVisit('onboarding','COMPLIANCE_OFFICER')).toBe(true)
       expect(canVisit('onboarding','OPERATIONS_SUPERVISOR')).toBe(false)

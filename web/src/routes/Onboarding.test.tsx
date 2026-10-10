@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Onboarding from './Onboarding'
 const api=vi.hoisted(()=>vi.fn())
@@ -21,6 +21,10 @@ it('shows real site creation and advances without claiming completion',async()=>
   render(<MemoryRouter><Onboarding/></MemoryRouter>)
   await screen.findByText('Placeholder')
   expect(screen.getByRole('button',{name:'Create operational site'})).toBeInTheDocument()
+  expect(screen.getByRole('region',{name:'Next action'})).toHaveTextContent('Set up your company and site')
+  expect(screen.getByRole('link',{name:'Open workspace'})).toHaveAttribute('href','/workspace')
+  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Go to company and sites'}))})
+  expect(within(screen.getByRole('navigation',{name:'Setup steps'})).getByRole('button',{name:/1\. Company and sites/})).toHaveAttribute('aria-current','step')
   expect(screen.getByText('Needs setup')).toBeInTheDocument()
   await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Continue to Capabilities'}))})
   expect(screen.getByText('Capability form')).toBeInTheDocument()
@@ -41,6 +45,14 @@ it('lets a compliance reviewer open the handoff without requesting admin-only mo
   expect(subscription).not.toHaveBeenCalled()
   expect(screen.queryByRole('button',{name:'Create operational site'})).not.toBeInTheDocument()
   expect(screen.queryByText('Reviewer provisioning')).not.toBeInTheDocument()
+})
+it('tells a reviewer when there is nothing ready to review',async()=>{
+  session.role='COMPLIANCE_OFFICER'
+  render(<MemoryRouter initialEntries={['/onboarding?step=4']}><Onboarding/></MemoryRouter>)
+  await screen.findByText('Configuration stage: review')
+  expect(screen.getByRole('region',{name:'Next action'})).toHaveTextContent('Waiting for procedures')
+  expect(screen.getByRole('region',{name:'Next action'})).toHaveTextContent('Ask the company administrator to save a workflow or policy')
+  expect(screen.getByRole('button',{name:'Go to operating procedures'})).toBeInTheDocument()
 })
 it('selects the created site for subsequent site-scoped API commands',async()=>{
   render(<MemoryRouter><Onboarding/></MemoryRouter>)

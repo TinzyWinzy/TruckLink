@@ -59,7 +59,7 @@ export function canAckAlert(role: Role | null): boolean {
  * Yard roles → /queue; EXECUTIVE/ADMIN → /reports; COMPLIANCE → /approvals. */
 export function landingPathForRole(role: Role): string {
   const tenant = useSession.getState().workspace?.configuration
-  if (role === 'ADMIN' && !tenant?.release && tenant?.modules?.yard === false) return '/onboarding'
+  if (role === 'ADMIN' && tenant && !tenant.release && tenant.modules?.yard === false) return '/workspace'
   if (tenant?.subscription && tenant.subscription.basis !== 'LEGACY_CONTINUITY' && canVisit('workspace',role)) return '/workspace'
   const preferred: RouteKey = role === 'EXECUTIVE' || role === 'ADMIN' ? 'reports' : role === 'COMPLIANCE_OFFICER' ? 'approvals' : 'queue'
   const route = [preferred, 'routes', 'workspace', 'hub'].find(key => canVisit(key as RouteKey,role)) ?? 'hub'

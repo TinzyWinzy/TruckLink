@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-test('unreleased tenant lands on a scoped onboarding page and survives refresh', async ({ page }, testInfo) => {
+test('unreleased tenant opens the workspace while setup remains one click away', async ({ page }, testInfo) => {
   const writes: string[] = [], errors: string[] = []
   let selection: null | {version:number;modules:string[];required_modules:string[];created_at:string;status:string}=null
   const catalogue=[{key:'yard',name:'Yard control',description:'Arrivals and exits',requires:['inspection','release'],included:false},{key:'inspection',name:'Inspections',description:'Recorded checks',requires:['yard'],included:false},{key:'release',name:'Release safeguards',description:'Independent approval',requires:['inspection'],included:false},{key:'audit',name:'Audit history',description:'Included records',requires:[],included:true}]
@@ -11,6 +11,8 @@ test('unreleased tenant lands on a scoped onboarding page and survives refresh',
     if(path==='/api/auth/me/'&&!req.headers().authorization){await route.fulfill({status:401,json:{}});return}
     if(path.startsWith('/api/auth/')){await route.fulfill({json:{token:'synthetic-only',user}});return}
     if(req.method()!=='GET')writes.push(path)
+    if(path==='/api/tenant/sites/'){await route.fulfill({json:{sites:user.facilities.map(site=>({...site,timezone:'Africa/Harare',placeholder:true}))}});return}
+    if(path==='/api/tenant/revisions/'){await route.fulfill({json:{revisions:[]}});return}
     if(path==='/api/tenant/subscription/'){
       if(req.method()==='POST'){
         const body=req.postDataJSON();expect(body.expected_version).toBe(selection?.version??0)
@@ -27,13 +29,19 @@ test('unreleased tenant lands on a scoped onboarding page and survives refresh',
   await page.getByLabel('Staff ID',{exact:true}).fill('TRK-SYNTH-ADMIN')
   await page.getByLabel('PIN',{exact:true}).fill('93472581')
   await page.getByRole('button',{name:'Sign in to shift',exact:true}).click()
+  await expect(page).toHaveURL(/\/workspace$/)
+  await expect(page.getByRole('heading',{name:'Your workspace',exact:true})).toBeVisible()
+  await expect(page.getByRole('region',{name:'Setup status'})).toContainText('Operational actions unlock after the required review and release activation.')
+  await page.getByRole('link',{name:'Continue setup',exact:true}).click()
   await expect(page).toHaveURL(/\/onboarding$/)
   await expect(page.getByRole('heading',{name:'Client onboarding',exact:true})).toBeVisible()
-  await expect(page.getByRole('region',{name:'Activation status'})).toContainText('Synthetic New Tenant')
-  await expect(page.getByText('Workspace created. Operational setup pending.',{exact:true})).toBeVisible()
+  await expect(page.getByRole('region',{name:'Next action'})).toContainText('Set up your company and site')
+  await expect(page.getByRole('button',{name:'Go to company and sites'})).toBeVisible()
+  await expect(page.getByRole('region',{name:'Confirm operational sites'}).getByText('Onboarding workspace',{exact:true})).toBeVisible()
+  await expect(page.getByRole('button',{name:'Create operational site',exact:true})).toBeVisible()
   await expect(page.getByRole('link',{name:'Reports',exact:true})).toHaveCount(0)
   await expect(page.getByRole('link',{name:'Queue',exact:true})).toHaveCount(0)
-  await expect(page.getByRole('link',{name:'Open tenant configuration',exact:true})).toBeVisible()
+  await page.getByRole('navigation',{name:'Setup steps'}).getByRole('button',{name:/2\. Capabilities/}).click()
   await page.getByRole('checkbox',{name:/Yard control/}).check()
   await page.getByRole('button',{name:'Save module request',exact:true}).click()
   await expect(page.getByText('Saved request v1',{exact:true})).toBeVisible()
@@ -47,7 +55,7 @@ test('unreleased tenant lands on a scoped onboarding page and survives refresh',
   await page.goto('/workspace')
   await expect(page.getByRole('heading',{name:'Your workspace',exact:true})).toBeVisible()
   await expect(page.getByRole('link',{name:/Audit & history/})).toBeVisible()
-  await expect(page.getByText('Operational activation is pending discovery and review.')).toBeVisible()
+  await expect(page.getByRole('region',{name:'Setup status'})).toContainText('Operational actions unlock after the required review and release activation.')
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
   await page.screenshot({path:testInfo.outputPath('workspace-mobile.png'),fullPage:true})
   expect(errors).toEqual([]);expect(writes).toEqual(['/api/tenant/subscription/'])
