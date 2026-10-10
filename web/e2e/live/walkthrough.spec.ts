@@ -5,6 +5,7 @@ test('assigned reviewer can navigate readiness and all-role walkthrough on mobil
   const writes:string[]=[]
   await page.route('**/api/**',async route=>{
     const path=new URL(route.request().url()).pathname
+    if(path==='/api/auth/me/'&&!route.request().headers().authorization){await route.fulfill({status:401,json:{}});return}
     if(route.request().method()!=='GET'&&path!=='/api/auth/pin/')writes.push(path)
     let response:unknown={}
     if(path==='/api/auth/pin/')response={token:'synthetic-only',user}
@@ -20,6 +21,7 @@ test('assigned reviewer can navigate readiness and all-role walkthrough on mobil
   await page.getByLabel('Staff ID',{exact:true}).fill('SYNTHETIC-OPS')
   await page.getByLabel('PIN',{exact:true}).fill('112233')
   await page.getByRole('button',{name:'Sign in to shift',exact:true}).click()
+  await expect(page).toHaveURL(/\/queue$/)
   await page.goto('/guide')
   await expect(page.getByRole('heading',{name:'Operational walkthrough'})).toBeVisible()
   await expect(page.getByText('Counts do not establish release eligibility.')).toBeVisible()

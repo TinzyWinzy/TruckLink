@@ -45,6 +45,7 @@ test('operations separates dock vacancy, exit and rejected delivery recovery on 
   for(const action of ['Record dock vacated','Record departed','Record destination arrived']){
     await panel.getByLabel('Observation reason').fill('Synthetic staff observation')
     await panel.getByRole('button',{name:action,exact:true}).click()
+    await expect(panel.getByLabel('Observation reason')).toHaveValue('')
   }
   await page.setViewportSize({width:390,height:1000})
   await panel.getByLabel('Delivery outcome').selectOption('DELIVERY_REJECTED')
@@ -53,10 +54,13 @@ test('operations separates dock vacancy, exit and rejected delivery recovery on 
   await panel.getByLabel('Delivery evidence reference').fill('test://receipt')
   await panel.getByLabel('Fingerprint delivery document').setInputFiles({name:'rejection.txt',mimeType:'text/plain',buffer:Buffer.from('Synthetic rejection receipt')})
   await panel.getByRole('button',{name:'Record delivery rejected'}).click()
+  await expect(panel.getByLabel('Observation reason')).toHaveValue('')
   await panel.getByLabel('Observation reason').fill('Receiver agreed reattempt at same destination')
   await panel.getByRole('button',{name:'Record delivery reattempt planned'}).click()
+  await expect(panel.getByLabel('Observation reason')).toHaveValue('')
   await panel.getByLabel('Observation reason').fill('Arrived for agreed reattempt')
   await panel.getByRole('button',{name:'Record destination arrived'}).click()
+  await expect(panel.getByLabel('Observation reason')).toHaveValue('')
   await panel.getByLabel('Observation reason').fill('Synthetic receiver acceptance')
   await expect(panel.getByRole('button',{name:'Record delivery accepted'})).toBeDisabled()
   await panel.getByLabel('Receiver name').fill('Test receiver')

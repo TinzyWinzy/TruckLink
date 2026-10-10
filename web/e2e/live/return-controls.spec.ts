@@ -10,6 +10,7 @@ test('operations records an authorised return through receiving visit and retain
     returns:[{id:7,facility_id:84,facility_name:'Disposable Yard',state,reason:'Rejected full consignment',consignments:[],route_reference:'test://route'}],receiving_visits:[{id:9,facility_id:84,reg_number:'TEST-123'}]})
   await page.route('**/api/**',async route=>{
     const path=new URL(route.request().url()).pathname;let response:unknown={}
+    if(path==='/api/auth/me/'&&!route.request().headers().authorization){await route.fulfill({status:401,json:{}});return}
     if(path==='/api/auth/pin/')response={token:'synthetic-only',user}
     if(path==='/api/auth/me/')response={user}
     if(path==='/api/yard/board/')response={queue:[],docks:[],alerts:[]}
@@ -27,15 +28,18 @@ test('operations records an authorised return through receiving visit and retain
   await page.goto('/')
   await page.getByLabel('Staff ID',{exact:true}).fill('SYNTHETIC-OPS');await page.getByLabel('PIN',{exact:true}).fill('112233')
   await page.getByRole('button',{name:'Sign in to shift',exact:true}).click()
+  await expect(page).toHaveURL(/\/queue$/)
   await page.goto('/routes?trip=3');await page.setViewportSize({width:390,height:1000})
   const panel=page.getByRole('region',{name:'Connected journey'})
   await panel.getByLabel('Return to update').selectOption('7')
   await panel.getByLabel('Operation reason').fill('Synthetic return departure')
   await panel.getByRole('button',{name:'Record return in transit'}).click()
+  await expect(panel.getByLabel('Operation reason')).toHaveValue('')
   await panel.getByLabel('Operation reason').fill('Synthetic receiving yard arrival')
   await expect(panel.getByRole('button',{name:'Record return arrived'})).toBeDisabled()
   await panel.getByLabel('Receiving yard visit').selectOption('9')
   await panel.getByRole('button',{name:'Record return arrived'}).click()
+  await expect(panel.getByLabel('Operation reason')).toHaveValue('')
   await panel.getByLabel('Operation reason').fill('Synthetic warehouse receipt')
   await panel.getByLabel('Return receiver').fill('Test warehouse receiver')
   await panel.getByLabel('Return receipt reference').fill('test://return-receipt')
