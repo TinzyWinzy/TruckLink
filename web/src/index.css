@@ -27,6 +27,9 @@
   --transport-focus: #1d4ed8;
   --transport-radius: 7px;
   --transport-radius-sm: 6px;
+  --transport-rule: #e4e7ec;
+  --transport-plate: #faf9f4;
+  --transport-ink-soft: #526075;
   --transport-shadow-1: 0 1px 2px rgb(11 21 38 / 0.07);
   --transport-shadow-2: 0 6px 20px -8px rgb(11 21 38 / 0.22);
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -68,11 +71,41 @@ button, a, input, select, [role="button"] {
 
 /* Eyebrow — section kicker above titles (editorial + industrial) */
 .eyebrow {
+  font-family: var(--font-data);
   font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--transport-amber);
+}
+/* Editorial type scale — mkdir-inspired: tight balanced titles, measured ledes, mono captions */
+.page-title {
+  text-wrap: balance;
+  letter-spacing: -0.025em;
+}
+.lede {
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--transport-ink-2);
+  max-width: 56ch;
+  text-wrap: pretty;
+}
+.caption {
+  font-family: var(--font-data);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--transport-ink-soft);
+}
+.index-num {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--transport-ink-3);
+  min-width: 2.5ch;
+  text-align: right;
 }
 /* stylelint-disable-next-line -- dark-surface variant */
 .on-dark .eyebrow {
@@ -135,10 +168,11 @@ button, a, input, select, [role="button"] {
   text-wrap: balance;
 }
 .page-sub {
-  font-size: 0.9rem;
-  line-height: 1.55;
+  font-size: 0.95rem;
+  line-height: 1.65;
   color: var(--transport-ink-2);
-  max-width: 62ch;
+  max-width: 56ch;
+  text-wrap: pretty;
 }
 .card {
   background: var(--transport-surface);
@@ -485,3 +519,18 @@ footer.yard-foot {
 .intel-stale-charts .intel-legend::after { content:'Last snapshot'; color:#84342d; }
 @media (max-width:1000px) { .intel-top-grid { grid-template-columns:minmax(0,1fr); } .intel-bottom-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:640px) { .intel-bottom-grid { grid-template-columns:minmax(0,1fr); } .intel-controls { width:100%; } .intel-controls label { flex:1; } .intel-controls select { width:100%; } .intel-controls button { font-size:13px; padding-inline:10px; } }
+
+/* Ruled lists — mkdir-inspired ranked rows: hairline rules, mono index, generous rhythm */
+.ruled-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--transport-rule); }
+.ruled-list > li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 4px; border-bottom: 1px solid var(--transport-rule); }
+.ruled-list > li:hover { background: var(--transport-plate); }
+.ruled-row-body { min-width: 0; flex: 1; }
+.ruled-row-meta { flex-shrink: 0; font-size: 12px; color: var(--transport-ink-soft); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .ruled-list > li { flex-wrap: wrap; gap: 8px 14px; } .ruled-row-meta { width: 100%; } }
+
+/* Subtle motion — content settles on mount; cards lift on hover. Reduced-motion kills all. */
+.workspace-main { animation: content-settle 0.35s ease-out; }
+@keyframes content-settle { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.card { transition: box-shadow 0.15s ease, border-color 0.15s ease; }
+a.card:hover, .card-raised { box-shadow: var(--transport-shadow-2); }
+a.card:hover { border-color: var(--transport-border-strong); }
