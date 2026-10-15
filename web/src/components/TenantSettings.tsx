@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { apiFetch } from '../lib/api'
 import { useSession } from '../store/session'
 import type { TenantConfiguration } from '../lib/tenant'
-import { Section } from './ui'
+import { LoadingState, Section } from './ui'
 
 export default function TenantSettings({guided=false}: {guided?:boolean} = {}) {
   const { workspace, setWorkspace } = useSession()
@@ -16,7 +16,7 @@ export default function TenantSettings({guided=false}: {guided?:boolean} = {}) {
       .catch(error => { if (active) setMessage(error.message) })
     return () => { active = false }
   }, [])
-  if (!config) return <p role="status">{message || 'Loading tenant configuration'}</p>
+  if (!config) return <LoadingState label={message || 'Loading tenant configuration'} lines={3} />
   function edit(update: (content: TenantConfiguration['content']) => void) {
     setConfig(old => { if (!old) return old; const next = structuredClone(old); update(next.content); return next })
   }

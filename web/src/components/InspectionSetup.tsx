@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiFetch } from '../lib/api'
-import { Section } from './ui'
+import { LoadingState, Section } from './ui'
 
 export type InspectionSetupData = {
   entry:{id:number;registration:string;status:string};can_record_context:boolean;can_record_load:boolean;
@@ -50,7 +50,7 @@ export default function InspectionSetup({entryId,onSaved,showBlockers=true}:{ent
   }
   return <Section title="Prepare this inspection" sub="Saving setup does not authorise release.">
     {error&&<p role="alert" className="mb-3 text-sm text-red-800">{error}</p>}
-    {!data?<p role="status">Loading entry setup.</p>:<>
+    {!data?<LoadingState label="Loading entry setup." lines={3} />:<>
       <p className="text-sm font-bold">{data.entry.registration} · Visit {data.entry.id} · {data.entry.status}</p>
       {showBlockers&&data.blockers.length>0&&<ol className="prerequisite-list">{data.blockers.map(b=><li key={b.code}><div><strong>{b.title}</strong><p>Responsible role: {b.owner}</p></div></li>)}</ol>}
       <details className="operational-details my-3"><summary>Setup responsibilities</summary><p>Dispatch manages trips in <Link className="underline" to="/routes">Routes & map</Link>. Admin manages vehicle evidence in <Link className="underline" to="/admin">Admin</Link>. Compliance uses <Link className="underline" to="/approvals">Pending approvals</Link>. A different person must approve rating evidence and configurations.</p></details>

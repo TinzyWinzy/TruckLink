@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { readSubscription, requiredModules, saveModuleSelection, type ModuleKey, type Subscription } from '../lib/subscriptions'
-import { Section } from './ui'
+import { LoadingState, Section } from './ui'
 
 export default function ModuleSelection({onSaved}: {onSaved?: () => void} = {}) {
   const [data,setData]=useState<Subscription|null>(null)
@@ -11,7 +11,7 @@ export default function ModuleSelection({onSaved}: {onSaved?: () => void} = {}) 
   async function save(){if(!data)return;setBusy(true);setError('');setMessage('');try{const value=await saveModuleSelection(selected,data.selection?.version??0);setData(value);setSelected(value.selection!.modules);setMessage('Module request saved. Subscription approval and operational activation are separate steps.');onSaved?.()}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
   const included=data?requiredModules(selected,data.catalogue):[]
   return <Section title="Choose your modules" sub="Request the capabilities your company needs. Saving a request does not activate access or take payment.">
-    {!data&&!error&&<p role="status">Loading module choices…</p>}
+    {!data&&!error&&<LoadingState label="Loading module choices…" lines={3} />}
     {error&&<div role="alert"><p>{error}</p><button type="button" className="btn-secondary mt-3 px-4" disabled={busy} onClick={reloadModules}>Reload modules</button></div>}
     {data&&<form onSubmit={e=>{e.preventDefault();void save()}}>
       <p className="mb-4 text-sm">Subscription permission: {data.entitlement.state.toLowerCase().replaceAll('_',' ')}{data.entitlement.basis==='LEGACY_CONTINUITY'?' (existing workspace continuity)':''}. Operational readiness is shown separately in setup. Pricing and checkout are not configured.</p>

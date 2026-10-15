@@ -4,7 +4,7 @@ import { useSession } from '../store/session'
 import { apiFetch, selectFacility } from '../lib/api'
 import { tenantDisplayName } from '../lib/tenant'
 import { readSubscription, type Subscription } from '../lib/subscriptions'
-import { PageHeader, Section } from '../components/ui'
+import { LoadingState, PageHeader, Section } from '../components/ui'
 import ModuleSelection from '../components/ModuleSelection'
 import TenantSettings from '../components/TenantSettings'
 import PlatformConfiguration from '../components/PlatformConfiguration'
@@ -79,7 +79,7 @@ export default function Onboarding() {
     </section>
     <nav aria-label="Setup steps"><ol className="grid gap-2 sm:grid-cols-5">{steps.map((label,index)=><li key={label}><button className={`w-full rounded-lg border p-3 text-left ${step===index+1?'border-blue-500 bg-blue-50':'border-slate-200'}`} aria-current={step===index+1?'step':undefined} onClick={()=>go(index+1)}><strong className="block text-sm">{index+1}. {label}</strong><span className="mt-1 block text-xs">{statuses[index]}</span></button></li>)}</ol></nav>
     {error&&<div role="alert" className="card p-4">{error}<button className="btn-secondary ml-3 px-3" onClick={()=>void refresh()}>Retry loading setup</button></div>}
-    {!loaded&&!error&&<p role="status">Loading saved setup…</p>}
+    {!loaded&&!error&&<LoadingState label="Loading saved setup…" lines={3} />}
     {role!=='ADMIN'&&<p className="card p-4">Company setup belongs to an administrator. Reviewers must use their own authorized account; authors cannot approve their own procedures.</p>}
     {step===1&&<><Section title="Confirm operational sites" sub="Owner: company administrator. The onboarding workspace is an administrative placeholder.">
       {sites.map(site=><p key={site.id} className="mb-2 text-sm"><strong>{site.name}</strong> · {site.timezone} · {site.placeholder?'Administrative placeholder':'Operational site saved'}</p>)}

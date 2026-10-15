@@ -8,7 +8,7 @@ import { dashboardCsv, fetchDashboard, type Dashboard, type DashboardWindow } fr
 import { practiceDashboard } from '../lib/dashboardPractice'
 import { practiceVisits } from '../lib/reportPracticeVisits'
 import { queueToCsv } from '../lib/live'
-import { PageHeader, Stat } from '../components/ui'
+import { PageHeader, LoadingState, Stat } from '../components/ui'
 import { DashboardCharts } from '../components/DashboardCharts'
 import MovementWorklist from '../components/MovementWorklist'
 import { tenantDisplayName } from '../lib/tenant'
@@ -111,7 +111,7 @@ function ReportsWorkspace({ window, onWindow, onRetry }: { window: DashboardWind
       <Stat label="Physical exits" value={data?String(counts!.physical_exits):'Awaiting data'} unavailable={unavailable} hint="Valid separate exit milestones in the selected window" />
       <Stat label="Turnaround avg" value={data?(counts!.mean_turnaround_minutes==null?'No physical exits':`${Math.round(counts!.mean_turnaround_minutes)}m`):'Awaiting data'} unavailable={unavailable || counts?.mean_turnaround_minutes==null} hint={`${counts?.physical_exits??0} physical exits · legacy completion proxies excluded`} />
     </div>
-    {loading && <div className="intel-loading" role="status">Loading activity graphs and source coverage…</div>}
+    {loading && <LoadingState label="Loading activity graphs and source coverage…" lines={5} className="intel-loading" />}
     {data && <div className={stale?'intel-stale-charts':''} aria-label={stale?'Last recorded dashboard snapshot':'Current dashboard graphs'}>
       {stale && <p className="intel-stale-banner" role="status">{paused?'Updates paused.':'Snapshot may be stale.'} Charts show the last successful read at {updated}.</p>}
       <DashboardCharts data={data} showDocks={workspace?.configuration?.modules?.docks!==false} showAlerts={workspace?.configuration?.modules?.yard!==false} />

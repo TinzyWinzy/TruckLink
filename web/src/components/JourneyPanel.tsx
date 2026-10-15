@@ -5,6 +5,7 @@ import { useSession } from '../store/session'
 import type { RouteTrip, RouteWorkspace } from '../lib/routes'
 import type { Journey } from '../lib/journey'
 import JourneyCommands from './JourneyCommands'
+import {LoadingState} from './ui'
 
 type Visit = { id: number; reg_number: string; status: string }
 const localNow = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,19)
@@ -68,7 +69,7 @@ export default function JourneyPanel({ trip, workspace, onChange }: { trip: Rout
   return <section className="report-panel mt-4" aria-label="Connected journey">
     <h2 className="text-lg font-bold">Registration to destination</h2>
     <p className="mt-2 text-sm">ERP and tracking connectors are not configured. Existing position reports remain separate evidence.</p>
-    {loading && <p role="status">Loading journey.</p>}
+    {loading && <LoadingState label="Loading journey." lines={2} />}
     {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
     {!loading && !journey && <>
       <p className="mt-3 text-sm">Link an origin yard visit to this assigned trip. Inspection history and registered vehicle must agree.</p>

@@ -7,7 +7,7 @@ import { quantityLabel as qty } from '../lib/consignments'
 import type { RouteTrip } from '../lib/routes'
 import type { Journey } from '../lib/journey'
 import JourneyPanel from '../components/JourneyPanel'
-import { PageHeader, Section } from '../components/ui'
+import { LoadingState, PageHeader, Section } from '../components/ui'
 
 const human = (value:string) => value.replaceAll('_',' ').toLowerCase()
 const blank = {reference:'',customer_name:'',customer_reference:'',commodity:'',target_quantity:'',unit:'t',deadline:'',external_system:'',external_reference:'',reason:''}
@@ -65,7 +65,7 @@ export default function Consignments() {
     {!live?<Section title="Connected customer orders"><p>Sign in to view consignments for your assigned tenant and yard.</p><p className="mt-2 text-sm">Prepare the trip in Dispatch flow, record its delivery plan, then allocate a plan line to a customer consignment before release.</p></Section>:<>
       <div className="flex flex-wrap items-end justify-between gap-3"><form className="flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();setParams({q:query,page:'1'})}}><label className="text-sm">Search customer, consignment or order reference<input className="field mt-1 block w-full sm:w-80" value={query} onChange={e=>setQuery(e.target.value)}/></label><button className="btn-primary min-h-12 px-4">Search</button></form><div className="flex items-center gap-4"><button className="report-text-link min-h-11" onClick={()=>setVersion(n=>n+1)}>Refresh consignments</button>{data?.can_create&&<button className="btn-primary min-h-12 px-4" onClick={()=>{setCreating(!creating);setWriteError('')}}>{creating?'Close form':'New consignment'}</button>}</div></div>
       {error&&<p role="alert" className="rounded-lg bg-red-50 p-4 text-red-800">{error} <button className="underline" onClick={()=>setVersion(n=>n+1)}>Retry</button></p>}
-      {!data&&!error&&<p role="status">Loading customer consignments…</p>}
+      {!data&&!error&&<LoadingState label="Loading customer consignments…" lines={3} />}
       {creating&&data?.can_create&&<Section title="Record a customer consignment" sub="Retain the order context, then allocate its delivery-plan lines. A manual ERP reference does not confirm an import.">
         <form className="grid max-w-4xl gap-4 sm:grid-cols-2 lg:grid-cols-3" onSubmit={e=>void create(e)}>
           {([['reference','Consignment reference'],['customer_name','Customer name'],['customer_reference','Customer order reference (optional)'],['commodity','Commodity / goods'],['target_quantity','Target quantity'],['unit','Quantity unit'],['deadline','Delivery deadline (optional)'],['external_system','ERP system (optional)'],['external_reference','ERP order reference (optional)'],['reason','Reason for recording']] as const).map(([key,label])=><label key={key} className="text-sm">{label}<input className="field mt-1 w-full" type={key==='deadline'?'date':key==='target_quantity'?'number':'text'} step={key==='target_quantity'?'.001':undefined} min={key==='target_quantity'?'.001':undefined} max={key==='target_quantity'?'1000000000':undefined} maxLength={key==='reason'?1000:['customer_name','commodity'].includes(key)?200:key==='external_system'?80:120} required={!['customer_reference','deadline','external_system','external_reference'].includes(key)} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})}/></label>)}
@@ -74,7 +74,7 @@ export default function Consignments() {
           <button className="btn-primary min-h-12 px-4" disabled={busy||Boolean(form.external_system)!==Boolean(form.external_reference)}>{busy?'Saving…':'Save consignment'}</button>
         </form>
       </Section>}
-      {!!orderId&&!order&&!detailError&&<p role="status">Loading consignment dossier…</p>}
+      {!!orderId&&!order&&!detailError&&<LoadingState label="Loading consignment dossier…" lines={3} />}
       {detailError&&<p role="alert" className="rounded-lg bg-red-50 p-4 text-red-800">{detailError} <button className="underline" onClick={()=>setVersion(n=>n+1)}>Retry dossier</button></p>}
       {order&&<Section title={`${order.reference} · ${order.customer_name}`} sub={`${order.commodity}${order.customer_reference?` · Customer order ${order.customer_reference}`:''}`}>
         <div className="max-w-3xl"><Progress order={order}/><dl className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">{[['Allocated',order.progress.allocated],['Still to allocate',order.progress.unallocated],['Outstanding delivery',order.progress.outstanding],['Authorised for return',order.progress.returned]].map(([label,value])=><div key={label}><dt className="text-sm text-slate-600">{label}</dt><dd className="mt-1 text-xl font-bold">{qty(value)} <span className="text-sm font-normal">{order.unit}</span></dd></div>)}</dl></div>
@@ -127,7 +127,7 @@ function AllocationForm({order,onSaved}:{order:CustomerConsignment;onSaved:()=>v
   }
   return <div className="mt-5 border-t border-slate-200 pt-5"><h3 className="text-lg font-bold">Allocate a planned load</h3><p className="mt-1 max-w-2xl text-sm text-slate-600">Choose a line from a linked trip's delivery plan before release. Quantity and unit come from that retained plan. Allocating a load keeps that plan fixed.</p>
     <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();setSearch(query);setReload(n=>n+1)}}><label className="text-sm">Find a truck or destination<input className="field mt-1 block" value={query} onChange={e=>setQuery(e.target.value)}/></label><button className="route-mode-button min-h-12 px-4">Find movements</button></form>
-    {!trips&&!error&&<p role="status" className="mt-3">Loading movements…</p>}
+    {!trips&&!error&&<LoadingState label="Loading movements…" lines={3} className="mt-3" />}
     {error&&<p role="alert" className="mt-3 text-red-800">{error} <button className="underline" onClick={()=>setReload(n=>n+1)}>Retry movements</button></p>}
     {trips&&<form className="mt-4 grid max-w-3xl gap-4 sm:grid-cols-2" onSubmit={e=>void save(e)}>
       <label className="text-sm">Truck movement<select className="field mt-1 w-full" value={tripId} onChange={e=>{setTripId(e.target.value);setError('')}}><option value="">Select a linked movement</option>{trips.map(trip=><option key={trip.id} value={trip.id}>{trip.vehicle?.plate??'Unassigned'} · Trip {trip.id} · {trip.destination}</option>)}</select></label>

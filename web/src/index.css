@@ -471,6 +471,14 @@ footer.yard-foot {
 .intel-table-scroll th, .intel-table-scroll td { padding:9px; border-bottom:1px solid var(--transport-border); text-align:right; }
 .intel-table-scroll th:first-child { text-align:left; }
 .intel-loading { min-height:280px; padding:40px 24px; border:1px solid var(--transport-border); border-radius:7px; color:var(--transport-ink-2); background:var(--transport-surface); }
+
+/* Skeleton loading states — shimmer shapes, text label retained for SR/tests */
+.skel-wrap { padding:16px; border:1px solid var(--transport-border); border-radius:7px; background:var(--transport-surface); }
+.skel-label { display:block; font-size:13px; font-weight:600; color:var(--transport-ink-2); margin-bottom:12px; }
+.skel-lines { display:grid; gap:10px; }
+.skel-line { height:14px; border-radius:6px; background:linear-gradient(90deg,#e8edf3 25%,#f6f8fb 50%,#e8edf3 75%); background-size:200% 100%; animation:skel-shimmer 1.4s ease-in-out infinite; }
+.skel-line:last-child { height:12px; }
+@keyframes skel-shimmer { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
 .intel-error, .intel-stale-banner { padding:16px 20px; border:1px solid #dca39d; background:#fff4f1; color:#84342d; border-radius:5px; font-size:14px; }
 .intel-stale { color:#84342d; }
 .intel-stale-banner { margin-bottom:16px; }

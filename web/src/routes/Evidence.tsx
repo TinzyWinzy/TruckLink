@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { apiFetch } from '../lib/api'
 import { useLive } from '../lib/liveGate'
 import { fingerprint } from '../lib/journey'
-import { PageHeader, Section } from '../components/ui'
+import { LoadingState, PageHeader, Section } from '../components/ui'
 import VehicleEvidenceDesk from '../components/VehicleEvidenceDesk'
 import { canVisit } from '../lib/gates'
 import { useSession } from '../store/session'
@@ -40,7 +40,7 @@ export default function Evidence(){
     <div className="flex flex-wrap items-end gap-3"><form className="flex flex-wrap items-end gap-2" onSubmit={e=>{e.preventDefault();setSearch(query)}}><label className="text-sm">Search document, vehicle, driver or destination<input className="field mt-1 block w-full" value={query} onChange={e=>setQuery(e.target.value)}/></label><button className="btn-primary min-h-12 px-4">Search</button></form>
     <label className="text-sm">Show<select className="field mt-1 block" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">All loaded revisions</option><option value="pending">Not independently approved</option><option value="expired">Expired</option><option value="current">Reviewed and in date</option></select></label><button className="report-text-link" onClick={()=>setRevision(n=>n+1)}>Refresh evidence</button>{canVisit('approvals',role)&&<Link className="report-text-link" to="/approvals">Pending approvals</Link>}</div>
     {error&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">{error} <button className="underline" onClick={()=>setRevision(n=>n+1)}>Retry</button></p>}{notice&&<p role="status" className="rounded-xl bg-slate-100 p-4 text-sm">{notice}</p>}
-    {!data&&!error?<p role="status">Loading evidence…</p>:data&&<>
+    {!data&&!error?<LoadingState label="Loading evidence…" lines={3} />:data&&<>
       <p className="text-sm text-slate-600">{data.scope} Showing {rows.length} of {data.records.length} loaded revisions ({data.total} matching). Read {new Date(data.as_of).toLocaleString()}. Search to narrow results beyond {data.limit}.</p>
       {data.can_create?<Section title="Record evidence"><button className="report-text-link" aria-expanded={formOpen} onClick={()=>setFormOpen(v=>!v)}>{formOpen?'Close document form':'Record a document revision'}</button>
       {formOpen&&<form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={save}>

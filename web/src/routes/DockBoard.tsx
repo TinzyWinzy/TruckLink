@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLive } from '../lib/liveGate'
 import type { LiveRow } from '../lib/live'
 import { isOnline } from '../lib/offline/db'
-import { EmptyState, PageHeader, StatusPill, spineForStatus } from '../components/ui'
+import { EmptyState, LoadingState, PageHeader, StatusPill, spineForStatus } from '../components/ui'
 import { DEMO_DOCKS } from '../lib/demoData'
 import { useSession } from '../store/session'
 
@@ -93,7 +93,7 @@ export default function DockBoard() {
       />
       {feedError && <p role="alert" className="mb-3 rounded bg-amber-50 p-3 text-sm">{feedError} <button className="underline" onClick={retryFeed}>Retry</button></p>}
       {message && <p role="status" className="mb-3 rounded-lg bg-slate-900 p-3 text-sm font-bold text-white">{message}</p>}
-      {!loaded && !feedError ? <p role="status">Loading docks…</p> : feedError && docks.length === 0 ? null : docks.length === 0 ? (
+      {!loaded && !feedError ? <LoadingState label="Loading docks…" lines={4} /> : feedError && docks.length === 0 ? null : docks.length === 0 ? (
         <EmptyState title="No docks configured" sub="Ask your supervisor to set up the yard." />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

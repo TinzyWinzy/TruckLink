@@ -5,7 +5,7 @@ import {apiFetch} from '../lib/api'
 import {canVisit} from '../lib/gates'
 import {tenantDisplayName} from '../lib/tenant'
 import {WALKTHROUGH_ROLES,WALKTHROUGH_TASKS} from '../lib/walkthrough'
-import {PageHeader,Section} from '../components/ui'
+import {LoadingState, PageHeader,Section} from '../components/ui'
 import {useSession,type Role} from '../store/session'
 
 type Readiness={counts:Record<string,number>;visits:{id:number;plate:string;status:string}[];integrations:{erp:string;tracker:string};notice:string}
@@ -40,7 +40,7 @@ export default function Guide() {
     </Section>
     {live&&<Section title="Current site readiness" sub="Read-only inventory. Counts do not certify a truck or authorise release.">
       {error&&<p role="alert" className="text-sm text-red-700">{error}</p>}
-      {!readiness&&!error&&<p role="status">Loading assigned-site readiness.</p>}
+      {!readiness&&!error&&<LoadingState label="Loading assigned-site readiness." lines={3} />}
       {readiness&&<><dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Object.entries(readiness.counts).map(([k,v])=><div className="card p-3" key={k}><dt className="text-xs uppercase text-slate-600">{k.replaceAll('_',' ')}</dt><dd className="text-2xl font-bold">{v}</dd></div>)}</dl>
         <p className="mt-3 text-sm">{readiness.notice}</p>
         <p className="mt-2 text-sm">ERP: {readiness.integrations.erp.replaceAll('_',' ')} · Tracker: {readiness.integrations.tracker.replaceAll('_',' ')}</p>

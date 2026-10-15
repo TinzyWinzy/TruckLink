@@ -112,3 +112,18 @@ export function EmptyState({ title, sub, icon = '○' }: { title: string; sub: s
     </div>
   )
 }
+
+/** Skeleton loading state — shimmer shape + preserved text label for SR/tests.
+ * Keep the human label so `getByText('Loading …')` and screen readers still match. */
+export function LoadingState({ label, lines = 3, className = '' }: { label: string; lines?: number; className?: string }) {
+  return (
+    <div className={`skel-wrap ${className}`} role="status" aria-live="polite" aria-busy="true">
+      <span className="skel-label">{label}</span>
+      <div className="skel-lines" aria-hidden="true">
+        {Array.from({ length: lines }).map((_, i) => (
+          <div key={i} className="skel-line" style={{ width: `${100 - (i % 3) * 12}%` }} />
+        ))}
+      </div>
+    </div>
+  )
+}

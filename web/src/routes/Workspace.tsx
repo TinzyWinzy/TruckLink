@@ -6,7 +6,7 @@ import { useLive } from '../lib/liveGate'
 import { fetchDashboard, type Dashboard } from '../lib/dashboard'
 import { practiceDashboard } from '../lib/dashboardPractice'
 import { isPracticeSession, useSession } from '../store/session'
-import { PageHeader, Stat } from '../components/ui'
+import { LoadingState, PageHeader, Stat } from '../components/ui'
 
 type WorkspaceData = {
   organisation: { id: number; name: string }
@@ -49,7 +49,7 @@ export default function Workspace() {
   return <div className="space-y-6">
     <PageHeader title="Your workspace" sub="Capabilities configured for your company, role and assigned site." />
     {practice && <p className="card p-5">Practice mode uses synthetic scenarios. Tenant subscriptions apply to signed-in company workspaces. <Link className="report-text-link" to="/guide">Open the walkthrough guide</Link></p>}
-    {!practice && !data && !error && <p role="status">Loading your workspace…</p>}
+    {!practice && !data && !error && <LoadingState label="Loading your workspace…" lines={3} />}
     {error && <div className="card p-5" role="alert"><p>{error}</p><button className="btn-secondary mt-3 px-4" onClick={() => { setError(''); setData(null); setReload(n => n + 1) }}>Retry workspace</button></div>}
     {data && <>
       <p className="text-sm font-semibold">{data.organisation.name} / {data.facility.name} · {data.role.replaceAll('_', ' ')}</p>

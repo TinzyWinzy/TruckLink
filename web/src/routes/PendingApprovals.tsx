@@ -2,7 +2,7 @@ import {useEffect,useState} from 'react'
 import {Link} from 'react-router-dom'
 import {apiFetch,facilityId} from '../lib/api'
 import {useLive} from '../lib/liveGate'
-import {PageHeader,Section} from '../components/ui'
+import {LoadingState,PageHeader,Section} from '../components/ui'
 
 type Review={id:number;subject:string;label:string;creator_id:number;created_at:string;can_review:boolean;expired:boolean;last_review:string;document_ref:string;document_sha256:string}
 type Exception={id:number;entry_id:number;plate:string;attempt_id:number;reason:string;creator_id:number;can_review:boolean}
@@ -18,7 +18,7 @@ export default function PendingApprovals(){
   return <div className="max-w-4xl space-y-4"><PageHeader title="Pending approvals" sub="Independent evidence review and site-specific operational exceptions have different permissions." mode={live?'live':'demo'}/>
     {!live?<Section title="Practice review boundary"><p className="text-sm">Use separate authorised accounts in an isolated training workspace to test independent approval. Local practice does not record regulatory reviews.</p><Link className="report-text-link" to="/guide">Review the workflow guide</Link></Section>:<>
       <div className="flex flex-wrap gap-3"><button className="report-text-link" onClick={()=>setVersion(n=>n+1)}>Refresh pending reviews</button><Link className="report-text-link" to="/evidence">Open evidence workspace</Link>{data&&<p className="text-xs">Read {new Date(data.as_of).toLocaleString()} · {data.scope}</p>}</div>
-      {error&&<p role="alert">{error} <button className="underline" onClick={()=>setVersion(n=>n+1)}>Retry</button></p>}{!data&&!error&&<p role="status">Loading pending reviews…</p>}{notice&&<p role="status">{notice}</p>}
+      {error&&<p role="alert">{error} <button className="underline" onClick={()=>setVersion(n=>n+1)}>Retry</button></p>}{!data&&!error&&<LoadingState label="Loading pending reviews…" lines={3} />}{notice&&<p role="status">{notice}</p>}
       {data&&<><label className="block text-sm font-bold">Decision reason<textarea className="field mt-1 w-full" value={reason} onChange={e=>setReason(e.target.value)}/></label>
         <Section title={`Evidence and configuration reviews (${data.evidence_reviews.length})`} sub="Tenant-owned records. The author cannot approve their own evidence.">
           {!data.evidence_reviews.length&&<p className="text-sm">No unapproved records in the loaded review window.</p>}

@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { Fragment, Suspense, lazy, useEffect, useState, createContext, useContext, type ReactNode } from 'react'
 import Layout from './components/Layout'
+import { LoadingState } from './components/ui'
 import { useSession } from './store/session'
 import { canVisit, landingPathForRole, type RouteKey } from './lib/gates'
 
@@ -59,7 +60,7 @@ function RoleGuard({ route, children }: { route: RouteKey; children: ReactNode }
 }
 
 function Fallback() {
-  return <p role="status" className="p-6 text-sm">Loading Trucki…</p>
+  return <div className="p-6"><LoadingState label="Loading Trucki…" lines={2} /></div>
 }
 
 /** Restore real yard sessions across refresh. The API token persists in

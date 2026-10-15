@@ -4,7 +4,7 @@ import type { LiveRow } from '../lib/live'
 import { isPushAvailable, pushState, subscribePush, type PushState } from '../lib/push'
 import { useSession } from '../store/session'
 import { canAckAlert } from '../lib/gates'
-import { EmptyState, PageHeader, StatusPill } from '../components/ui'
+import { EmptyState, LoadingState, PageHeader, StatusPill } from '../components/ui'
 import { DEMO_ALERTS } from '../lib/demoData'
 
 const SEED: LiveRow[] = DEMO_ALERTS as unknown as LiveRow[]
@@ -131,7 +131,7 @@ export default function Alerts() {
           </button>
         </div>
       )}
-      {!loaded && !feedError ? <p role="status">Loading alerts…</p> : feedError && alerts.length === 0 ? null : alerts.length === 0 ? (
+      {!loaded && !feedError ? <LoadingState label="Loading alerts…" lines={4} /> : feedError && alerts.length === 0 ? null : alerts.length === 0 ? (
         <EmptyState title="Yard is quiet" sub="No alerts. New quarantine, wait and equipment flags land here." />
       ) : (
         <ul className="space-y-2">

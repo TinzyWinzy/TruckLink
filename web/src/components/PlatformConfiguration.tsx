@@ -3,7 +3,7 @@ import { readSubscription } from '../lib/subscriptions'
 import { apiFetch } from '../lib/api'
 import { useSession } from '../store/session'
 import type { TenantConfiguration } from '../lib/tenant'
-import { Section } from './ui'
+import { LoadingState, Section } from './ui'
 
 interface Revision { id:number; kind:string; key:string; version:number; content:Record<string,unknown>; facility_id:number|null; authored_by_you?:boolean; review_approved?:boolean|null }
 interface Release { id:number; version:number; artifact_ids:number[]; configuration_id:number }
@@ -74,7 +74,7 @@ export default function PlatformConfiguration({stage}: {stage?: 'configure'|'rev
   let draft:Record<string,unknown>={};try{draft=JSON.parse(content)}catch{ /* Advanced editor reports validation on save. */ }
   const flow=(draft.workflow??{}) as {mandatory_checks?:string[];inspection_max_age_seconds?:number;escalation_minutes?:{FM:number;EXEC:number}}
   const ownReview = revisions.find(r=>String(r.id)===reviewId)?.authored_by_you === true
-  if (!registry) return <p role="status">{message || 'Loading platform configuration'}</p>
+  if (!registry) return <LoadingState label={message || 'Loading platform configuration'} lines={3} />
   return <Section title="Modules and workflow releases" sub={'Active release ' + (registry.release?.version ?? 'not yet configured') + '. Publication and activation are separate.'}>
     <div className="space-y-4">
       <p className="text-sm">Workflows and company policies require a different authorized reviewer. Regulatory packs come from the platform catalogue. Integration bindings require a platform operator.</p>
