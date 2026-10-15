@@ -72,6 +72,7 @@ urlpatterns = [
     path("tenancy/signup-invites/", core_views.create_signup_invite),
     path("tenancy/signup-invites/<str:token>/", core_views.resolve_signup_invite),
     path("admin/pins/", core_views.provision_pin),
+    path("admin/pins/assign-site/", core_views.assign_pin_site),
     # Web push (core app; SAD §10)
     path("push/public-key/", core_views.push_public_key),
     path("push/subscribe/", core_views.push_subscribe),

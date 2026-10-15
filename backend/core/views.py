@@ -240,6 +240,38 @@ def provision_pin(request):
     )
 
 
+@api_view(["POST"])
+@permission_classes([IsAdmin])
+def assign_pin_site(request):
+    """POST /api/admin/pins/assign-site/ — ADMIN assigns an org yard to an existing PIN holder.
+
+    PIN credentials provisioned without a facility sign in with no assigned yard,
+    which leaves list screens querying an empty facility. This backfills the
+    assignment without recreating the credential.
+    """
+    staff_id = _normalize_staff_id(str(request.data.get("staff_id", "")))
+    org = get_user_organisation(request.user)
+    if org is None:
+        return Response({"ok": False, "error": "admin has no organisation"}, status=status.HTTP_400_BAD_REQUEST)
+    cred = PinCredential.objects.filter(staff_id=staff_id, organisation=org).select_related("user").first()
+    if cred is None or cred.user is None:
+        return Response({"ok": False, "errors": {"staff_id": "unknown staff credential in your organisation"}},
+                        status=status.HTTP_404_NOT_FOUND)
+    facility = Facility.objects.filter(pk=request.data.get("facility_id"), organisation=org, is_deleted=False).first()
+    if facility is None:
+        return Response({"ok": False, "errors": {"facility_id": "not in your organisation"}},
+                        status=status.HTTP_400_BAD_REQUEST)
+    with transaction.atomic():
+        cred.user.profile.facilities.add(facility)
+        if cred.facility_id is None:
+            cred.facility = facility
+            cred.save(update_fields=["facility", "updated_at"])
+        from core.audit import append_audit
+        append_audit(facility=facility, actor=request.user, action="ASSIGN_PIN_SITE",
+                     payload={"staff_id": cred.staff_id, "facility_id": facility.pk})
+    return Response({"ok": True, "staff_id": cred.staff_id, "facility_id": facility.pk})
+
+
 # ---------------------------------------------------------------------------
 # Web Push (SAD §10) — VAPID-native, Firebase-free.
 # ---------------------------------------------------------------------------

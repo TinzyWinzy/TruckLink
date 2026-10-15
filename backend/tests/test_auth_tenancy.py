@@ -92,6 +92,35 @@ class TestPinLogin:
         assert resp.status_code == 401
         assert resp.json()["error"] == "invalid credentials"
 
+    def test_assign_site_backfills_yard_for_facilityless_pin(self, admin_client, default_facility, anon_client):
+        provisioned = admin_client.post("/api/admin/pins/", {
+            "staff_id": "TRK-0901", "pin": "1234", "role": UserRole.DISPATCH_SUPERVISOR,
+        }, format="json")
+        assert provisioned.status_code == 201
+        login = anon_client.post("/api/auth/pin/", {"staff_id": "TRK-0901", "pin": "1234"}, format="json")
+        assert login.status_code == 200 and login.json()["user"]["facilities"] == []
+
+        assigned = admin_client.post("/api/admin/pins/assign-site/", {
+            "staff_id": "TRK-0901", "facility_id": default_facility.id,
+        }, format="json")
+        assert assigned.status_code == 200, assigned.json()
+        assert assigned.json()["facility_id"] == default_facility.id
+
+        login = anon_client.post("/api/auth/pin/", {"staff_id": "TRK-0901", "pin": "1234"}, format="json")
+        assert [f["slug"] for f in login.json()["user"]["facilities"]] == [default_facility.slug]
+
+    def test_assign_site_rejects_foreign_staff_and_yard(self, admin_client, default_facility):
+        assert admin_client.post("/api/admin/pins/assign-site/", {
+            "staff_id": "TRK-0000", "facility_id": default_facility.id,
+        }, format="json").status_code == 404
+        provisioned = admin_client.post("/api/admin/pins/", {
+            "staff_id": "TRK-0902", "pin": "1234", "role": UserRole.DISPATCH_SUPERVISOR,
+        }, format="json")
+        assert provisioned.status_code == 201
+        assert admin_client.post("/api/admin/pins/assign-site/", {
+            "staff_id": "TRK-0902", "facility_id": 999999,
+        }, format="json").status_code == 400
+
     def test_inactive_credential_401(self, admin_client, default_facility, anon_client):
         _provision(admin_client, default_facility)
         cred = PinCredential.objects.get(staff_id="TRK-0007")
