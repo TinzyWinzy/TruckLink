@@ -212,7 +212,12 @@ class TenantEntitlementVersion(models.Model):
         if self.version < 1 or not isinstance(self.reason,str) or not self.reason.strip() or (self.effective_to and self.effective_to <= self.effective_from):
             raise ValidationError('Positive version, reason and valid effective dates required')
         if self.creator_id:
-            if not self.creator.is_superuser or not self.creator.is_active:
+            operator = self.creator.is_superuser and self.creator.is_active
+            trial_admin = False
+            if not operator and self.basis == 'TRIAL' and self.state == 'ACTIVE':
+                sites = list(self.organisation.facilities.filter(is_deleted=False))
+                trial_admin = bool(sites) and all(str(s.yard_config.get('mode', 'OPERATIONS')) == 'DEMO' for s in sites) and self.creator.profile.role == 'ADMIN'
+            if not operator and not trial_admin:
                 raise ValidationError('Entitlements require an active platform operator')
         elif self.basis != 'LEGACY_CONTINUITY':
             raise ValidationError('A platform operator must issue the entitlement')

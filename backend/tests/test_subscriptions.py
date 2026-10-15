@@ -41,14 +41,15 @@ def test_dependencies_keep_safety_and_audit_included():
             expand_modules(invalid)
 
 
-def test_admin_request_is_versioned_scoped_and_does_not_grant_or_activate(admin_client,admin_user,default_org,default_facility):
+def test_admin_request_is_versioned_scoped_and_demo_yard_self_serves_trial(admin_client,admin_user,default_org,default_facility):
     default_org.requires_release = True; default_org.save()
     response = admin_client.post('/api/tenant/subscription/',{'modules':['yard'],'expected_version':0,'reason':'Synthetic selection'},format='json')
     assert response.status_code == 201, response.data
     assert response.data['selection']['required_modules'] == ['audit','inspection','release','yard']
-    assert response.data['entitlement']['modules'] == ['audit']
+    assert response.data['entitlement']['state'] == 'ACTIVE' and response.data['entitlement']['basis'] == 'TRIAL'
+    assert response.data['entitlement']['modules'] == ['audit','inspection','release','yard']
     assert not response.data['effective_modules']['yard']
-    assert not TenantEntitlementVersion.objects.exists() and not ReleaseActivation.objects.exists()
+    assert TenantEntitlementVersion.objects.count() == 1 and not ReleaseActivation.objects.exists()
     assert response['Cache-Control'] == 'private, no-store'
     assert admin_client.post('/api/tenant/subscription/',{'modules':[],'expected_version':0,'reason':'Stale'},format='json').status_code == 409
     assert admin_client.post('/api/tenant/subscription/',{'modules':[],'expected_version':1,'reason':'Audit only'},format='json').status_code == 201

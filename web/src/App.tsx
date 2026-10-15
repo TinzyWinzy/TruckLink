@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { Fragment, Suspense, lazy, useEffect, useState, createContext, useContext, type ReactNode } from 'react'
 import Layout from './components/Layout'
 import { LoadingState } from './components/ui'
@@ -8,6 +8,7 @@ import { canVisit, landingPathForRole, type RouteKey } from './lib/gates'
 const Modelling = lazy(() => import('./routes/Modelling'))
 const RoutesMap = lazy(() => import('./routes/RoutesMap'))
 const Login = lazy(() => import('./routes/Login'))
+const Signup = lazy(() => import('./routes/Signup'))
 const QueueDashboard = lazy(() => import('./routes/QueueDashboard'))
 const DockBoard = lazy(() => import('./routes/DockBoard'))
 const ComplianceCheck = lazy(() => import('./routes/ComplianceCheck'))
@@ -51,6 +52,9 @@ function RoleGuard({ route, children }: { route: RouteKey; children: ReactNode }
           >
             Switch role →
           </button>
+          <Link className="btn-secondary touch-target mt-2 block w-full px-4" to="/workspace">
+            Back to workspace
+          </Link>
         </div>
       </Layout>
     )
@@ -116,6 +120,7 @@ export default function App() {
         <Route path="/approvals" element={<RoleGuard route="approvals"><Layout><PendingApprovals /></Layout></RoleGuard>} />
         <Route path="/routes" element={<RoleGuard route="routes"><Layout><RoutesMap /></Layout></RoleGuard>} />
         <Route path="/" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
         <Route path="/queue" element={<RoleGuard route="queue"><Layout><QueueDashboard /></Layout></RoleGuard>} />
         <Route path="/docks" element={<RoleGuard route="docks"><Layout><DockBoard /></Layout></RoleGuard>} />
         <Route path="/compliance" element={<RoleGuard route="compliance"><Layout><ComplianceCheck /></Layout></RoleGuard>} />

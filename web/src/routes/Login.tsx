@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useSession, roleFromSlug, type Role } from '../store/session'
 import { isLive } from '../lib/api'
 import { landingPathForRole } from '../lib/gates'
@@ -245,6 +245,11 @@ export default function Login() {
           )}
         </div>
         <p className="mt-3 text-center text-xs font-semibold text-white/60">Works offline in the yard · Queued work syncs on reconnect</p>
+        {live && (
+          <p className="mt-2 text-center text-xs font-semibold text-white/80">
+            <Link className="underline" to="/signup">New logistics company? Create your yard →</Link>
+          </p>
+        )}
       </div>
     </div>
   )

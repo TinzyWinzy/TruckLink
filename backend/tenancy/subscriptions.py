@@ -47,6 +47,27 @@ def effective_modules(org, at=None):
 
 
 @transaction.atomic
+def grant_trial_entitlement(org, actor, modules, reason):
+    """Self-serve demo/trial grant for DEMO-mode tenants during onboarding.
+
+    Server-internal (no superuser check): callers must gate on tenant demo status.
+    OPERATIONS tenants keep the platform-operator issuance path only.
+    """
+    from trip.models import Organisation
+    from .catalogue import expand_modules as _expand
+    Organisation.objects.select_for_update().get(pk=org.pk)
+    latest = TenantEntitlementVersion.objects.filter(organisation=org).order_by('-version').first()
+    row = TenantEntitlementVersion.objects.create(organisation=org, version=(latest.version if latest else 0)+1,
+        creator=actor, modules=_expand(modules), state='ACTIVE', basis='TRIAL', reason=reason,
+        effective_from=timezone.now())
+    from core.audit import append_audit
+    for site in org.facilities.filter(is_deleted=False):
+        append_audit(facility=site, actor=actor, action='GRANT_DEMO_TENANT_ENTITLEMENT', payload={
+            'entitlement_id': row.pk, 'version': row.version, 'modules': row.modules, 'reason': reason})
+    return row
+
+
+@transaction.atomic
 def issue_entitlement(actor, org, modules, expected_version, reason, basis='CONTRACT', state='ACTIVE', effective_from=None, effective_to=None):
     from trip.models import Organisation
     if not actor.is_active or not actor.is_superuser:

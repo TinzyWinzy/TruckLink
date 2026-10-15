@@ -96,7 +96,8 @@ def rbac_allows(role: str | None, resource: str, action: str, organisation=None,
         from tenancy.registry import RESOURCE_MODULE
         from tenancy.releases import module_enabled
         module = RESOURCE_MODULE.get(resource)
-        if action != 'read' and module and not module_enabled(organisation,module):
+        governance = (resource, action) == ('regulatory', 'review')
+        if action != 'read' and module and not governance and not module_enabled(organisation,module):
             return False
         from tenancy.configuration import resolved
         config = resolved(organisation,facility=facility)['content']

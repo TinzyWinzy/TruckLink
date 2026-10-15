@@ -160,6 +160,8 @@ def review(request,pk):
         if not rbac_allows(get_user_role(request.user),'regulatory','review',org,row.facility):
             raise PermissionError('Tenant permission profile does not authorize configuration review')
         approved = serializers.BooleanField().run_validation(request.data.get('approved'))
+        if row.creator_id == request.user.pk:
+            raise PermissionError('Independent tenant reviewer required; authors cannot approve their own revision')
         with transaction.atomic():
             Organisation.objects.select_for_update().get(pk=org.pk)
             revision = ArtifactReview.objects.create(organisation=org,artifact=row,creator=request.user,

@@ -56,7 +56,7 @@ export default function Workspace() {
       {data.activation_required && <section className="card p-5" aria-label="Setup status">
         <h2 className="text-lg font-bold">Setup in progress</h2>
         <p className="mt-1">Your workspace is ready to explore. Operational actions unlock after the required review and release activation.</p>
-        {role === 'ADMIN' && <Link className="btn-primary mt-4 inline-flex px-4" to="/onboarding">Continue setup</Link>}
+        {(role === 'ADMIN' || role === 'COMPLIANCE_OFFICER') && <Link className="btn-primary mt-4 inline-flex px-4" to="/onboarding">Continue setup</Link>}
       </section>}
       {activityEnabled && <WorkspaceActivity facility={facility} live={!practice && live} />}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{data.cards.filter(card => canVisit(card.href.slice(1) as RouteKey, role)).map(card => <Link key={card.key} className="card block p-5 hover:border-blue-400 focus-visible:outline-2" to={card.href}><h2 className="text-lg font-bold">{card.title}</h2><p className="mt-2 text-sm text-slate-600">{card.description}</p><span className="report-text-link mt-4 inline-block">Open →</span></Link>)}</div>

@@ -52,6 +52,13 @@ def subscription(request):
                         'reason':data['reason'],'previous_version':latest.version if latest else None,'new_state':'REQUESTED'})
         except ValidationError as exc:
             return Response({'error':'; '.join(exc.messages)},status=400)
+        sites = list(org.facilities.filter(is_deleted=False))
+        demo_only = bool(sites) and all(str(s.yard_config.get('mode','OPERATIONS')) == 'DEMO' for s in sites)
+        if demo_only:
+            from .subscriptions import grant_trial_entitlement
+            with transaction.atomic():
+                grant_trial_entitlement(org, request.user, data['modules'],
+                    'Demo-yard trial granted during tenant onboarding; no operator action required.')
     latest = TenantModuleSelection.objects.filter(organisation=org).order_by('-version').first()
     response = Response({'organisation':{'id':org.pk,'name':org.name},'catalogue':catalogue(),
         'selection':selection_output(latest),'entitlement':entitlement(org),'configured_modules':configured_modules(org),

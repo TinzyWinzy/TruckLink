@@ -69,6 +69,8 @@ urlpatterns = [
     path("auth/switch-role/", auth_views.switch_role),
     # Tenancy (core app)
     path("tenancy/signup/", core_views.tenancy_signup),
+    path("tenancy/signup-invites/", core_views.create_signup_invite),
+    path("tenancy/signup-invites/<str:token>/", core_views.resolve_signup_invite),
     path("admin/pins/", core_views.provision_pin),
     # Web push (core app; SAD §10)
     path("push/public-key/", core_views.push_public_key),

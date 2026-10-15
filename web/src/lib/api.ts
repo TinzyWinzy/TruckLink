@@ -130,7 +130,7 @@ export async function apiFetch<T = unknown>(
 ): Promise<T> {
   const { method = 'GET', body } = init
   const headers: Record<string, string> = { Accept: 'application/json' }
-  const anonymous = ['/auth/login/', '/auth/pin/', '/auth/register/', '/auth/refresh/', '/tenancy/signup/'].includes(path)
+  const anonymous = ['/auth/login/', '/auth/pin/', '/auth/register/', '/auth/refresh/', '/tenancy/signup/'].includes(path) || path.startsWith('/tenancy/signup-invites/')
   if (!anonymous && !getToken() && hasSession()) await refreshAccess()
   const token = anonymous ? null : getToken()
   if (token) headers['Authorization'] = `Token ${token}`

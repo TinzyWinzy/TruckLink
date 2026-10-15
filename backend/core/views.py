@@ -20,6 +20,9 @@ from trip.permissions import IsAdmin, get_user_organisation
 from .models import Facility, PinCredential, PushSubscription
 from .sessions import issue_session
 from .throttling import CredentialIPThrottle
+from django.core import signing
+
+INVITE_SALT = "trucki-signup-invite"
 
 User = get_user_model()
 
@@ -48,6 +51,15 @@ def tenancy_signup(request):
     email = str(request.data.get("email", "")).strip()
     facility_mode = str(request.data.get("facility_mode", "OPERATIONS"))
     site_timezone = str(request.data.get('facility_timezone', 'UTC'))
+    invite_token = str(request.data.get('invite', '')).strip()
+    invited_email = ''
+    if invite_token:
+        try:
+            invited_email = str(signing.loads(invite_token, salt=INVITE_SALT, max_age=7 * 24 * 3600)).strip()
+        except signing.BadSignature:
+            return Response({'ok': False, 'errors': {'invite': 'link expired or invalid; request a new signup link'}}, status=status.HTTP_400_BAD_REQUEST)
+        if not email:
+            email = invited_email
 
     errors = {}
     if type(onboarding) is not bool:
@@ -108,6 +120,7 @@ def tenancy_signup(request):
             append_audit(facility=facility, actor=user, action='CREATE_TENANT', payload={
                 'organisation_id': org.pk, 'facility_id': facility.pk, 'admin_id': user.pk,
                 'onboarding_workspace': onboarding, 'operational_release_required': True,
+                'invited_email': invited_email or None,
             })
             session = issue_session(user)
     except IntegrityError:
@@ -123,6 +136,36 @@ def tenancy_signup(request):
         },
         status=status.HTTP_201_CREATED,
     )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_signup_invite(request):
+    """Platform operator (superuser) mints a signup link for a new logistics company."""
+    if not request.user.is_superuser:
+        return Response({'error': 'Platform operator required'}, status=status.HTTP_403_FORBIDDEN)
+    email = str(request.data.get('email', '')).strip()
+    if not email or '@' not in email:
+        return Response({'ok': False, 'errors': {'email': 'valid email required'}}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        hours = min(max(int(request.data.get('validity_hours', 168)), 1), 24 * 30)
+    except (TypeError, ValueError):
+        hours = 168
+    token = signing.dumps(email, salt=INVITE_SALT)
+    return Response({'ok': True, 'invite_token': token, 'path': f'/signup?invite={token}',
+                     'valid_hours': hours}, status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def resolve_signup_invite(request, token):
+    """Public: resolve an invite token so the signup form can prefill the invited email."""
+    try:
+        email = str(signing.loads(token, salt=INVITE_SALT, max_age=7 * 24 * 3600))
+    except signing.BadSignature:
+        return Response({'ok': False, 'error': 'link expired or invalid; request a new signup link'}, status=status.HTTP_404_NOT_FOUND)
+    return Response({'ok': True, 'email': email})
 
 
 @api_view(["POST"])

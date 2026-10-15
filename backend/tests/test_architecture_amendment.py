@@ -280,7 +280,7 @@ def test_release_api_requires_independent_review_and_explicit_activation(domain)
     data = {'kind':'WORKFLOW','key':'yard','expected_version':0,'content':{'template':'yard-lifecycle-v1','transitions':TEMPLATES['yard-lifecycle-v1']['transitions'],'workflow':content['workflow']},'reason':'Synthetic workflow authoring'}
     response = author.post('/api/tenant/revisions/',data,format='json'); assert response.status_code == 201
     workflow_id = response.json()['revision']['id']
-    assert author.post(f'/api/tenant/revisions/{workflow_id}/review/',{'approved':True,'reason':'Self review'},format='json').status_code == 409
+    assert author.post(f'/api/tenant/revisions/{workflow_id}/review/',{'approved':True,'reason':'Self review'},format='json').status_code == 403
     publication = {'configuration_id':config.pk,'artifact_ids':[module_id,workflow_id],'expected_version':0,'reason':'Synthetic publication'}
     assert author.post('/api/tenant/releases/',publication,format='json').status_code == 409
     assert reviewer.post(f'/api/tenant/revisions/{workflow_id}/review/',{'approved':True,'reason':'Independent review'},format='json').status_code == 201
