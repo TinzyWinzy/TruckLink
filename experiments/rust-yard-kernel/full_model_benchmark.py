@@ -21,32 +21,75 @@ os.environ.setdefault('DJANGO_SECRET_KEY', 'isolated-modelling-benchmark-only')
 import django
 django.setup()
 from regulatory import modelling
+from regulatory.modelling import (DECISION_INITIAL_DISTRIBUTION, DECISION_TRANSITIONS,
+                                  RECHECK_DELAY_MINUTES, RECHECK_TRANSITIONS)
 from rest_framework.renderers import JSONRenderer
 from benchmark import load_kernel, rust_buffer_batch
 
 
 def batch_schedule(rng, vehicles, docks, arrivals_per_hour, service_minutes, scenarios, kernel):
-    arrivals, accepted, durations, movements = [], [], [], []
-    arrival = busy = 0.0
+    """Mirrors run_model's Phase 1 sampling order draw for draw, then hands the
+    sorted serviced events to the kernel. RNG stream must match the Python
+    variant exactly: per vehicle (arrival, scenario or HOLD's delay+recheck
+    draws, transition draw), then one uniform duration per sorted event."""
+    order = [s['id'] for s in scenarios]
+    results = {s['id']: s['result'] for s in scenarios}
+    arrival = 0.0
+    current = rng.choices(order, weights=[DECISION_INITIAL_DISTRIBUTION[k] for k in order])[0]
+    pending_rechecks = []
+    movements = []
+    service_events = []
+    last_time = 0.0
     for index in range(vehicles):
-        arrival += rng.expovariate(arrivals_per_hour/60)
-        scenario = rng.choices(scenarios, weights=[60,12,5,8,5,5,5])[0]
-        result = scenario['result']
-        passes = result['decision'] == 'PASS'
-        duration = rng.uniform(.8,1.2)*service_minutes if passes else 0.0
-        if passes:
-            busy += duration
-        arrivals.append(arrival); accepted.append(int(passes)); durations.append(duration)
-        movements.append({'reference': f'SYN-{index+1:04}', 'arrival_minutes': round(arrival,2),
-            'scenario': scenario['id'], 'decision': result['decision'], 'override_eligible': result['override_eligible'],
-            'wait_minutes': None, 'turnaround_minutes': None, 'dock': None})
-    results = rust_buffer_batch(kernel, arrivals, accepted, durations, docks)
-    available = [0.0]*docks
-    for row, at, duration, (wait, turnaround, dock) in zip(movements, arrivals, durations, results):
-        if dock is not None:
-            row.update(dock=dock, wait_minutes=round(wait,2), turnaround_minutes=round(turnaround,2))
-            available[dock-1] = at+wait+duration
-    return available, arrival, busy, movements
+        arrival += rng.expovariate(arrivals_per_hour / 60)
+        result = results[current]
+        row = {'reference': f'SYN-{index+1:04}', 'arrival_minutes': round(arrival, 2),
+               'scenario': current, 'decision': result['decision'],
+               'override_eligible': result['override_eligible'], 'wait_minutes': None,
+               'turnaround_minutes': None, 'dock': None}
+        if result['decision'] == 'PASS':
+            service_events.append({'arrival': arrival, 'seq': index, 'movement': row})
+        elif result['decision'] == 'HOLD':
+            recheck_time = arrival + rng.uniform(*RECHECK_DELAY_MINUTES)
+            recheck_id = rng.choices(order, weights=[
+                RECHECK_TRANSITIONS[current].get(k, 0.0) for k in order])[0]
+            pending_rechecks.append((recheck_time, index, current, recheck_id,
+                                     results[recheck_id]['decision']))
+        movements.append(row)
+        last_time = arrival
+        current = rng.choices(order, weights=[
+            DECISION_TRANSITIONS[current].get(k, 0.0) for k in order])[0]
+    rechecks = []
+    for spec_index, (recheck_time, index, initial_id, recheck_id, decision) in enumerate(pending_rechecks):
+        row = {'reference': f'SYN-{index+1:04}-R1', 'arrival_minutes': round(recheck_time, 2),
+               'scenario': f'{initial_id}-recheck', 'decision': decision,
+               'override_eligible': False, 'wait_minutes': None,
+               'turnaround_minutes': None, 'dock': None}
+        if decision == 'PASS':
+            service_events.append({'arrival': recheck_time, 'seq': 10000 + spec_index,
+                                   'movement': row})
+        rechecks.append(row)
+        last_time = max(last_time, recheck_time)
+    service_events.sort(key=lambda event: (event['arrival'], event['seq']))
+    durations = [rng.uniform(.8, 1.2) * service_minutes for _ in service_events]
+    event_arrivals = [event['arrival'] for event in service_events]
+    results_rows = rust_buffer_batch(kernel, event_arrivals, [1] * len(event_arrivals),
+                                     durations, docks)
+    for event, duration, (wait, turnaround, dock) in zip(service_events, durations, results_rows):
+        event['movement'].update(dock=dock, wait_minutes=round(wait, 2),
+                                 turnaround_minutes=round(turnaround, 2))
+        event['duration'] = duration
+    available = [0.0] * docks
+    busy = 0.0
+    for event, duration, (wait, _turnaround, dock) in zip(service_events, durations, results_rows):
+        if dock is None:
+            continue
+        busy += duration
+        available[dock - 1] = event['arrival'] + wait + duration
+    serviced = [r for r in movements if r['dock'] is not None] + \
+               [r for r in rechecks if r['dock'] is not None]
+    elapsed = max(last_time, *available)
+    return movements, rechecks, serviced, busy, elapsed
 
 
 def variants(kernel):
@@ -54,10 +97,14 @@ def variants(kernel):
     tuned_line = 'bay = available.index(min(available))'
     assert source.count(tuned_line) == 1, 'Scheduling source changed; review experiment'
     original_source = source.replace(tuned_line, 'bay = min(range(docks), key=lambda i: available[i])')
-    start = source.index('    available = [0.0] * docks\n')
-    end = source.index('    completed = [r for r in movements', start)
+    start = source.index('    order = [s[\'id\'] for s in scenarios]\n')
+    end = source.index("    report = {'synthetic': True", start)
     batch_source = source[:start] + (
-        '    available, arrival, busy, movements = batch_schedule(rng, vehicles, docks, arrivals_per_hour, service_minutes, scenarios, kernel)\n'
+        "    movements, rechecks, serviced, busy, elapsed = batch_schedule(rng, vehicles, docks, arrivals_per_hour, service_minutes, scenarios, kernel)\n"
+        "    counts = {decision: sum(r['decision'] == decision for r in movements)\n"
+        "              for decision in sorted({r['decision'] for r in movements})}\n"
+        "    recheck_counts = {decision: sum(r['decision'] == decision for r in rechecks)\n"
+        "                      for decision in sorted({r['decision'] for r in rechecks})} if rechecks else {}\n"
     ) + source[end:]
     def compile_variant(text):
         namespace = {**modelling.__dict__, 'batch_schedule': batch_schedule, 'kernel': kernel}

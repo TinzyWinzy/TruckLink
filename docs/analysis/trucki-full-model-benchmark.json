@@ -18,36 +18,36 @@
   "runs": [
     {
       "vehicles": 72,
-      "json_bytes": 30721,
+      "json_bytes": 33697,
       "median_ms": {
-        "original_python": 1.158,
-        "tuned_python": 1.136,
-        "rust_batch_experiment": 1.167
+        "original_python": 1.371,
+        "tuned_python": 1.347,
+        "rust_batch_experiment": 1.343
       },
-      "rust_vs_tuned_speedup": 0.973,
-      "tuned_vs_original_speedup": 1.019
+      "rust_vs_tuned_speedup": 1.003,
+      "tuned_vs_original_speedup": 1.018
     },
     {
       "vehicles": 300,
-      "json_bytes": 70009,
+      "json_bytes": 79146,
       "median_ms": {
-        "original_python": 2.663,
-        "tuned_python": 2.583,
-        "rust_batch_experiment": 2.649
+        "original_python": 3.661,
+        "tuned_python": 3.401,
+        "rust_batch_experiment": 3.334
       },
-      "rust_vs_tuned_speedup": 0.975,
-      "tuned_vs_original_speedup": 1.031
+      "rust_vs_tuned_speedup": 1.02,
+      "tuned_vs_original_speedup": 1.076
     },
     {
       "vehicles": 5000,
-      "json_bytes": 883614,
+      "json_bytes": 1027935,
       "median_ms": {
-        "original_python": 35.474,
-        "tuned_python": 34.341,
-        "rust_batch_experiment": 35.09
+        "original_python": 53.049,
+        "tuned_python": 51.194,
+        "rust_batch_experiment": 48.478
       },
-      "rust_vs_tuned_speedup": 0.979,
-      "tuned_vs_original_speedup": 1.033
+      "rust_vs_tuned_speedup": 1.056,
+      "tuned_vs_original_speedup": 1.036
     }
   ]
 }

@@ -1,0 +1,14 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "trucki_yard_kernel"
+version = "0.1.0"
+description = "Experimental synthetic yard-capacity kernel. Never evaluates or authorizes release."
+requires-python = ">=3.11"
+# Private experiment; never published.
+classifiers = ["Private :: Do Not Upload"]
+
+[tool.maturin]
+bindings = "pyo3"
